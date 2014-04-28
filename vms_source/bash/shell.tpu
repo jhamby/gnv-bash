@@ -1,0 +1,65 @@
+! File shell.tpu
+!
+! $Id: shell.tpu,v 1.1 2013/05/14 22:05:44 wb8tyw Exp $
+!
+! Copyright 2012, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+! VMS specific patches needed.
+!
+! Add OpenVMS-specific #include for vms_fakefork
+! Add an extern declaration for subshell_level so that subshell_level
+! is in the compilation scope of module shell. We need this because the
+! subsequent modification of the sh_exit function needs to access the
+! state of subshell level in order to determine whether or not the shell
+! process must really exit the process that is running it.
+!
+LOCAL find_range;
+VMS_INSERT_BEFORE('subshell_environment', '#ifdef __VMS');
+COPY_TEXT('extern int subshell_level;');
+SPLIT_LINE;
+COPY_TEXT('extern pid_t last_made_pid;');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+
+!
+! Change the sh_exit function so that, for OpenVMS, it only really exits the
+! shell process when it is not currently executing a subshell. This is the
+! case when subshell_level = 0.
+!
+find_range := SEARCH_QUIETLY(LINE_BEGIN + 'sh_exit (s)', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+    VMS_INSERT_BEFORE('  exit (s);', '#ifdef __VMS');
+    COPY_TEXT('/* For VMS the bash process really exits only when we are not in a subshell. */');
+    SPLIT_LINE;
+    COPY_TEXT('  if (subshell_level > 0)');
+    SPLIT_LINE;
+    COPY_TEXT('     set_pid_status(GetCurrentChildExitPid(), s << 8);');
+    SPLIT_LINE;
+    COPY_TEXT('  else');
+    SPLIT_LINE;
+    COPY_TEXT('     exit (s);');
+    SPLIT_LINE;
+    COPY_TEXT('#else');
+    SPLIT_LINE;
+    POSITION(LINE_BEGIN);
+    MOVE_VERTICAL(1);
+    COPY_TEXT('#endif');
+    SPLIT_LINE;
+ENDIF;

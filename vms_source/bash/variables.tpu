@@ -1,0 +1,170 @@
+! File variables.tpu
+!
+! $Id: variables.tpu,v 1.5 2013/07/11 23:50:06 robertsonericw Exp $
+!
+! Copyright 2012, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+
+! Need a declaration to get the VMS display environmnent variable equivalent
+! Also need the copy_variable() routine.
+VMS_INSERT_BEFORE('TEMPENV_HASH_BUCKETS', '#ifdef __VMS');
+COPY_TEXT('char * get_decw_display(void);');
+SPLIT_LINE;
+COPY_TEXT('#define INCLUDE_UNUSED 1');
+SPLIT_LINE;
+COPY_TEXT('char * sh_get_home_dir (void);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+!
+!routine initialize_shell_variables
+!
+find_range := SEARCH_QUIETLY('initialize_shell_variables', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+! The GNV Bash 1.14.8 was doing a fixup on HOME
+! Tests shows that at least on VMS 8.x this is not needed.
+! If it is an issue, it should be fixed in a wrapper to getpwuid()
+!
+!
+! PATH is starting out defaulting to the current working directory.
+! So when starting up Bash, need to fix it up.
+find_range := SEARCH_QUIETLY('PATH', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+VMS_INSERT_AFTER('#endif', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  temp_var = find_variable ("SHLVL");');
+SPLIT_LINE;
+COPY_TEXT('  if (!temp_var)');
+SPLIT_LINE;
+COPY_TEXT('    {');
+SPLIT_LINE;
+COPY_TEXT('      bind_variable ("PATH", DEFAULT_PATH_VALUE, 0);');
+SPLIT_LINE;
+COPY_TEXT('    }');
+SPLIT_LINE;
+COPY_TEXT('#ifdef __VAX');
+SPLIT_LINE;
+COPY_TEXT('  bind_variable ("HOME", sh_get_home_dir (), 0);');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+
+! The GNV Bash 1.14.8 was making a change to TERM
+! Tests show it is being set correctly on VMS 8.x.
+! So no action.
+
+! The GNV Bash 1.14.8 was setting a number of COE variables.
+! Most of these are not found on a Linux system and if needed should be
+! set through a site wide initialization file.
+! Need to set LOGNAME, and DISPLAY though.
+VMS_INSERT_AFTER('initialize_dynamic_variables','#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  name = get_decw_display();');
+SPLIT_LINE;
+COPY_TEXT('  temp_var = set_if_not ("DISPLAY", name);');
+SPLIT_LINE;
+COPY_TEXT('  set_auto_export(temp_var);');
+SPLIT_LINE;
+COPY_TEXT('  temp_var = set_if_not ("LOGNAME", current_user.user_name);');
+SPLIT_LINE;
+COPY_TEXT('  set_auto_export(temp_var);');
+SPLIT_LINE;
+COPY_TEXT('  temp_var = find_variable("SHELL");');
+SPLIT_LINE;
+COPY_TEXT('  if (temp_var)');
+SPLIT_LINE;
+COPY_TEXT('      set_auto_export(temp_var);');
+SPLIT_LINE;
+COPY_TEXT('  temp_var = find_variable("HOME");');
+SPLIT_LINE;
+COPY_TEXT('  if (temp_var)');
+SPLIT_LINE;
+COPY_TEXT('      set_auto_export(temp_var);');
+SPLIT_LINE;
+COPY_TEXT('  temp_var = find_variable("HOSTNAME");');
+SPLIT_LINE;
+COPY_TEXT('  if (temp_var)');
+SPLIT_LINE;
+COPY_TEXT('      set_auto_export(temp_var);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+!
+!  print_var_list
+!
+find_range := SEARCH_QUIETLY('print_var_list', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+!
+! Bash 1.14.8 has a QUIT statement here.
+VMS_INSERT_BEFORE('printf','#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      QUIT;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+! Add new function for restoring Bash "special" shell variables. The "special"
+! shell variable POSIXLY_CORRECT is explicitly excluded from this blanket restore
+! operation because its semantics are distinct from all of the other "special"
+! shell variables in the sense that it is only intended to be interpreted during
+! shell startup initialization or when explicitly set. It is also distinct in the
+! sense that setting or unsetting it affects multiple global variables instead of
+! just one associated global variable. This function is used only in vms_fakefork.c
+! to restore global variable values associated with "special" shell environment
+! variables. 
+!
+POSITION(END_OF(CURRENT_BUFFER));
+SPLIT_LINE;
+COPY_TEXT('#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('/* Define the function for restoring all of the Bash */');
+SPLIT_LINE;
+COPY_TEXT('/* special shell variables. */');
+SPLIT_LINE;
+COPY_TEXT('void vms_restore_special_vars(void)');
+SPLIT_LINE;
+COPY_TEXT('{');
+SPLIT_LINE;
+COPY_TEXT('unsigned long ul_index;');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('for (ul_index = 0; (ul_index < N_SPECIAL_VARS); ul_index++)');
+SPLIT_LINE;
+COPY_TEXT('   {');
+SPLIT_LINE;
+COPY_TEXT('   if (strcmp(special_vars[ul_index].name, "POSIXLY_CORRECT"))');
+SPLIT_LINE;
+COPY_TEXT('      (*special_vars[ul_index].function)(special_vars[ul_index].name);');
+SPLIT_LINE;
+COPY_TEXT('   }');
+SPLIT_LINE;
+COPY_TEXT('}');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');

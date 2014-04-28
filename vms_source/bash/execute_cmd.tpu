@@ -1,0 +1,1371 @@
+! File execute_cmd.tpu
+!
+! $Id: execute_cmd.tpu,v 1.6 2013/07/11 23:47:02 robertsonericw Exp $
+!
+! Copyright 2012, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+! VMS specific patches needed.
+!
+!
+! VAX needs an ODS-2 legal file
+!-------------------------------
+VMS_INSERT_BEFORE('#include <y.tab.h>', '#ifndef __VMS');
+VMS_INSERT_AFTER('#include <y.tab.h>', '#else');
+SPLIT_LINE;
+COPY_TEXT('#ifdef __VAX');
+SPLIT_LINE;
+COPY_TEXT('#include <y_tab.h>');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+COPY_TEXT('#include <y.tab.h>');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+
+!
+! Need VMS specific header for env save/restore routines.
+!--------------------------------
+VMS_INSERT_BEFORE('#include "execute_cmd.h"', '#ifdef __VMS');
+COPY_TEXT('/* Set flag for vms_fakefork.h (included by execute_cmd.h) */');
+SPLIT_LINE;
+COPY_TEXT('/* to make special routines visible */');
+SPLIT_LINE;
+COPY_TEXT('#ifndef MOD_EXECUTE_CMD');
+SPLIT_LINE;
+COPY_TEXT('#define MOD_EXECUTE_CMD 1');
+SPLIT_LINE;
+COPY_TEXT('#endif /* MOD_EXECUTE_CMD */');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+VMS_INSERT_BEFORE('extern int dollar_dollar_pid', '#ifdef __VMS');
+COPY_TEXT('/* VMS bug, ferror(closed_file) access violates */');
+SPLIT_LINE;
+COPY_TEXT('#ifdef ferror');
+SPLIT_LINE;
+COPY_TEXT('#undef ferror');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+COPY_TEXT('#define ferror(__x)  (*__x ? ferror(__x) : 0)');
+SPLIT_LINE;
+COPY_TEXT('/* VMS does not fork, so do not exit */');
+SPLIT_LINE;
+COPY_TEXT('#define exit(foo) vms_fake_child_status = vms_fake_fork_exit(foo)');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('/* Need special handling of wait_for for fake child pids */');
+SPLIT_LINE;
+COPY_TEXT('#define wait_for(child_pid) vms_fake_wait_for(child_pid)');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('/* From shell.c, status of shell startup state */');
+SPLIT_LINE;
+COPY_TEXT('int startup_state;');
+SPLIT_LINE;
+COPY_TEXT('/* Found in the GNV Bash 1.14.8 port of bash */');
+SPLIT_LINE;
+! subshell_skip_commands set by builtins/exit.def
+COPY_TEXT('int subshell_skip_commands = 0;');
+SPLIT_LINE;
+COPY_TEXT('int subshell_exit_value = 0;');
+SPLIT_LINE;
+COPY_TEXT('int subshell_exit_builtin = 0;');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('int vms_fifo_write_pipe(int * pipe_fd);');
+SPLIT_LINE;
+COPY_TEXT('#define pipe(__fds) vms_fifo_write_pipe(__fds)');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+SPLIT_LINE;
+
+!
+!
+!routine execute_command
+!
+!
+!routine execute_command_internal
+!
+find_range := SEARCH_QUIETLY('DESCRIBE_PID(pid)', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+!
+!
+! This is from the GNV Bash 1.14.8 port
+! Above replaces useless code.
+VMS_INSERT_BEFORE('#if 0', '#ifdef __VMS');
+!COPY_TEXT('  fprintf(stderr, "*DEBUG* execute_command_internal\n\n");');
+!SPLIT_LINE;
+COPY_TEXT('  if (subshell_skip_commands)');
+SPLIT_LINE;
+COPY_TEXT('    return (EXECUTION_SUCCESS);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+! Bugfix, savestring is a macro, so do not pass it a function
+VMS_INSERT_BEFORE('pid_t paren_pid','      char *cmd_str;');
+VMS_INSERT_AFTER('pid_t paren_pid', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      VMS_BASH_ENVIRON * old_envbuf = NULL;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+! Need VMS specific variables to save status
+! GNV Bash 1.14.8 location, moved to execute_in_subshell
+
+! Need to save the environment before the fake fork()
+VMS_INSERT_BEFORE('/* Fork a subshell', '#ifdef __VMS');
+COPY_TEXT('      old_envbuf = vms_save_bash_environ (VMS_SAVE_SUBSHELL);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+SPLIT_LINE;
+
+! Bugfix, savestring continuing.
+! Todo: Fix Macro, not here.
+VMS_INSERT_BEFORE('savestring (',
+'      cmd_str = make_command_string (command);');
+VMS_REPLACE('make_command_string (command)', 'cmd_str');
+!
+!
+! VMS patch - Execute child, section, add braces for a block.
+VMS_INSERT_BEFORE('if (paren_pid == 0)', '#ifndef __VMS');
+! for 1.14.8 port:
+! save the old_trap_list and signal modes
+! cancel the exit trap
+! for 4.2, probably do this in execute_in_subshell()
+
+VMS_INSERT_BEFORE('exit (', '#endif /* __VMS */');
+!COPY_TEXT(
+!' fprintf(stderr, "*DEBUG* exec*_com*_int* ret from exec*_in_subshell\n\n");');
+!SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('        {');
+SPLIT_LINE;
+
+
+!
+! Close the braces, Then execute the parent cleanup by always executing
+! the else clause.
+VMS_INSERT_BEFORE('else', '        }');
+!COPY_TEXT(
+!   '  fprintf(stderr, "*DEBUG* execute_command_internal - parent side\n");');
+!SPLIT_LINE;
+COPY_TEXT('#ifndef __VMS');
+SPLIT_LINE;
+VMS_INSERT_BEFORE('{', '#endif /* __VMS */');
+VMS_INSERT_AFTER('{', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('	  vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+!
+! before the '    }' before #if defined (COMMAND_TIMING)
+! VMS needs to return (EXECUTION_SUCCESS) according to 1.14.8
+find_range := SEARCH_QUIETLY('DESCRIBE_PID (paren_pid)', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+find_range := SEARCH_QUIETLY('return (EXECUTION_SUCCESS);', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+    find_range := SEARCH_QUIETLY('}', FORWARD, EXACT);
+    IF find_range <> 0
+    THEN
+        POSITION(END_OF(find_range));
+	MOVE_HORIZONTAL(1);
+        find_range := SEARCH_QUIETLY('}', FORWARD, EXACT);
+        IF find_range <> 0
+        THEN
+            POSITION(END_OF(find_range));
+        ENDIF;
+    ENDIF;
+    VMS_INSERT_BEFORE('}', '#ifdef __VMS');
+    COPY_TEXT('         return (EXECUTION_SUCCESS);');
+    SPLIT_LINE;
+    COPY_TEXT('#endif /* __VMS */');
+    SPLIT_LINE;
+ENDIF;
+!
+!
+!
+! For case cm_simple: Bash 1.14.8 is saving a fake child status of -1
+! before actually executing the command.  Assume that this is needed.
+VMS_INSERT_BEFORE("/* We can't rely", '#ifdef __VMS');
+!COPY_TEXT(
+!'  fprintf(stderr, "*DEBUG* execute_command_internal cm_simple:\n\n");');
+!SPLIT_LINE;
+COPY_TEXT('	vms_fake_child_status = -1;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! execute_in_subshell
+!
+find_range := SEARCH_QUIETLY('execute_in_subshell', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+!
+! Need VMS specific variables to save status
+VMS_INSERT_AFTER('volatile COMMAND', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  COMMAND * old_command;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! Need to save the environment from before the fake fork()
+! GNV Bash 1.14.8 saves the old trap list and signals modes.
+VMS_INSERT_BEFORE('subshell_level++', '#ifdef __VMS');
+!COPY_TEXT('  fprintf(stderr, "*DEBUG* execute_in_subshell\n\n");');
+!SPLIT_LINE;
+COPY_TEXT('  old_command = command;');
+SPLIT_LINE;
+COPY_TEXT('  command = copy_command (old_command);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! We did not fake fork() in this routine, so must not fake exit()
+! As parent routine does a fake exit() sometimes on return.
+VMS_INSERT_BEFORE('exit (invert', '       {');
+SPLIT_LINE;
+COPY_TEXT('#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('	return (invert ? EXECUTION_SUCCESS : EXECUTION_FAILURE);');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+VMS_INSERT_AFTER('exit (invert', '       }');
+SPLIT_LINE;
+
+find_range := SEARCH_QUIETLY('setjmp (return_catch)', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+! From GNV Bash 1.14.8 code to handle unwinding the frame has been added for VMS
+!VMS_INSERT_BEFORE("/* If we're going to exit", '#ifdef __VMS');
+!COPY_TEXT('  begin_unwind_frame ("subshell-execute-command");');
+!SPLIT_LINE;
+!COPY_TEXT('  unwind_protect_int (subshell_exit_value);');
+!SPLIT_LINE;
+!COPY_TEXT('  unwind_protect_int (subshell_exit_builtin);');
+!SPLIT_LINE;
+!COPY_TEXT('  unwind_protect_int (subshell_skip_commands);');
+!SPLIT_LINE;
+!SPLIT_LINE;
+!COPY_TEXT('  subshell_exit_value = 0;');
+!SPLIT_LINE;
+!COPY_TEXT('  subshell_exit_builtin = 1;');
+!SPLIT_LINE;
+!COPY_TEXT('  subshell_skip_commands = 0;');
+!SPLIT_LINE;
+!COPY_TEXT('#endif /* __VMS */');
+!SPLIT_LINE;
+! exit code needs to be handled.
+!
+! From GNV Bash 1.14.8 fix up return code and run_unwind_frame
+VMS_INSERT_BEFORE('/* If we were explicitly placed in', '#ifdef __VMS');
+!COPY_TEXT(
+!'  fprintf(stderr, "*DEBUG* exe*_in_subshell exe*_com*_int* return\n\n");');
+!SPLIT_LINE;
+COPY_TEXT('  if (subshell_skip_commands)');
+SPLIT_LINE;
+COPY_TEXT('    {');
+SPLIT_LINE;
+COPY_TEXT('      return_code = subshell_exit_value;');
+SPLIT_LINE;
+COPY_TEXT('      last_command_exit_value = return_code;');
+SPLIT_LINE;
+COPY_TEXT('    }');
+!SPLIT_LINE;
+!COPY_TEXT('  run_unwind_frame ("subshell-execute-command");');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+SPLIT_LINE;
+
+! Need to set the wait status according to GNV Bash 1.14.8
+VMS_INSERT_BEFORE('return (return_code)', '#ifdef __VMS');
+!COPY_TEXT('      debug_var_context_table(shell_variables);');
+!SPLIT_LINE;
+!COPY_TEXT('      debug_var_context_table(global_variables);');
+!SPLIT_LINE;
+!COPY_TEXT('      debug_var_context_table(old_envbuf->shell_variables);');
+!SPLIT_LINE;
+!COPY_TEXT('      debug_var_context_table(old_envbuf->global_variables);');
+SPLIT_LINE;
+COPY_TEXT('  vms_fake_child_status = return_code << 8;');
+SPLIT_LINE;
+COPY_TEXT('  /* restore signal */');
+SPLIT_LINE;
+COPY_TEXT('  restore_default_signal (0);');
+SPLIT_LINE;
+COPY_TEXT('  /* restore arg list */');
+SPLIT_LINE;
+COPY_TEXT('  dispose_command (command);');
+SPLIT_LINE;
+COPY_TEXT('  command = old_command;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+! The coproc stuff is not currently being compiled and has a make_child in it.
+! Put the changes in for later testing.
+! execute_coproc
+find_range := SEARCH_QUIETLY('execute_coproc', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+!
+! May need VMS specific variables to save status
+VMS_INSERT_AFTER('char *tcmd', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  VMS_BASH_ENVIRON * old_envbuf = NULL;');
+SPLIT_LINE;
+!COPY_TEXT(
+!'  fprintf(stderr, "*DEBUG* exe*_in_subshell exe*_com*_int* return\n\n");');
+!SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! Make sure that we run the child side, then parent side.
+VMS_INSERT_BEFORE('coproc_pid = make_child (', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  old_envbuf = vms_save_bash_environ (VMS_SAVE_SUBSHELL);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+VMS_INSERT_BEFORE('if (coproc_pid == 0)', '#ifndef __VMS');
+VMS_INSERT_AFTER('if (coproc_pid == 0)', '#endif /* !__VMS */');
+
+VMS_INSERT_BEFORE('close (rpipe[1])', '#ifdef __VMS');
+COPY_TEXT('  /* restore fd, jmp_buf, current directory, */');
+SPLIT_LINE;
+COPY_TEXT('  /* global variables */');
+SPLIT_LINE;
+COPY_TEXT('  vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! execute_pipeline
+find_range := SEARCH_QUIETLY('execute_pipeline', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+!
+! In GNV Bash 1.14.8, this code was skipped for VMS
+VMS_INSERT_BEFORE('fd_bitmap->bitmap[', '#ifndef __VMS');
+VMS_INSERT_AFTER('fd_bitmap->bitmap[', '#endif /* __VMS */');
+
+!
+! Bug fix, missing check for not having job_control
+! This bug was almost fixed by Patch-ID: Bash42-018
+! but it missed, and left an uninitialize variable.
+! So now we compensate for the bad patch until this gets fixed.
+find_range := SEARCH_QUIETLY('Now execute the rightmost', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+VMS_INSERT_BEFORE('#if defined (JOB_CONTROL)','  lastpipe_flag = 0;');
+
+! Keep old searches from replaces that are not needed in place as all
+! searches are relative to each other.
+find_range := SEARCH_QUIETLY('lastpipe_opt && job_control', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+
+! execute_connection
+
+!
+! In execute_for_command, bash 1.14.8 has an if (subshell_skip_commands) break;
+! just before if (breaking)
+VMS_INSERT_BEFORE('if (breaking)', '#ifdef __VMS');
+COPY_TEXT('       if (subshell_skip_commands)');
+SPLIT_LINE;
+COPY_TEXT('         break;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+! Execute_select_command
+find_range := SEARCH_QUIETLY('execute_select_command', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+!
+! In execute_select_command, bash 1.14.8 has an if (subshell_skip_commands)
+! break;
+! just before if (breaking).
+VMS_INSERT_BEFORE('if (breaking)', '#ifdef __VMS');
+COPY_TEXT('      if (subshell_skip_commands)');
+SPLIT_LINE;
+COPY_TEXT('        break;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+!execute_case_command
+
+!execute_while_command
+
+!execute_until_command
+
+find_range := SEARCH_QUIETLY('execute_while_or_until', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+! In execute_while_or_until, bash 1.14.8 has an if (subshell_skip_commands)
+! break;
+! just before if (type == CMD_WHILE
+VMS_INSERT_BEFORE('if (type == CMD_WHILE &&', '#ifdef __VMS');
+COPY_TEXT('      if (subshell_skip_commands)');
+SPLIT_LINE;
+COPY_TEXT('        break;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! And just after the second QUIT
+find_range := SEARCH_QUIETLY('QUIT', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+find_range := SEARCH_QUIETLY('QUIT', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+VMS_INSERT_BEFORE('if (breaking)', '#ifdef __VMS');
+COPY_TEXT('      if (subshell_skip_commands)');
+SPLIT_LINE;
+COPY_TEXT('        break;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+!
+! execute_if_command
+!
+find_range := SEARCH_QUIETLY('execute_if_command', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+!
+! In execute_if_command, bash 1.14.8 has an if (subshell_skip_commands)
+! RETURN (EXECUTION_SUCCESS);
+! just before if (return_value == EXECUTION_SUCCESS).
+VMS_INSERT_BEFORE('if (return_value == EXECUTION_SUCCESS)', '#ifdef __VMS');
+COPY_TEXT('  if (subshell_skip_commands)');
+SPLIT_LINE;
+COPY_TEXT('    return (EXECUTION_SUCCESS);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+!execute_arith_command
+!execute_cond_node
+!execute_cond_command
+
+!execute_null_command
+find_range := SEARCH_QUIETLY('execute_null_command', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+! May need VMS specific variables to save status
+VMS_INSERT_AFTER('REDIRECT *rd', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  VMS_BASH_ENVIRON * old_envbuf = NULL;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+VMS_INSERT_BEFORE('if (make_child (', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      old_envbuf = vms_save_bash_environ (VMS_SAVE_NORMAL);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+VMS_INSERT_AFTER('if (make_child ', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('        {}');
+SPLIT_LINE;
+!COPY_TEXT(
+!'  fprintf(stderr, "*DEBUG* exe*_null_command after make_child\n\n");');
+!SPLIT_LINE;
+COPY_TEXT('        if (1)');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+VMS_INSERT_BEFORE('restore_original_signals ()','#ifndef __VMS');
+VMS_INSERT_AFTER('restore_original_signals ()','#endif /*__VMS */');
+
+! VMS does not exit here, a macro has nullified the exit, so now we
+! do the parent cleanup and return;
+! since HAVE_DEV_FD is undef on VMS, do not need to unlink_fifo_list.
+VMS_INSERT_BEFORE('}','#ifdef __VMS');
+
+VMS_INSERT_BEFORE('close (rpipe[1])', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('	  /* restore fd, jmp_buf, current directory, */');
+SPLIT_LINE;
+COPY_TEXT('	  /* global variables */');
+SPLIT_LINE;
+COPY_TEXT('	  vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('	  close_pipes (pipe_in, pipe_out);');
+SPLIT_LINE;
+COPY_TEXT('#if defined (PROCESS_SUBSTITUTION) && defined (HAVE_DEV_FD)');
+SPLIT_LINE;
+COPY_TEXT('	  unlink_fifo_list ();');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+COPY_TEXT('	  return (EXECUTION_SUCCESS);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+!
+! execute_simple_command
+find_range := SEARCH_QUIETLY('execute_simple_command', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+VMS_INSERT_AFTER('volatile int old_builtin', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  VMS_BASH_ENVIRON * old_envbuf = NULL;');
+SPLIT_LINE;
+COPY_TEXT('  int parent_pipe_in = pipe_in;');
+SPLIT_LINE;
+COPY_TEXT('  int parent_pipe_out = pipe_out;');
+SPLIT_LINE;
+COPY_TEXT('  int vms_env_saved = 0;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! GNV Bash 1.14.8 is doing some stuff with command_line and the_printed_command
+! At this time, I can not see that it does anything useful, so not doing
+! it here.
+
+VMS_INSERT_AFTER('maybe_make_export_env ()', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      old_envbuf = vms_save_bash_environ (VMS_SAVE_SUBSHELL);');
+SPLIT_LINE;
+COPY_TEXT('      vms_env_saved = 1;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! In execute_simple_command, bash 1.14.8 make_child always returns as a parent
+! and we need to execute both the parent and child sides.
+! So add a dummy {} block for VMS only.
+find_range := SEARCH_QUIETLY('if (make_child (savestring (', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+    VMS_INSERT_BEFORE('{', '#ifdef __VMS');
+    COPY_TEXT('        {}');
+    SPLIT_LINE;
+!COPY_TEXT(
+!'  fprintf(stderr, "*DEBUG* exe*_simple_command after make_child\n\n");');
+!SPLIT_LINE;
+    COPY_TEXT('        if (1)');
+    SPLIT_LINE;
+    COPY_TEXT('#endif /* __VMS */');
+    SPLIT_LINE;
+ENDIF;
+!
+! Mark the else (parent) portion of the "if (make_child(...) == 0)" with a label
+! so that when the fake child completes, OpenVMS can target a goto statement here
+! to return and complete the execution of the parent code.
+!
+POSITION(END_OF(SEARCH_QUIETLY('else', FORWARD, EXACT)));
+VMS_INSERT_AFTER('{', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('vms_parent_exit:');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! After returning from execute_null_command, if we are a child,
+! then after calling exit() , restore the environment and execute
+! the code that the parent would have executed after the earlier
+! call to make_child. Otherwise, continue as parent with no fork.
+VMS_INSERT_AFTER('if (already_forked)', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('	{');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+VMS_INSERT_AFTER('exit (result);', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('         vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('         pipe_in = parent_pipe_in;');
+SPLIT_LINE;
+COPY_TEXT('         pipe_out = parent_pipe_out;');
+SPLIT_LINE;
+COPY_TEXT('         goto vms_parent_exit;');
+SPLIT_LINE;
+COPY_TEXT('	}');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! Need to make sure that the environment is restored before taking an
+! error long jump.
+VMS_INSERT_BEFORE('last_command_exit_value =', '#ifdef __VMS');
+COPY_TEXT('    if (vms_env_saved)');
+SPLIT_LINE;
+COPY_TEXT('      {');
+SPLIT_LINE;
+COPY_TEXT('	if (already_forked)');
+SPLIT_LINE;
+COPY_TEXT('	  {');
+SPLIT_LINE;
+COPY_TEXT('	    vms_fake_fork_exit(EXECUTION_FAILURE);');
+SPLIT_LINE;
+COPY_TEXT('	  }');
+SPLIT_LINE;
+COPY_TEXT('	vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+! Because of the longjump, we do not need to clear the flag.
+!COPY_TEXT('	vms_env_saved = 0;');
+!SPLIT_LINE;
+COPY_TEXT('      }');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+! GNV Bash 1.14.8 does a special expand_words_for_internal_comand()
+! before execute_subshell_builtin_or_function()
+! As near as I can tell, this code is not normally used, and there
+! are other ways to do what it was inserted for with out changing bash.
+
+!
+! GNV Bash 1.14.8 had in incomplete and incorrect sequence of code
+! here for restoring parent context and executing parent code. It
+! has been replaced with what you see below.
+!------------------------------------------------------------------
+VMS_INSERT_AFTER('subshell_level--;','#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('           vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('           pipe_in = parent_pipe_in;');
+SPLIT_LINE;
+COPY_TEXT('           pipe_out = parent_pipe_out;');
+SPLIT_LINE;
+COPY_TEXT('           goto vms_parent_exit;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+
+! GNV Bash 1.14.8 does a special expand_words_for_internal_comand()
+! before execute_builtin_or_function()
+! As near as I can tell, this code is not normally used, and there
+! are other ways to do what it was inserted for with out changing bash.
+
+
+!
+! GNV Bash 1.14.8 closes the pipes later there is no child at this point.
+! Now we close them after the command is executed and restore the environment
+! so that we can save the result.
+!------------------------------------------------------------------
+!VMS_INSERT_BEFORE('if (builtin)','#ifdef __VMS');
+!COPY_TEXT('	  close_pipes (pipe_in, pipe_out);');
+!SPLIT_LINE;
+!COPY_TEXT('	  if (vms_env_saved)');
+!SPLIT_LINE;
+!COPY_TEXT('	    {');
+!SPLIT_LINE;
+!COPY_TEXT('	      vms_restore_bash_environ (old_envbuf);');
+!SPLIT_LINE;
+! clear the flag to prevent a double environment restore.
+!COPY_TEXT('	      vms_env_saved = 0;');
+!SPLIT_LINE;
+!COPY_TEXT('	    }');
+!SPLIT_LINE;
+!SPLIT_LINE;
+!COPY_TEXT('#endif /* __VMS */');
+!SPLIT_LINE;
+
+! GNV Bash 1.14.8 overwrites the value of result after execute_disk_command
+! if (startup_state == 2) because execute_disk_command did not return a status.
+! More fun, startup_state is an global variable set in shell.c, but not set
+! in a header file.
+! Since now execute_disk_command does return a value, skip this change.
+
+
+! Before we return, we have to make absolute certain that the enironment
+! has been restored.
+VMS_INSERT_BEFORE('return (result)', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  if (vms_env_saved)');
+SPLIT_LINE;
+COPY_TEXT('    {');
+SPLIT_LINE;
+! Because of the return, we do not need to clear the flag.
+!COPY_TEXT('      vms_env_saved = 0;');
+!SPLIT_LINE;
+COPY_TEXT('	if (already_forked)');
+SPLIT_LINE;
+COPY_TEXT('	  {');
+SPLIT_LINE;
+COPY_TEXT('	    vms_fake_fork_exit(result);');
+SPLIT_LINE;
+COPY_TEXT('	  }');
+SPLIT_LINE;
+COPY_TEXT('      vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('    }');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+!execute_builtin routine hacks here.
+find_range := SEARCH_QUIETLY('executing_builtin++', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+
+! GNV Bash 1.14.8 has special handling for the exit_builtin.
+
+VMS_INSERT_AFTER('result = ((*builtin', '#ifdef __VMS');
+COPY_TEXT('  /* check subshell return */');
+SPLIT_LINE;
+COPY_TEXT('  if (builtin == exit_builtin && result == EXECUTION_SUCCESS)');
+SPLIT_LINE;
+COPY_TEXT('    result = last_command_exit_value;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+!execute_function
+!execute_shell_function
+
+! execute_subshell_builtin_or_function needs to be changed to return
+! status instead of doing a fake exit, otherwise we risk losing the
+! fake child status.  Can not fake exit because we did not fake fork here()
+
+!execute_subshell_builtin_or_function hacks here.
+find_range := SEARCH_QUIETLY('Execute a shell builtin or', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+
+! GNV Bash 1.14.8 has VMS save the environment as soon as it enters this
+! routine.
+
+! Then handle the fake exit()
+VMS_INSERT_AFTER('if (do_redirections', '   {');
+SPLIT_LINE;
+COPY_TEXT('#ifndef __VMS');
+SPLIT_LINE;
+VMS_INSERT_AFTER('exit (EXECUTION_FAILURE)', '#else /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('    vms_fake_fork_exit1(EXECUTION_FAILURE);');
+SPLIT_LINE;
+COPY_TEXT('    return;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('   }');
+SPLIT_LINE;
+
+! Fix the other exits() here.
+
+VMS_INSERT_BEFORE('exit (last_command_exit_value', '	{');
+SPLIT_LINE;
+COPY_TEXT('#ifndef __VMS');
+SPLIT_LINE;
+VMS_INSERT_AFTER('exit (last_command_exit_value', '#else /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('	vms_fake_fork_exit1(last_command_exit_value);');
+SPLIT_LINE;
+COPY_TEXT('	return;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('   }');
+SPLIT_LINE;
+
+VMS_INSERT_BEFORE('exit (EXECUTION_FAILURE', '	{');
+SPLIT_LINE;
+COPY_TEXT('#ifndef __VMS');
+SPLIT_LINE;
+VMS_INSERT_AFTER('exit (EXECUTION_FAILURE)', '#else /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('	vms_fake_fork_exit1(EXECUTION_FAILURE);');
+SPLIT_LINE;
+COPY_TEXT('	return;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('   }');
+SPLIT_LINE;
+
+VMS_INSERT_BEFORE('exit (return_catch_value', '	{');
+SPLIT_LINE;
+COPY_TEXT('#ifndef __VMS');
+SPLIT_LINE;
+VMS_INSERT_AFTER('exit (return_catch_value)', '#else /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('	vms_fake_fork_exit1(return_catch_value);');
+SPLIT_LINE;
+COPY_TEXT('	return;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('   }');
+SPLIT_LINE;
+
+VMS_INSERT_BEFORE('exit (r);', '	{');
+SPLIT_LINE;
+COPY_TEXT('#ifndef __VMS');
+SPLIT_LINE;
+VMS_INSERT_AFTER('exit (r)', '#else /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('	  vms_fake_fork_exit1(r);');
+SPLIT_LINE;
+COPY_TEXT('	  return;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('   }');
+SPLIT_LINE;
+
+VMS_INSERT_BEFORE('exit (r);', '	{');
+SPLIT_LINE;
+COPY_TEXT('#ifndef __VMS');
+SPLIT_LINE;
+VMS_INSERT_AFTER('exit (r)', '#else /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('      vms_fake_fork_exit1(r);');
+SPLIT_LINE;
+COPY_TEXT('      return;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('   }');
+SPLIT_LINE;
+
+
+!execute_builtin_or_function
+!
+!execute_disk_command
+!
+! In execute_disk_command() when startup_state == 2, replace the returned value
+! with vms_fake_child_status.
+find_range := SEARCH_QUIETLY('execute a simple command', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+VMS_INSERT_AFTER('WORD_LIST *wl;', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  int vms_child_status;');
+SPLIT_LINE;
+COPY_TEXT('  int vms_command_not_found = 0;');
+SPLIT_LINE;
+COPY_TEXT('  VMS_BASH_ENVIRON * old_envbuf = NULL;');
+SPLIT_LINE;
+COPY_TEXT('  int vms_env_saved = 0;');
+SPLIT_LINE;
+!COPY_TEXT('  fprintf(stderr, "*DEBUG* exe*_disk_command\n\n");');
+!SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+
+
+! After if (nofork, set PID to "1" special VMS pid  on VMS.
+VMS_INSERT_BEFORE('pid = 0', '   {');
+COPY_TEXT('#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('    pid = VMS_SPECIAL_PID;');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('pid = 0', '#endif /* __VMS */');
+SPLIT_LINE;
+COPY_TEXT('   }');
+SPLIT_LINE;
+
+VMS_INSERT_AFTER('else', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('    {');
+SPLIT_LINE;
+COPY_TEXT('    old_envbuf = vms_save_bash_environ (VMS_SAVE_NORMAL);');
+SPLIT_LINE;
+COPY_TEXT('    vms_env_saved = 1;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+VMS_INSERT_AFTER('pid = make_child', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('    }');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+! Found another make_child() call, fake it so that the child path
+! is always taken.
+VMS_INSERT_BEFORE('if (pid == 0)', '#ifndef __VMS');
+VMS_INSERT_AFTER('if (pid == 0)', '#endif /* !__VMS */');
+
+! From the GNV Bash 1.14.8, save subshell environment
+VMS_INSERT_AFTER('int old_interactive', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      int vms_old_subshell_environment = subshell_environment;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! From the GNV Bash 1.14.8 port, the trap canceling and setup_async_signals are
+! skipped. With the 4.2.x port, this code needs to be present to permit minimal
+! support for asynchronous commands in shells built without job control. So, its
+! no longer ifdef'd out as it was in the 1.14.8 port.
+!VMS_INSERT_BEFORE('reset_terminating_signals', '#ifndef __VMS');
+!VMS_INSERT_BEFORE('/* This functionality is now', '#endif /* !__VMS */');
+
+VMS_INSERT_AFTER('exit (EXECUTION_FAILURE', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('	  if (vms_env_saved)');
+SPLIT_LINE;
+COPY_TEXT('	    {');
+SPLIT_LINE;
+COPY_TEXT('	      vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('	      vms_env_saved = 0;');
+SPLIT_LINE;
+COPY_TEXT('	    }');
+SPLIT_LINE;
+COPY_TEXT('	  vms_command_not_found = 1;');
+SPLIT_LINE;
+COPY_TEXT('	  goto vms_exec_return;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! And here is where the DCL fallback use to be in GNV Bash 1.14.8
+! It is not going back in here because it badly breaks just about all
+! shell scripts.
+
+VMS_INSERT_BEFORE('exit (EX_NOTFOUND)', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('	      if (vms_env_saved)');
+SPLIT_LINE;
+COPY_TEXT('	        {');
+SPLIT_LINE;
+COPY_TEXT('	          exit(EX_NOTFOUND);');
+SPLIT_LINE;
+COPY_TEXT('	          vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('	          vms_env_saved = 0;');
+SPLIT_LINE;
+COPY_TEXT('	        } else { ');
+SPLIT_LINE;
+COPY_TEXT('	          vms_fake_fork_exit1(EX_NOTFOUND);');
+SPLIT_LINE;
+COPY_TEXT('	        }');
+SPLIT_LINE;
+COPY_TEXT('	      vms_command_not_found = 1;');
+SPLIT_LINE;
+COPY_TEXT('	      goto vms_exec_return;');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+
+! Shell function hook:
+VMS_INSERT_AFTER('exit (execute_shell_function', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('	  if (vms_env_saved)');
+SPLIT_LINE;
+COPY_TEXT('	    {');
+SPLIT_LINE;
+COPY_TEXT('	      vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('	      vms_env_saved = 0;');
+SPLIT_LINE;
+COPY_TEXT('	    }');
+SPLIT_LINE;
+COPY_TEXT('	  vms_command_not_found = 1;');
+SPLIT_LINE;
+COPY_TEXT('	  goto vms_exec_return;');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+
+! Just before the exit, we need to call vms_shell_execve instead of
+! shell_execve.  We apparently need the additional async parameter.
+! old sequence:
+! * call vms_shell_execve()
+! * dispose_word_array (args)  - Done internal to vms_shell_execve?
+! * vmsutil_restore_std_fds()
+! * if pid == special VMS pid, then free (command) return - Not needed!
+! * Otherwise, goto parent_return that does a free (command) return.
+! * Note that the args[] array is dynamically allocated so must be
+!   freed before exit.
+! The contents of the args[] array should not be freed.
+VMS_INSERT_BEFORE('exit (shell_execve', '#ifdef __VMS');
+SPLIT_LINE;
+!COPY_TEXT('    debug_stdfd();');
+!SPLIT_LINE;
+COPY_TEXT('      vms_child_status = ');
+SPLIT_LINE;
+COPY_TEXT('        vms_shell_execve(command, args, export_env,');
+SPLIT_LINE;
+COPY_TEXT('                         words, async, NULL);');
+SPLIT_LINE;
+COPY_TEXT('      free(args);');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('vms_exec_return:');
+SPLIT_LINE;
+COPY_TEXT('      /* Fake a child exit if the command was actually found */');
+SPLIT_LINE;
+COPY_TEXT('      if (vms_command_not_found == 0)');
+SPLIT_LINE;
+COPY_TEXT('        {');
+SPLIT_LINE;
+COPY_TEXT('          if (pid != VMS_SPECIAL_PID)');
+SPLIT_LINE;
+COPY_TEXT('              exit(vms_child_status); /* Fake exit */');
+SPLIT_LINE;
+COPY_TEXT('          else');
+SPLIT_LINE;
+COPY_TEXT('              vms_fake_fork_exit1(vms_child_status);');
+COPY_TEXT('        }');
+SPLIT_LINE;
+COPY_TEXT('      if (vms_env_saved)');
+SPLIT_LINE;
+COPY_TEXT('        {');
+SPLIT_LINE;
+COPY_TEXT('          vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('          vms_env_saved = 0;');
+SPLIT_LINE;
+COPY_TEXT('        }');
+SPLIT_LINE;
+COPY_TEXT('      if (pid == VMS_SPECIAL_PID)');
+SPLIT_LINE;
+COPY_TEXT('	     goto vms_disk_command_nofork;');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('      /* restore_parent_environment */');
+SPLIT_LINE;
+COPY_TEXT('      subshell_environment = vms_old_subshell_environment;');
+SPLIT_LINE;
+COPY_TEXT('      goto parent_return;');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('exit (shell_execve', '#endif /* __VMS */');
+
+!
+! On VMS, also run the parent side
+VMS_INSERT_BEFORE('  else', '#ifndef __VMS');
+
+VMS_INSERT_AFTER('  else', '#endif /* !__VMS */');
+!
+! From GNV Bash 1.14.8 port, special cleanup for when forking not done
+VMS_INSERT_BEFORE('FREE (command)', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('vms_disk_command_nofork:');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+!
+! In STRINGCHAR macro, need to accept \r just like MSDOS
+find_range := SEARCH_QUIETLY('#if !defined (MSDOS)', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+COPY_TEXT(') && !defined (__VMS');
+!
+!
+!execute_shell_script
+! Use STRINGCHAR macro to accept \r just like MSDOS.
+! And adjust the name.
+find_range := SEARCH_QUIETLY('If the operating system on which',
+			     FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+VMS_INSERT_BEFORE('static int', '#ifdef __VMS');
+COPY_TEXT('static int');
+SPLIT_LINE;
+COPY_TEXT(
+'execute_shell_script (sample, sample_len, command, args, env, words)');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_BEFORE('char *sample', '#endif /* __VMS */');
+
+VMS_INSERT_BEFORE('{', '#ifdef __VMS');
+COPY_TEXT('     WORD_LIST *words;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+VMS_INSERT_AFTER(', larry;', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  int result;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+VMS_INSERT_BEFORE('return (shell_execve', '#ifndef __VMS');
+VMS_INSERT_AFTER('return (shell_execve', '#else');
+SPLIT_LINE;
+COPY_TEXT('  result = vms_shell_execve (execname, args, env, words, 0, NULL);');
+SPLIT_LINE;
+COPY_TEXT('  FREE (execname);');
+SPLIT_LINE;
+COPY_TEXT('  FREE (firstarg);');
+SPLIT_LINE;
+COPY_TEXT('  return result;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+!initialize_subshell
+
+!shell_execve
+find_range := SEARCH_QUIETLY('Call execve (), handling', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+!
+! Old GNV Bash 1.14.8 code:
+!   Replace shell_execve with a stub that calls shell_execve_dos.
+!   Note [.builtins]exec.def calls shell_execve.
+!   Modify shell_execve as follows:
+!   New name,
+!   Add async flag parameter
+!   Add WORD_LIST parameter.
+!   Changing parameters requires new name and forward prototype at start
+!   of file.
+!   Inside, the original routine modifies argv[] to point to strings
+!   allocated elsewhere.  VMS must make copies instead to prevent
+!   heap corruption from double deallocation.
+!
+VMS_INSERT_AFTER('char **args, **env;','#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('{');
+SPLIT_LINE;
+COPY_TEXT(
+'  return vms_shell_execve(command, args, env, NULL, VMS_WAIT_CHILD, NULL);');
+SPLIT_LINE;
+COPY_TEXT('}');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('int');
+SPLIT_LINE;
+COPY_TEXT('vms_shell_execve (char * command, char** args, char ** env,');
+SPLIT_LINE;
+COPY_TEXT('                  WORD_LIST * words, int async, int *pExecStatus)');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+VMS_INSERT_BEFORE('execve', '#ifndef __VMS');
+VMS_INSERT_AFTER('execve', '#else');
+SPLIT_LINE;
+COPY_TEXT('  {');
+SPLIT_LINE;
+COPY_TEXT('    int execve_status, child_status;');
+SPLIT_LINE;
+COPY_TEXT('    execve_status = vms_vfork_exec (command, args, env, async,');
+SPLIT_LINE;
+COPY_TEXT('				  &child_status);');
+SPLIT_LINE;
+COPY_TEXT('    if (pExecStatus != NULL) *pExecStatus = execve_status;');
+SPLIT_LINE;
+COPY_TEXT('    /* If child was succesfully launched, return now. */');
+SPLIT_LINE;
+COPY_TEXT('    if (execve_status == 0)');
+SPLIT_LINE;
+COPY_TEXT('      {');
+SPLIT_LINE;
+COPY_TEXT('	set_pid_status(GetCurrentChildExitPid(), child_status);');
+SPLIT_LINE;
+COPY_TEXT('	return (child_status >> 8);');
+SPLIT_LINE;
+COPY_TEXT('      }');
+SPLIT_LINE;
+COPY_TEXT('  }');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! The next part if if the exec() function failed, which may mean that we
+! have a script instead of a binary.
+!
+! In the GNV Bash 1.14.8 code the next VMS code is after the comment
+! "This file is executable".  The variable should_exec is initialized
+! differently.  This variable does not exist in Bash 4.2.
+!
+! Need to pass the words parameter to execute_shell_script
+find_range := SEARCH_QUIETLY('If it begins with #!, then', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+VMS_INSERT_AFTER('if (sample_len > 2 &&', '      {');
+SPLIT_LINE;
+COPY_TEXT('#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('	int result;');
+SPLIT_LINE;
+COPY_TEXT('	result = execute_shell_script (sample, sample_len, command,');
+SPLIT_LINE;
+COPY_TEXT('				       args, env, words);');
+SPLIT_LINE;
+COPY_TEXT('	return result;');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('return', '#endif /* __VMS */');
+VMS_INSERT_BEFORE('else', '      }');
+
+! Here is handling a subshell.
+! Bash tries to avoid an additional fork by doing a longjump.
+! Because VMS is doing a fake fork, here we actually have to spawn
+! a new child.
+VMS_INSERT_BEFORE('initialize_subshell', '#ifndef __VMS');
+VMS_INSERT_AFTER('set_sigint_handler', '#endif /* __VMS */');
+
+VMS_INSERT_BEFORE('if (subshell_argv)', '#ifdef __VMS');
+COPY_TEXT('  {');
+SPLIT_LINE;
+COPY_TEXT('    int execve_status, child_status;');
+SPLIT_LINE;
+COPY_TEXT('    char * vms_shell_name;');
+SPLIT_LINE;
+COPY_TEXT('    vms_shell_name = vms_getjpi_imagename();');
+SPLIT_LINE;
+COPY_TEXT('    execve_status = vms_vfork_exec(vms_shell_name, args, env,');
+SPLIT_LINE;
+COPY_TEXT('				  VMS_WAIT_CHILD, &child_status);');
+SPLIT_LINE;
+COPY_TEXT('    if (pExecStatus != NULL) *pExecStatus = execve_status;');
+SPLIT_LINE;
+COPY_TEXT('    if (execve_status == 0)');
+SPLIT_LINE;
+COPY_TEXT('      {');
+SPLIT_LINE;
+COPY_TEXT('	set_pid_status(GetCurrentChildExitPid(), child_status);');
+SPLIT_LINE;
+COPY_TEXT('	return (child_status >> 8);');
+SPLIT_LINE;
+COPY_TEXT('      }');
+SPLIT_LINE;
+COPY_TEXT('    else');
+SPLIT_LINE;
+COPY_TEXT('      {');
+SPLIT_LINE;
+COPY_TEXT('	int e;');
+SPLIT_LINE;
+COPY_TEXT('	e = errno;');
+SPLIT_LINE;
+COPY_TEXT('	internal_error(_("%s: %s - VMS can not find running shell"),');
+SPLIT_LINE;
+COPY_TEXT('			command, strerror(e));');
+SPLIT_LINE;
+COPY_TEXT('	return (EX_NOEXEC);');
+SPLIT_LINE;
+COPY_TEXT('      }');
+SPLIT_LINE;
+COPY_TEXT('  }');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+SPLIT_LINE;
+
+
+!execute_intern_function
+!close_all_files
+
+!do_piping
+!GNV Bash 1.14.8 does an lseek(0, 0, SEEK_SET).  Why?
+find_range := SEARCH_QUIETLY('Redirect input and output to be', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+VMS_INSERT_AFTER('close (pipe_in)', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      /* reset the file pointer */');
+SPLIT_LINE;
+COPY_TEXT('      lseek (0, 0, SEEK_SET);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;

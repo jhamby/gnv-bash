@@ -1,0 +1,58 @@
+! File bashline.tpu
+!
+! $Id: bashline.tpu,v 1.1.1.1 2012/12/02 19:25:20 wb8tyw Exp $
+!
+! Copyright 2012, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+
+! Instead of using the standard header files, bashline.c is hardcoding
+! a tputs definition.  Unfortuantely it is not coding one that is compatible
+! with the lib readline modules that are included with Bash
+! and when we override it globally for VMS, it does not compile.
+
+VMS_INSERT_BEFORE('extern int tputs __P', '#ifdef _MINIX');
+COPY_TEXT(
+'extern int tputs __P((const char *string, int nlines, void (*outx)(int)));');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('extern int tputs __P', '#endif /* _MINIX */');
+
+VMS_INSERT_BEFORE('static int putx __P', '#ifdef _MINIX');
+COPY_TEXT(
+'static void putx __P((int));');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('static int putx __P', '#endif /* _MINIX */');
+
+find_range := SEARCH_QUIETLY('Support for binding', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+
+VMS_INSERT_BEFORE('static int', '#ifdef _MINIX');
+COPY_TEXT(
+'static void');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('static int', '#endif /* _MINIX */');
+
+VMS_INSERT_BEFORE('return', '#ifndef _MINIX');
+VMS_INSERT_AFTER('return', '#endif /* _MINIX */');

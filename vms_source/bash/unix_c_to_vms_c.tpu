@@ -1,0 +1,574 @@
+! File: UNIX_C_TO_VMS_C.TPU
+!
+! $Id: unix_c_to_vms_c.tpu,v 1.2 2013/05/15 04:08:32 wb8tyw Exp $
+!
+! This procedure handles automagic edits that convert some UNIX
+! programming issues to OpenVMS.
+!
+! Copyright 2011, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+! 16-Jul-2001	J. Malmberg	Change ".st_ino" assigns / compares to macros
+! 26-Jul-2001	J. Malmberg	Change "ino_t foo" to "ino_t foo[3]";
+! 09-Apr-2005	J. Malmberg	Remove Frontport reference, and VMS versions
+!				of the generated macros, as 64 bit V8.2 does
+!				not need the macros.
+! 18-Oct-2011	J. Malmberg	ADD VMS_INSERT_BEFORE routine
+! 01-Mar-2012	J. Malmberg	Add VMS_INSERT_AFTER routine
+!=============================================================================
+
+CONSTANT
+  alphanum :=
+     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_";
+
+
+CONSTANT whitespace := ASCII(9) + ASCII(32);
+
+CONSTANT separator := ";(){}=!~/%+:?|\&";
+
+
+!
+! Routine to patch a bug in the code
+!-----------------------------------
+PROCEDURE VMS_REPLACE(old_string, new_string)
+local ret_stat,
+	find_range;
+
+    ret_stat := 0;
+
+    find_range := SEARCH_QUIETLY(old_string, FORWARD, EXACT);
+    IF find_range <> 0
+    THEN
+	ret_stat := 1;
+	POSITION(END_OF(find_range));
+	ERASE(find_range);
+	COPY_TEXT(new_string);
+    ENDIF;
+
+    return ret_stat;
+ENDPROCEDURE;
+
+
+!
+! Routine to do an OpenVMS specific replace
+!------------------------------------------
+PROCEDURE VMS_PATCH(old_string, new_string)
+local ret_stat,
+	find_range,
+	old_line;
+
+    ret_stat := 0;
+    find_range := SEARCH_QUIETLY(old_string, FORWARD, EXACT);
+    IF find_range <> 0
+    THEN
+	ret_stat := 1;
+	POSITION(END_OF(find_range));
+	old_line := CURRENT_LINE;
+	ERASE(find_range);
+	COPY_TEXT(new_string);
+	POSITION(END_OF(SEARCH_QUIETLY(LINE_BEGIN,REVERSE,EXACT)));
+	COPY_TEXT("#ifdef __VMS");
+	SPLIT_LINE;
+	POSITION(END_OF(SEARCH_QUIETLY(LINE_BEGIN,FORWARD,EXACT)));
+	MOVE_HORIZONTAL(1);
+	POSITION(END_OF(SEARCH_QUIETLY(LINE_BEGIN,FORWARD,EXACT)));
+	COPY_TEXT("#else");
+	SPLIT_LINE;
+	COPY_TEXT(old_line);
+	SPLIT_LINE;
+	COPY_TEXT("#endif");
+	SPLIT_LINE;
+    ENDIF;
+
+    RETURN ret_stat;
+
+ENDPROCEDURE;
+
+!
+! Routine to insert a new line of code
+!---------------------------------------
+PROCEDURE VMS_INSERT_BEFORE(before_string, new_string)
+local ret_stat,
+	find_range;
+
+    ret_stat := 0;
+
+    find_range := SEARCH_QUIETLY(before_string, FORWARD, EXACT);
+    IF find_range <> 0
+    THEN
+	ret_stat := 1;
+	POSITION(BEGINNING_OF(find_range));
+	POSITION(END_OF(SEARCH_QUIETLY(LINE_BEGIN,REVERSE,EXACT)));
+	COPY_TEXT(new_string);
+	SPLIT_LINE;
+    ENDIF;
+
+    return ret_stat;
+ENDPROCEDURE;
+
+!
+! Routine to insert a new line of code
+!---------------------------------------
+PROCEDURE VMS_INSERT_AFTER(after_string, new_string)
+local ret_stat,
+	find_range;
+
+    ret_stat := 0;
+
+    find_range := SEARCH_QUIETLY(after_string, FORWARD, EXACT);
+    IF find_range <> 0
+    THEN
+	ret_stat := 1;
+	POSITION(END_OF(find_range));
+	POSITION(END_OF(SEARCH_QUIETLY(LINE_END, FORWARD, EXACT)));
+	SPLIT_LINE;
+	COPY_TEXT(new_string);
+    ENDIF;
+
+    return ret_stat;
+ENDPROCEDURE;
+
+!
+!
+! Routine to fix st_ino references
+!---------------------------------
+PROCEDURE fix_st_ino_references(inode_str)
+
+LOCAL	begin_mark,
+	end_mark,
+	sep_str,
+	s_op,
+	s_direction,
+	s_range1,
+	s_range2,
+	s_term,
+	s_term_str,
+	s_pat,
+	saved_pos,
+	end_pat,
+	end_pat2,
+	begin_pat,
+	e_range,
+	edit_range,
+	symbol1_str,
+	symbol2_str,
+	ret_stat;
+
+
+! First see if this subroutine has anything to do
+!-------------------------------------------------
+    POSITION(BEGINNING_OF(main_buffer));
+    ret_stat := 0;
+!    s_pat := SPAN(alphanum) + ("." | "->") + "ino_t" &
+!	(ANY(separator) @ s_term);
+    sep_str := separator + whitespace;
+    s_pat := SPAN(alphanum) + ("." | "->") + inode_str &
+	(ANY(sep_str) @ s_term);
+
+    ! Assume that this is on one line for now
+    !-----------------------------------------
+    end_pat := ANCHOR + SPAN(whitespace) + ("!" | "=");
+    end_pat2 := "=" + SPAN(whitespace);
+    begin_pat := ANY(separator) | LINE_BEGIN;
+
+
+    POSITION(BEGINNING_OF(main_buffer));
+
+    ! Ok, some ino_t references need to be wrapped with macros
+    !---------------------------------------------------------
+    LOOP
+
+	s_range1 := SEARCH_QUIETLY(s_pat, FORWARD, EXACT);
+	EXITIF s_range1 = 0;
+
+	! Default to do nothing
+	!------------------------
+	s_op := "SKIP";
+
+	! Drop the terminator
+	!--------------------
+	POSITION(END_OF(s_range1));
+	IF LENGTH(s_term) > 0
+	THEN
+	    symbol1_str := SUBSTR(s_range1, 1, LENGTH(s_range1) - 1);
+	    MOVE_HORIZONTAL(-1);
+	ELSE
+	    symbol1_str := STR(s_range1);
+	ENDIF;
+	end_mark := MARK(NONE);
+
+	s_term_str := STR(s_term);
+
+	IF (s_term_str = "=") OR (s_term_str = "!")
+	THEN
+	    POSITION(BEGINNING_OF(s_range1));
+	    begin_mark := MARK(NONE);
+	    s_direction := FORWARD;
+	    POSITION(END_OF(s_range1));
+	    MOVE_HORIZONTAL(1);
+	ELSE
+	    ! Look forward for a terminator
+	    !--------------------------------
+	    POSITION(END_OF(s_range1));
+	    s_range2 := SEARCH_QUIETLY(end_pat, FORWARD, EXACT);
+	    IF (s_range2 <> 0)
+	    THEN
+		POSITION(BEGINNING_OF(s_range1));
+		begin_mark := MARK(NONE);
+		s_term_str := SUBSTR(s_range2, LENGTH(s_range2), 1);
+		s_direction := FORWARD;
+		POSITION(END_OF(s_range2));
+	    ELSE
+	    ! Look backwards for a terminator
+	    !--------------------------------
+		POSITION(BEGINNING_OF(s_range1));
+		MOVE_HORIZONTAL(-1);
+		IF CURRENT_CHARACTER = "="
+		THEN
+		    MOVE_HORIZONTAL(-1);
+		    IF (CURRENT_CHARACTER <> "=") AND(CURRENT_CHARACTER <> "!")
+		    THEN
+			MOVE_HORIZONTAL(1);
+		    ENDIF;
+		ELSE
+		    s_range2 := SEARCH_QUIETLY(end_pat2, REVERSE, EXACT);
+		    IF (s_range2 <> 0)
+		    THEN
+			s_term_str := SUBSTR(s_range2, 1, 1);
+			s_direction := REVERSE;
+			MOVE_HORIZONTAL(-1);
+			IF (CURRENT_CHARACTER <> "=") AND
+			    (CURRENT_CHARACTER <> "!")
+			THEN
+			    MOVE_HORIZONTAL(1);
+			ENDIF;
+		    ENDIF;
+		ENDIF;
+	    ENDIF;
+	ENDIF;
+
+
+	! Now find out the operation
+	!------------------------------
+	IF CURRENT_CHARACTER = "="
+	THEN
+	    MOVE_HORIZONTAL(1);
+	    IF CURRENT_CHARACTER = "="
+	    THEN
+		s_op := "INO_T_CMP(";
+	    ELSE
+		s_op := "INO_T_CPY(";
+	    ENDIF;
+	ELSE
+	    if CURRENT_CHARACTER = "!"
+	    THEN
+		s_op := "!INO_T_CMP(";
+	    ENDIF;
+	ENDIF;
+	IF s_direction = FORWARD
+	THEN
+	    MOVE_HORIZONTAL(1);
+	ELSE
+	    MOVE_HORIZONTAL(-2);
+	ENDIF;
+
+
+	! Now get the other token
+	!--------------------------
+	saved_pos := MARK(NONE);
+	IF (s_direction = FORWARD)
+	THEN
+	    ! Look forward for next token
+	    !----------------------------
+	    ! Look forward for end of token
+	    !-----------------------------------
+	    s_range2 := SEARCH_QUIETLY(ANY(alphanum), FORWARD, EXACT);
+	    IF s_range2 <> 0
+	    THEN
+		POSITION(BEGINNING_OF(s_range2));
+		saved_pos := MARK(NONE);
+		e_range := SEARCH_QUIETLY(ANY(sep_str), FORWARD, EXACT);
+		IF (e_range <> 0)
+		THEN
+		    POSITION(END_OF(e_range));
+		    MOVE_HORIZONTAL(-1);
+		    end_mark := MARK(NONE);
+		    e_range := CREATE_RANGE(saved_pos, end_mark);
+		    symbol2_str := STR(e_range);
+		ENDIF;
+	    ENDIF;
+
+	ELSE
+	    ! Look backwards for next token
+	    !------------------------------
+	    symbol2_str := symbol1_str;
+	    s_range2 := SEARCH_QUIETLY(begin_pat, REVERSE, EXACT);
+	    IF s_range2 <> 0
+	    THEN
+		e_range := CREATE_RANGE(BEGINNING_OF(s_range2), saved_pos);
+		s_range2 := SEARCH_QUIETLY
+				  (NOTANY(whitespace), FORWARD, EXACT, e_range);
+		e_range := CREATE_RANGE
+				(BEGINNING_OF(s_range2), END_OF(e_range));
+		s_range2 := SEARCH
+				  (NOTANY(whitespace), REVERSE, EXACT, e_range);
+		e_range := CREATE_RANGE
+				    (BEGINNING_OF(e_range), END_OF(s_range2));
+		begin_mark := BEGINNING_OF(e_range);
+		symbol1_str := STR(e_range);
+	    ENDIF;
+	ENDIF;
+
+	! Now replace
+	!---------------
+	IF s_op <> "SKIP"
+	THEN
+	    ret_stat := 1;
+
+	    ! Now find the beginning of the expression
+	    !------------------------------------------
+	    POSITION(begin_mark);
+	    edit_range := CREATE_RANGE(begin_mark, end_mark);
+
+	    ERASE(edit_range);
+	    COPY_TEXT(s_op);
+	    COPY_TEXT(symbol1_str);
+	    COPY_TEXT(", ");
+	    COPY_TEXT(symbol2_str);
+	    COPY_TEXT(")");
+	ELSE
+	    POSITION(END_OF(s_range1));
+	ENDIF;
+
+    ENDLOOP;
+
+    RETURN ret_stat;
+
+ENDPROCEDURE;
+!
+! Routine to fix ino_t references
+!---------------------------------
+PROCEDURE fix_ino_t_references()
+
+LOCAL	begin_mark,
+	end_mark,
+	sep_str,
+	s_range1,
+	s_range2,
+	s_range3,
+	inode_str,
+	s_term,
+	s_pat,
+	old_line,
+	ret_stat;
+
+
+! First see if this subroutine has anything to do
+!-------------------------------------------------
+    POSITION(BEGINNING_OF(main_buffer));
+    ret_stat := 0;
+!    s_pat := SPAN(alphanum) + ("." | "->") + "st_ino" &
+!	(ANY(separator) @ s_term);
+    sep_str := separator + whitespace;
+    s_pat := ANY(whitespace) +  "ino_t" + ANY(whitespace);
+
+
+    POSITION(BEGINNING_OF(main_buffer));
+
+    ! Ok, some ino_t references need to be changed
+    !---------------------------------------------------------
+    LOOP
+
+	s_range1 := SEARCH_QUIETLY(s_pat, FORWARD, NO_EXACT);
+	EXITIF s_range1 = 0;
+
+
+	!Make sure that this is not a preprocessor command
+	!-------------------------------------------------
+	POSITION(BEGINNING_OF(s_range1));
+	s_range2 := SEARCH_QUIETLY(LINE_BEGIN, REVERSE);
+	if s_range2 <> 0
+	THEN
+	    POSITION(END_OF(s_range2));
+	    IF current_character <> "#"
+	    THEN
+		begin_mark := MARK(NONE);
+		old_line := current_line;
+		s_range3 := SEARCH_QUIETLY((";"|LINE_END),FORWARD,EXACT);
+		s_range2 := SEARCH_QUIETLY(";",FORWARD,EXACT,s_range3);
+		IF s_range2 <> 0
+		THEN
+		    COPY_TEXT("#ifdef __VMS");
+		    SPLIT_LINE;
+		    POSITION(BEGINNING_OF(s_range2));
+		    MOVE_HORIZONTAL(-1);
+		    end_mark := MARK(NONE);
+		    s_range3 := SEARCH_QUIETLY(ANY(whitespace), REVERSE);
+		    POSITION(BEGINNING_OF(s_range3));
+		    MOVE_HORIZONTAL(1);
+		    s_range3 := CREATE_RANGE(MARK(NONE), end_mark);
+		    inode_str := STR(s_range3);
+		    POSITION(BEGINNING_OF(s_range2));
+		    COPY_TEXT("[3]");
+		    POSITION(END_OF(SEARCH_QUIETLY(LINE_BEGIN, FORWARD)));
+		    COPY_TEXT("#else");
+		    SPLIT_LINE;
+		    COPY_TEXT(old_line);
+		    SPLIT_LINE;
+		    COPY_TEXT("#endif");
+		    SPLIT_LINE;
+		    end_mark := MARK(NONE);
+		    fix_st_ino_references(inode_str);
+		    POSITION(end_mark);
+		    ret_stat := 1;
+		ELSE
+		    POSITION(END_OF(s_range1));
+		ENDIF;
+	    ELSE
+		POSITION(END_OF(s_range1));
+	    ENDIF;
+	ELSE
+	    POSITION(END_OF(s_range1));
+	ENDIF;
+
+    ENDLOOP;
+
+
+
+    RETURN ret_stat;
+
+ENDPROCEDURE;
+
+
+PROCEDURE FIX_DOT_DOT_SLASH
+LOCAL ret_stat,
+	s_stat;
+
+    ret_stat := 0;
+    POSITION(BEGINNING_OF(main_buffer));
+    LOOP
+	s_stat := VMS_PATCH('"../','"');
+
+    EXITIF s_stat = 0;
+	ret_stat := 1;
+
+    ENDLOOP;
+
+    RETURN ret_stat;
+ENDPROCEDURE;
+
+!
+!
+!
+! Main routine
+!-----------------
+!    input_file := GET_INFO(COMMAND_LINE, "file_name"); ! Set up main
+!    if input_file = ""
+!    THEN
+!	EXIT;
+!    ENDIF;
+!
+!    main_buffer := CREATE_BUFFER ("MAIN", input_file); ! buffer from input
+!    IF GET_INFO(COMMAND_LINE, "output")
+!    THEN
+!	out_file := GET_INFO(COMMAND_LINE, "output_file");
+!	if out_file <> ""
+!	THEN
+!	    SET(OUTPUT_FILE, main_buffer, out_file);
+!	ENDIF;
+!    ENDIF;
+
+    main_buffer := CURRENT_BUFFER;
+
+    POSITION (BEGINNING_OF (main_buffer));
+    SET(INSERT, main_buffer);
+
+    !
+    ! VMS has a structure, not a scaler for ino_t
+    !---------------------------------------------
+    x3 := fix_dot_dot_slash;
+    x2 := fix_ino_t_references;
+    x1 := fix_st_ino_references("st_ino");
+
+
+    !
+    ! Process the initialization file
+    !--------------------------------
+    init_file := GET_INFO(COMMAND_LINE, "initialization_file");
+
+    IF init_file <> ""
+    THEN
+	init_buffer := CREATE_BUFFER ("INITIALIZATION", init_file);
+	SET(JOURNALING, init_buffer, OFF);
+	SET(MODIFIABLE, init_buffer, OFF);
+	SET(MODIFIED, init_buffer, OFF);
+	SET(NO_WRITE, init_buffer, OFF);
+	POSITION (BEGINNING_OF (main_buffer));
+	SET(INFORMATIONAL, ON);
+	EXECUTE(init_buffer);
+    ENDIF;
+
+    ! If anything was found, put a new header on the file
+    !----------------------------------------------------
+    IF (x1 <> 0) OR (x2 <> 0) OR (x3 <> 0) OR (init_file <> "")
+    THEN
+
+	! Try to find the first blank line outside of a comment
+	!-------------------------------------------------------
+
+	! Failing that, the beginning of file will do.
+	!---------------------------------------------
+
+	! Write a header item to the new file
+	!------------------------------------
+	POSITION (BEGINNING_OF (main_buffer));
+	COPY_TEXT("/* Converted by ");
+	COPY_TEXT(GET_INFO(COMMAND_LINE, "command_file"));
+        IF init_file <> ""
+	THEN
+	    COPY_TEXT(" AND ");
+	    COPY_TEXT(init_file);
+	ENDIF;
+	COPY_TEXT(" on ");
+	COPY_TEXT(FAO("!%D ", 0));
+	COPY_TEXT(STR(GET_INFO(SYSTEM, "operating_system")));
+	COPY_TEXT(" */");
+	SPLIT_LINE;
+   ENDIF;
+
+
+   ! Special header if an ino_t reference was fixed up
+   !--------------------------------------------------
+   IF (x1 <> 0) OR (x2 <> 0)
+   THEN
+	COPY_TEXT("#ifndef INO_T_CPY");
+	SPLIT_LINE;
+
+	COPY_TEXT("#define INO_T_CPY(_a, _b) _a = _b");
+	SPLIT_LINE;
+
+	COPY_TEXT("#endif /* INO_T_CPY */");
+	SPLIT_LINE;
+
+	COPY_TEXT("#ifndef INO_T_CMP");
+	SPLIT_LINE;
+
+	COPY_TEXT("#define INO_T_CMP(_a, _b) _a == _b");
+	SPLIT_LINE;
+
+	COPY_TEXT("#endif /* INO_T_CMP */");
+	SPLIT_LINE;
+    ENDIF;
+
+EXIT;

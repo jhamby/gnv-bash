@@ -1,0 +1,37 @@
+! File signals.tpu
+!
+! $Id: signals.tpu,v 1.1 2013/05/14 22:05:44 wb8tyw Exp $
+!
+! Copyright 2012, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+! VMS specific patches needed.
+!
+! The OpenVMS CRTL implementation of kill() is has a bug whereby all calls to
+! kill() after the first, fail to generate the signal when the pid argument
+! identifies the calling process. Since in this particular case the target
+! for the signal is the calling process itself, we use raise() on OpenVMS
+! until the CRTL is fixed.
+!
+!need to add routines to save and restore trap and signal state.
+!
+local pattern, find_range;
+pattern := "static RETSIGTYPE" + LINE_END + "_rl_handle_signal (sig)";
+find_range := SEARCH_QUIETLY(pattern, FORWARD, EXACT);
+if find_range <> 0
+then
+   VMS_PATCH('kill (getpid (), sig)', 'raise(sig)');
+endif

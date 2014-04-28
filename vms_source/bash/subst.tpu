@@ -1,0 +1,275 @@
+! File subst.tpu
+!
+! $Id: subst.tpu,v 1.5 2013/07/11 23:48:03 robertsonericw Exp $
+!
+! Copyright 2012, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+! VMS specific patches needed.
+!
+!
+! Need VMS specific header for env save/restore routines.
+!--------------------------------
+VMS_INSERT_BEFORE('#include "execute_cmd.h"', '#ifdef __VMS');
+COPY_TEXT('/* Set flag for vms_fakefork.h (included by execute_cmd.h) */');
+SPLIT_LINE;
+COPY_TEXT('/* to make special routines visible */');
+SPLIT_LINE;
+COPY_TEXT('#ifndef MOD_SUBST');
+SPLIT_LINE;
+COPY_TEXT('#define MOD_SUBST 1');
+SPLIT_LINE;
+COPY_TEXT('#endif /* MOD_SUBST */');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+VMS_INSERT_BEFORE('/* The size that strings change', '#ifdef __VMS');
+COPY_TEXT('/* VMS does not fork, so do not exit */');
+SPLIT_LINE;
+COPY_TEXT('#define exit(foo) vms_fake_child_status = vms_fake_fork_exit(foo)');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('int vms_fifo_write_pipe(int * pipe_fd);');
+SPLIT_LINE;
+COPY_TEXT('#define pipe(__fds) vms_fifo_write_pipe(__fds)');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+SPLIT_LINE;
+
+! process_substitute
+find_range := SEARCH_QUIETLY('Return a filename that will', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+VMS_INSERT_AFTER('pid_t old_pid, pid', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  VMS_BASH_ENVIRON * old_envbuf = NULL;');
+SPLIT_LINE;
+COPY_TEXT('  char *file_share_attr="shr=del,get,put,upd";');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+VMS_INSERT_BEFORE('pid = make_child', '#ifdef __VMS');
+COPY_TEXT('  old_envbuf = vms_save_bash_environ (VMS_SAVE_SUBSHELL);');
+SPLIT_LINE;
+
+! Bash forks and exits after doing a free(string)
+! VMS does not fork, so we can not free the original string.
+COPY_TEXT('  char * newstring = string;');
+SPLIT_LINE;
+COPY_TEXT('  string = savestring (newstring);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+VMS_INSERT_BEFORE('if (pid == 0)', '#ifndef __VMS');
+VMS_INSERT_AFTER('if (pid == 0)', '#endif /* !__VMS */');
+
+! GNV Bash 1.14.8 code is doing a cleanup when make_child returns -1.
+! I am skipping that because make_child is now hardcoded to return 0 on VMS.
+! for Bash 4.x
+
+! if (pid > 0) is parent side and exits.
+! Need to run child side and then jump back here.
+VMS_INSERT_BEFORE('if (pid > 0)', '#ifdef __VMS');
+COPY_TEXT('  if (pid == 0)');
+SPLIT_LINE;
+COPY_TEXT('#else /* __VMS */');
+SPLIT_LINE;
+VMS_INSERT_AFTER('if (pid > 0)', '#endif /* __VMS */');
+
+VMS_INSERT_AFTER('{', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      vms_process_substitute_parent:');
+SPLIT_LINE;
+COPY_TEXT('      vms_restore_bash_environ (old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+!
+! For OpenVMS, change the call to open() to include the mode argument and
+! optional RMS file attributes.
+!
+VMS_INSERT_AFTER('Open the named pipe in the child', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  if (open_for_read_in_child) file_share_attr="shr=get";');
+SPLIT_LINE;
+COPY_TEXT('  fd = open (pathname, open_for_read_in_child ? O_RDONLY|O_NONBLOCK : O_WRONLY,');
+SPLIT_LINE;
+COPY_TEXT('             0660, "rfm=stmlf", "rat=none", "ctx=rec,eol", file_share_attr);');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+old_pattern := 'fd = open (pathname, open_for_read_in_child ? O_RDONLY|O_NONBLOCK : O_WRONLY);' +
+               LINE_END;
+POSITION(END_OF(SEARCH_QUIETLY(old_pattern, FORWARD, EXACT)));
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+find_range := SEARCH_QUIETLY(
+	'open_for_read_in_child ? 0 : 1);', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+VMS_INSERT_AFTER('exit (127)', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      goto vms_process_substitute_exit;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! after the goto, the bash environment is restored.
+VMS_INSERT_AFTER('exit (result)', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('vms_process_substitute_exit:');
+SPLIT_LINE;
+COPY_TEXT('      goto vms_process_substitute_parent;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+! command_substitute
+find_range := SEARCH_QUIETLY('Perform command substitution', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+ENDIF;
+
+VMS_INSERT_AFTER('WORD_DESC *ret', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  VMS_BASH_ENVIRON * old_envbuf = NULL;');
+SPLIT_LINE;
+
+! Bash forks and exits after doing a free(string)
+! VMS does not fork, so we can not free the original string.
+COPY_TEXT('  char * newstring = string;');
+SPLIT_LINE;
+COPY_TEXT('  string = savestring (newstring);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+! On VMS we need to mark the fildes as not set and then do not restore on exit.
+VMS_INSERT_BEFORE('goto error_exit;', '#ifdef __VMS');
+COPY_TEXT('      fildes[0] = -1;');
+SPLIT_LINE;
+COPY_TEXT('      fildes[1] = -1;');
+SPLIT_LINE;
+COPY_TEXT('      goto error_exit_without_restore;');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('goto error_exit;', '#endif /* __VMS */');
+
+!
+! Needs to be a full subshell save (VMS_SAVE_SUBSHELL) because command
+! substitutions can contain commands which affect the value of shell variables.
+!
+VMS_INSERT_BEFORE('pid = make_child ', '#ifdef __VMS');
+COPY_TEXT('  old_envbuf = vms_save_bash_environ (VMS_SAVE_SUBSHELL);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+VMS_INSERT_BEFORE('if (pid == 0)', '#ifndef __VMS');
+VMS_INSERT_BEFORE('{', '#endif /* !__VMS */');
+
+! Error exit cleanup handling.
+! Set pid to -1 to skip child processing.
+VMS_INSERT_BEFORE('error_exit:', '#ifdef __VMS');
+COPY_TEXT('      vms_fake_fork_exit(EXECUTION_FAILURE);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+VMS_INSERT_AFTER('error_exit:', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      vms_restore_bash_environ(old_envbuf);');
+SPLIT_LINE;
+COPY_TEXT('    error_exit_without_restore:');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+VMS_INSERT_BEFORE('if (pid == 0)', '#ifndef __VMS');
+VMS_INSERT_AFTER('if (pid == 0)', '#endif /* !__VMS */');
+
+
+! On VMS we do not exit, so must go to an error exit
+VMS_INSERT_AFTER('exit (EXECUTION_FAILURE);', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('	  goto error_exit;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+! On VMS since we are still in the parent, do not close these */
+VMS_INSERT_BEFORE('/* If standard output is closed', '#ifndef __VMS');
+VMS_INSERT_AFTER('close (fildes[0]);', '#endif /* !__VMS */');
+
+! The setjmp()s in this module mean that some portions of this section
+! are executed a second time after a command is executed as sometimes
+! the parse_and_execute() does not actually return, but does a longjump.
+
+! Need to restore the environment after running a command in fake child
+! This is the common place as long as subshell_level is not one of the
+! variables saved/restored.
+! not here, must be after running the exit trap().
+!VMS_INSERT_BEFORE('last_command_exit_value = rc', '#ifdef __VMS');
+!COPY_TEXT('      vms_restore_bash_environ(old_envbuf);');
+!SPLIT_LINE;
+!COPY_TEXT('#endif /* __VMS */');
+!SPLIT_LINE;
+
+
+! After fake exiting from child, restore parent environment and continue
+! executing the parent.
+VMS_INSERT_AFTER('exit (rc)', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      vms_restore_bash_environ(old_envbuf);');
+SPLIT_LINE;
+!COPY_TEXT('      if ((result == ERREXIT) || (result == EXITPROG) || result)');
+!SPLIT_LINE;
+!COPY_TEXT('	{');
+!SPLIT_LINE;
+!COPY_TEXT('	  goto error_exit_without_restore;');
+!SPLIT_LINE;
+!COPY_TEXT('	}');
+!SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+
+
+! VMS is run child first, parent second - With a few modifications
+VMS_INSERT_BEFORE(' else', '#ifndef __VMS');
+VMS_INSERT_AFTER(' else', '#endif /* !__VMS */');
+
+VMS_INSERT_AFTER('close (fildes[1])', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('      fildes[1] = -1;');
+SPLIT_LINE;
+COPY_TEXT('      lseek (fildes[0], 0, SEEK_SET);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;

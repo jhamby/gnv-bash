@@ -1,0 +1,53 @@
+! File trap_h.tpu
+!
+! $Id: trap_h.tpu,v 1.1 2013/05/14 22:05:44 wb8tyw Exp $
+!
+! Copyright 2012, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+! VMS specific patches needed.
+!
+! We need to add an OpenVMS-specific structure definition for saving trap and
+! signal state across subshells and add OpenVMS-specific prototypes for routines
+! to save and restore trap and signal state.
+!
+VMS_INSERT_AFTER('extern int signal_in_progress __P((int));','#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('/* extra OpenVMS types, macros and functions needed to save and restore trap');
+SPLIT_LINE;
+COPY_TEXT('   and signal state around subshells. */');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('struct VMS_trapnsigstate');
+SPLIT_LINE;
+COPY_TEXT('   {');
+SPLIT_LINE;
+COPY_TEXT('   char * trap_list[BASH_NSIG];');
+SPLIT_LINE;
+COPY_TEXT('   int    pending_traps[NSIG];');
+SPLIT_LINE;
+COPY_TEXT('   int    sigmodes[BASH_NSIG];');
+SPLIT_LINE;
+COPY_TEXT('   };');
+SPLIT_LINE;
+COPY_TEXT('#define IsTrapSentinel(t) ((t == (char *)DEFAULT_SIG) || (t == (char *)IGNORE_SIG) || (t == (char *)IMPOSSIBLE_TRAP_HANDLER))');
+SPLIT_LINE;
+COPY_TEXT('void vms_save_trap_signal_state(struct VMS_trapnsigstate *);');
+SPLIT_LINE;
+COPY_TEXT('void vms_restore_trap_signal_state(struct VMS_trapnsigstate *);');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;

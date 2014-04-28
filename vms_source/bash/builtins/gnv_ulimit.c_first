@@ -1,0 +1,539 @@
+/* File: builtins/gnv$ulimit.c_first builtins/gnv_ulimit.c_first
+ *
+ * $Id: gnv_ulimit.c_first,v 1.2 2013/06/09 18:05:03 wb8tyw Exp $
+ *
+ * Copyright 2012, John Malmberg
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ *
+ */
+
+#include <limits.h>
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
+
+#define __NEW_STARLET 1
+#include <descrip.h>
+#include <efndef.h>
+#include <jpidef.h>
+#include <prcdef.h>
+#include <prvdef.h>
+#include <stsdef.h>
+#include <syidef.h>
+
+#ifdef __VAX
+typedef union prvdef PRVDEF;
+#endif
+
+/* These three are noise that the compiler generate for VMS specific code
+ * in the more stricter modes
+ */
+#pragma message disable pragma
+#pragma message disable dollarid
+#pragma message disable valuepres
+
+#pragma member_alignment save
+#pragma nomember_alignment longword
+struct item_list_3 {
+	unsigned short len;
+	unsigned short code;
+	void * bufadr;
+	unsigned short * retlen;
+};
+
+struct mbx_iosb {
+	unsigned short status;
+	unsigned short count;
+	unsigned long value;
+};
+
+#pragma member_alignment restore
+
+#pragma message save
+#pragma message disable noparmlist
+int SYS$GETJPIW
+       (unsigned long efn,
+	pid_t * pid,
+	const struct dsc$descriptor_s * prcnam,
+	const struct item_list_3 * itmlst,
+	void * iosb,
+	void (* astadr)(__unknown_params),
+	void * astprm,
+	void * nullarg);
+
+int SYS$GETSYIW
+       (unsigned long efn,
+	unsigned long * csi,
+	const struct dsc$descriptor_s * nodenam,
+	const struct item_list_3 * itmlst,
+	void * iosb,
+	void (* astadr)(__unknown_params),
+	void * astprm);
+
+#pragma message restore
+
+/* Missing RLIMITS for ulimit builtin */
+
+/* ULMIIT.C defines these if not present, but we need them now */
+#define RLIMIT_PIPESIZE 257
+/* #define RLIMIT_VMBLKSZ 1 */
+#define RLIMIT_MAXUPPROC 260
+
+/* CPU limit */
+#define RLIMIT_CPU 0
+
+/* Maximum file size */
+#define RLIMIT_FSIZE 1
+
+/* Processs data segment size */
+#ifdef VMS_LIMIT_UNLIMITED
+#define RLIMIT_DATA 2
+#else
+#define RLIMIT_DATA 512
+#endif
+
+/* Stack size */
+#ifdef VMS_LIMIT_UNLIMITED
+#define RLIMIT_STACK  3
+#else
+#define RLIMIT_STACK 513
+#endif
+
+/* Core file size, VMS default to not producing a core */
+/* Should allow to be set on a per-process basis */
+#define RLIMIT_CORE 4
+
+/* Max memory size */
+#define RLIMIT_RSS 5
+
+/* Max number of processes */
+#define RLIMIT_NPROC 6
+
+/* Max number of open files */
+#define RLIMIT_NOFILE 7
+
+/* Maxed locked memory */
+#ifdef VMS_LIMIT_UNLIMITED
+#define RLIMIT_MEMLOCK 8
+#endif
+
+/* Address Space Limit */
+#define RLIMIT_AS 9
+
+/* file locks */
+#define RLIMIT_LOCKS 10
+
+/* Pending Signals */
+#define RLIMIT_SIGPENDING 11
+
+/* Posix Message Queue does not seem to exist for VMS right now */
+#ifdef VMS_LIMIT_UNLIMITED
+#define RLIMIT_MSGQUEUE 12
+#endif
+
+/* Process priority - Unix -20 to 19 and 0 should map to VMS 4 */
+/* Unix lower number is higher priority, VMS higher number is lower priority */
+/* Need to check VMS nice() implmentation for translation */
+#define RLIMIT_NICE 13
+
+/* Real Time priority timing */
+#ifdef VMS_LIMIT_UNLIMITED
+#define RLIMIT_RTPRIO 14
+#endif
+
+/* Maximum number of threads (POSIX_THREAD_THREADS_MAX?) */
+#ifdef VMS_LIMIT_UNLIMITED
+#define RLIMIT_PTHREAD 250
+#endif
+
+/* Default max socket buffer size */
+/* VMS default is 128 K, but need to look it up to be sure */
+/* How do we look it up, getsockopt()? */
+#ifdef VMS_LIMIT_UNLIMITED
+#define RLIMIT_SBSIZE 251
+#endif
+
+/* Virtual Memory */
+#define HAVE_RESOURCE
+#define HAVE_GETRLIMIT 1
+/* We may need to fix these */
+/* #ifdef __VAX */
+/* #define RLIMIT_VMBLKSZ 1 */
+/* #else */
+/* #define RLIMIT_VMBLKSZ 8 */
+/* #endif */
+
+/* Swap size */
+#ifdef VMS_LIMIT_UNLIMITED
+#define RLIMIT_SWAP 524
+#endif
+
+typedef long vms_rlim_t;
+
+struct vms_rlimit {
+    vms_rlim_t rlim_cur;  /* Soft limit */
+    vms_rlim_t rlim_max;  /* Hard limit ceiling for rlim_cur) */
+};
+
+static int
+vms_getrlimit_notimplemented(struct vms_rlimit *rlim) {
+
+    errno = ENOSYS;
+    return -1;
+}
+
+static int
+vms_setrlimit_notimplemented(const struct vms_rlimit *rlim) {
+
+    errno = ENOSYS;
+    return -1;
+}
+
+static int
+vms_getjpi_curpriv(PRVDEF *priv) {
+
+int result;
+int status;
+unsigned short result_len;
+struct item_list_3 itemlist[2];
+unsigned short jpi_iosb[4];
+
+     result = 0;
+
+     /* Soft limit is from sys$getjpiw */
+     itemlist[0].len = 4;
+     itemlist[0].code = JPI$_CURPRIV;
+     itemlist[0].bufadr = priv;
+     itemlist[0].retlen = &result_len;
+     itemlist[1].len = 0;
+     itemlist[1].code = 0;
+
+    status = SYS$GETJPIW(EFN$C_ENF,
+			 0,
+			 NULL,
+			 itemlist,
+			 jpi_iosb,
+			 NULL,
+			 NULL,
+			 0);
+
+    if (!$VMS_STATUS_SUCCESS(status)) {
+	errno = EVMSERR;
+	vaxc$errno = status;
+	return -1;
+    }
+
+    if (!$VMS_STATUS_SUCCESS(jpi_iosb[0])) {
+	errno = EVMSERR;
+	vaxc$errno = jpi_iosb[0];
+	return -1;
+    }
+
+    return 0;
+}
+
+static int
+vms_getrlimit_getjpi(int jpi_code, struct vms_rlimit *rlim) {
+
+int status;
+int result;
+unsigned short result_len;
+struct item_list_3 itemlist[2];
+unsigned short jpi_iosb[4];
+
+     result = 0;
+
+     /* Soft limit is from sys$getjpiw */
+     itemlist[0].len = 4;
+     itemlist[0].code = jpi_code;
+     itemlist[0].bufadr = &result;
+     itemlist[0].retlen = &result_len;
+     itemlist[1].len = 0;
+     itemlist[1].code = 0;
+
+    status = SYS$GETJPIW
+	   (EFN$C_ENF,
+	    0,
+	    NULL,
+	    itemlist,
+	    &jpi_iosb,
+	    NULL,
+	    NULL,
+	    0);
+
+    if (!$VMS_STATUS_SUCCESS(status)) {
+	errno = EVMSERR;
+	vaxc$errno = status;
+	return -1;
+    }
+
+    if (!$VMS_STATUS_SUCCESS(jpi_iosb[0])) {
+	errno = EVMSERR;
+	vaxc$errno = jpi_iosb[0];
+	return -1;
+    }
+
+    /* Usually if the result is 0, we want to return -1 */
+    if (result == 0) {
+        rlim->rlim_cur = -1;
+	rlim->rlim_max = -1;
+    } else {
+	rlim->rlim_cur = result;
+	rlim->rlim_max = result;
+    }
+    return 0;
+}
+
+int
+vms_getrlimit(int resource, struct vms_rlimit *rlim) {
+
+int jpi_code;
+int result;
+sigset_t signal_set;
+PRVDEF cur_priv;
+
+    /* Protect ourself */
+    if (rlim == NULL) {
+	errno = EINVAL;
+	return -1;
+    }
+
+    switch (resource) {
+    case RLIMIT_CPU:
+	/* CPU time limit in seconds */
+	jpi_code = JPI$_CPULIM;
+	result = vms_getrlimit_getjpi(jpi_code, rlim);
+	if (result < 0) {
+	    return result;
+	}
+	/* Use 0 for unlimited CPU */
+	if (rlim->rlim_cur == -1) {
+	    rlim->rlim_cur = 0;
+	    rlim->rlim_max = rlim->rlim_cur;
+	}
+	return result;
+
+    case RLIMIT_FSIZE:
+	/* Max file size - 1 Tib size */
+        /* Note that shell scripts are limited to __INT32_MAX */
+	/* because bash is using read() to read the entire file in */
+	/* read only returns an ssize_t, not off_t */
+	/* Report the smaller value because we only have an int to return it. */
+        /* LONG_MAX for VAX, and older ALPHA */
+        /* 1 TiB for Alpha/IA64 with _LARGEFILE */
+        /* 2 TiB for 8.4 and later */
+	rlim->rlim_cur = LONG_MAX;
+	rlim->rlim_max = LONG_MAX;
+	return 0;
+
+    case RLIMIT_NPROC:
+	/* Number of subprocesses allowed */
+	jpi_code = JPI$_PRCLM;
+	return vms_getrlimit_getjpi(jpi_code, rlim);
+
+    case RLIMIT_NOFILE:
+	/* Max number of open files */
+	jpi_code = JPI$_FILLM;
+	return vms_getrlimit_getjpi(jpi_code, rlim);
+
+    case RLIMIT_RSS:
+	/* Working set extent - Physical memory */
+	jpi_code = JPI$_WSEXTENT;
+	result = vms_getrlimit_getjpi(jpi_code, rlim);
+	if (result < 0) {
+	    return result;
+	}
+
+	/* Need to adjust based on VAX page sizes */
+	rlim->rlim_cur = rlim->rlim_cur / 2;
+	rlim->rlim_max = rlim->rlim_cur;
+	return result;
+
+    case RLIMIT_AS:
+	/* Virtual address space in use */
+	jpi_code = JPI$_VIRTPEAK;  /* * page file */
+	result = vms_getrlimit_getjpi(jpi_code, rlim);
+	if (result < 0) {
+	    return result;
+	}
+
+	/* Need to adjust based on VAX page sizes */
+	rlim->rlim_cur = rlim->rlim_cur / 2;
+	rlim->rlim_max = rlim->rlim_cur;
+	return result;
+
+    case RLIMIT_LOCKS:
+	/* Locks allowed to be held */
+	jpi_code = JPI$_ENQLM;
+	return vms_getrlimit_getjpi(jpi_code, rlim);
+
+    case RLIMIT_NICE:
+	result = vms_getjpi_curpriv(&cur_priv);
+	if (result < 0) {
+	    return result;
+	}
+	jpi_code = JPI$_AUTHPRI;
+	result = vms_getrlimit_getjpi(jpi_code, rlim);
+	if (result < 0) {
+	    return result;
+	}
+	/* Undo changing 0 to -1 */
+	if (rlim->rlim_cur == -1) {
+	    rlim->rlim_cur = 0;
+	    rlim->rlim_max = rlim->rlim_cur;
+	}
+
+        /* Unix priority = -1 * (vms priority - 4) */
+	rlim->rlim_cur = (rlim->rlim_cur - 4) * -1;
+
+        /* if JPI$_CURPRIV has ALTPRI  return VMS 0-15 */
+        /* Else JPI$_AUTHPRI is max */
+	if (cur_priv.prv$v_setpri != 0) {
+	    rlim->rlim_max = rlim->rlim_cur;
+	} else {
+	    rlim->rlim_max = 15 - 4;  /* Unix inverts the sign for max */
+	}
+        /* MAX = 20 - Unix priority */
+	return result;
+
+    case RLIMIT_CORE:
+	/* Can only get the flag at process creation time */
+	/* Otherwise needs kernel mode code */
+	jpi_code = JPI$_CREPRC_FLAGS;
+	result = vms_getrlimit_getjpi(jpi_code, rlim);
+	if (result < 0) {
+	    return result;
+	}
+	if ((rlim->rlim_cur & PRC$M_IMGDMP) != 0) {
+	    rlim->rlim_cur = -1;
+	} else {
+	    rlim->rlim_cur = 0;
+	}
+	rlim->rlim_max = -1;
+	return result;
+
+#ifdef RLIMIT_SIGPENDING
+    case RLIMIT_SIGPENDING:
+	result = sigfillset(&signal_set);
+	if (result < 0) {
+	    return result;
+	}
+	rlim->rlim_cur = 0;
+	result = sigpending(&signal_set);
+	if (result < 0) {
+	    return result;
+	} else {
+	    int i;
+	    unsigned int sig1, sig2;
+	    sig1 = signal_set._set[0];
+	    sig2 = signal_set._set[1];
+	    i = 0;
+	    while((sig1 != 0) && (i < 32)) {
+		if (sig1 & 1) {
+		    rlim->rlim_cur++;
+		}
+		sig1 = sig1 >> 1;
+	    }
+	    i = 0;
+	    while((sig2 != 0) && (i < 32)) {
+		if (sig2 & 1) {
+		    rlim->rlim_cur++;
+		}
+		sig2 = sig2 >> 1;
+	    }
+	}
+	rlim->rlim_max = rlim->rlim_cur;
+	return result;
+#endif
+
+	/* I do not know how to report the items below on VMS */
+#ifdef RLIMIT_RTPRIO
+    case RLIMIT_RTPRIO:
+#endif
+#ifdef RLIMIT_MEMLOCK
+    case RLIMIT_MEMLOCK:
+#endif
+#ifdef RLIMIT_PTHREAD
+    case RLIMIT_PTHREAD:
+#endif
+#ifdef RLIMIT_STACK
+    case RLIMIT_STACK:
+#endif
+#ifdef RLIMIT_DATA
+    case RLIMIT_DATA:
+#endif
+#ifdef RLIMIT_SMGQUEUE
+    case RLIMIT_MSGQUEUE:
+#endif
+#ifdef RLMIT_SBSIZE
+    case RLIMIT_SBSIZE:
+#endif
+	return vms_getrlimit_notimplemented(rlim);
+    }
+    errno = EINVAL;
+    return -1;
+}
+
+int vms_setrlimit(int resource, const struct vms_rlimit *rlim) {
+
+    /* Protect ourself */
+    if (rlim == NULL) {
+	errno = EINVAL;
+	return -1;
+    }
+
+
+    switch (resource) {
+    case RLIMIT_CPU:
+    case RLIMIT_FSIZE:
+    case RLIMIT_CORE:
+    case RLIMIT_RSS:
+    case RLIMIT_NPROC:
+    case RLIMIT_NOFILE:
+    case RLIMIT_AS:
+    case RLIMIT_LOCKS:
+    case RLIMIT_SIGPENDING:
+    case RLIMIT_NICE:
+#ifdef RLIMIT_RTPRIO
+    case RLIMIT_RTPRIO:
+#endif
+#ifdef RLIMIT_MEMLOCK
+    case RLIMIT_MEMLOCK:
+#endif
+#ifdef RLIMIT_PTHREAD
+    case RLIMIT_PTHREAD:
+#endif
+#ifdef RLIMIT_STACK
+    case RLIMIT_STACK:
+#endif
+#ifdef RLIMIT_DATA
+    case RLIMIT_DATA:
+#endif
+#ifdef RLIMIT_SMGQUEUE
+    case RLIMIT_MSGQUEUE:
+#endif
+#ifdef RLMIT_SBSIZE
+    case RLIMIT_SBSIZE:
+#endif
+	return vms_setrlimit_notimplemented(rlim);
+    }
+    errno = EINVAL;
+    return -1;
+}
+
+#define rlimit vms_rlimit
+#define getrlimit vms_getrlimit
+#define setrlimit vms_setrlimit
+#define rlim_t vms_rlim_t
+

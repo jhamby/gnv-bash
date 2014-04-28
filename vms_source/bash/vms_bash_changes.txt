@@ -1,0 +1,662 @@
+source_root:[gnv213.bash]bashhist.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]bashhist.c;1
+
+work_root:[gnv.bash]bashhist.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2]bashhist.c;1
+
+Code added to expand a path for a file.
+
+TODO: Handle with transparent wrapper.
+
+
+source_root:[gnv213.bash]command.h is different from
+SOURCE_ROOT:[gnu.bash-1^.14 ^.7]command.h;1
+
+Coded added for an additional VMS specific member of a structure for
+handling VMS/UNIX name translation.
+
+
+source_root:[gnv213.bash]endian.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]endian.c;1
+
+Fixes to produce the right answer on endian.c for VAX.
+
+
+source_root:[gnv213.bash]execute_cmd.c is different from.
+SOURCE_ROOT:[gnu.bash-1^.14^.7]execute_cmd.c;13
+
+Massive VMS specific changes to support vfork()
+
+
+source_root:[gnv213.bash]execute_cmd.h is different from.
+SOURCE_ROOT:[gnu.bash-1^.14^.7]execute_cmd.h;13
+
+Massive VMS specific changes.
+
+
+Comment out an include file, and some other changes.  Why?
+
+
+source_root:[gnv213.bash]filecntl.h is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]filecntl.h;1
+
+VMS macros added that duplicate the standard header file ones.
+
+
+source_root:[gnv213.bash]general.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]general.c;1
+
+More filename handling changes, probably could be done differently.
+
+
+source_root:[gnv213.bash]general.h is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]general.h;
+
+Definition fix-ups and add VMS-hack header files.
+Need to rework to removing VMS-hack header files and use the
+/first_include feature to include them.
+
+
+source_root:[gnv213.bash]input.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]input.c;1
+
+VMS file format handling fix-ups.
+
+
+source_root:[gnv213.bash]jobs.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]jobs.c;
+
+VMS changes to stub out terminal functions.
+
+Most changes are not needed if the proper defines are placed in config.h and
+a sgtty.h file is added.
+
+Need to investigate if substituting vfork() for fork() is sufficient.
+
+The build uses either jobs.c or nojobs.c, not both, so why are there
+VMS specific changes to both modules when only one is actually going to be
+used.
+
+
+source_root:[gnv213.bash]jobs.h is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]jobs.h;1
+
+fork() handling hack.
+
+If /first_include or config.h is used to handle fork(), no changes to this
+file are probably needed.
+
+
+
+source_root:[gnv213.bash]machines.h is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]machines.h;1
+
+VMS specific support added.
+
+
+source_root:[gnv213.bash]mailcheck.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]mailcheck.c;1
+
+
+VMS specific change to handle missing include file, needs changes to
+actually check for mail on VMS.
+
+
+source_root:[gnv213.bash]make_cmd.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]make_cmd.c;1
+
+Looks like something for handling "document_size" differently on VMS with
+no explanation as to why.
+
+We really should find out why this change was made as it does not appear to
+be related to porting the code to VMS.
+
+
+source_root:[gnv213.bash]nojobs.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]nojobs.c;1
+
+VMS vfork() / wait() handling.
+Need to review if to use jobs.c or nojobs.c
+jobs.c compiles, which indicates it may work.
+
+The build uses either jobs.c or nojobs.c, not both, so why are there
+VMS specific changes to both modules when only one is actually going to be
+used.
+
+
+source_root:[gnv213.bash]parse.y is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]parse.y;1
+
+Filename handling.
+
+Bash 4.2 patch 5 patch variables.h, parse.y, printf.def
+
+
+source_root:[gnv213.bash]print_cmd.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]print_cmd.c;1
+
+Need to fix illegal VMS ods-2 name in header file.  Only needed for VAX builds.
+
+
+
+source_root:[gnv213.bash]shell.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]shell.c;1
+
+Multiple VMS changes, many look like they should not be in this module, but
+done in other places.
+
+
+source_root:[gnv213.bash]siglist.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]siglist.c;1
+
+Changes to how headers are included.  Why?
+
+
+source_root:[gnv213.bash]subst.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]subst.c;1
+
+VMS filename handling, proably can be reordered.
+
+Bash 4.2 patch 1 update to subst.c / subst.h
+
+Bash 4.2 patch 4 update to subst.c
+
+Bash 4.2 patch 7 update to subst.c
+
+
+source_root:[gnv213.bash]test.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]test.c;
+
+VMS special stat and filename handling, optional searching for
+.EXE on files.
+
+
+source_root:[gnv213.bash]trap.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]trap.c;1
+
+VMS specific signalling code, reason unknown.
+
+
+source_root:[gnv213.bash]trap.h is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]trap.h;
+
+Small changes to definitions.  why?
+Original file seems to work fine.
+
+
+source_root:[gnv213.bash]variables.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7]variables.c;1
+
+VMS specific code added.  May be able to move to a wrapper.
+
+Bash 4.2 patch 5 patch variables.h, parse.y, printf.def
+Bash 4.2 patch 6 patch variables.c
+
+
+
+source_root:[gnv213.bash.builtins]cd.def is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]cd.def;1
+
+Header file fixup.  Does not appear to be needed.
+
+Bash 4.2 patch 5 patch variables.h, parse.y, printf.def
+
+
+
+source_root:[gnv213.bash.builtins]common.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]common.c;1
+
+VMS needs a cast for qsort for some unknown reason.
+
+
+
+source_root:[gnv213.bash.builtins]exit.def is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]exit.def;1
+
+Looking for VMS alternate filenames, and special VMS exit code.
+Move alternate lookups to wrapper library.
+
+
+source_root:[gnv213.bash.builtins]fc.def is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]fc.def;1
+
+Header file fixup.  Does not appear to be needed for VMS.
+
+
+source_root:[gnv213.bash.builtins]history.def is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]history.def;1
+
+Header file fixup.  Does not appear to be needed for VMS.
+
+
+source_root:[gnv213.bash.builtins]jobs.def is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]jobs.def;1
+
+An assert has been added, unknown if this if VMS specific or why.
+
+
+
+source_root:[gnv213.bash.builtins]mkbuiltins.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]mkbuiltins.c;1
+
+Attempt to fix the case of names to make MMS happy on ODS-5 volumes.
+Do not set line directives so VMS debugger will use generated .c FILE
+
+
+source_root:[gnv213.bash.builtins]psize.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]psize.c;1
+
+Not sure why the VMS changes are here as it is not even clear that this
+module is even used in the VMS build.
+
+I built the original module and ran the script on VMS.  It was CPU bound and
+I/O bound for a period of time with out indicating anything.  I finally killed
+it.
+
+As near as I can tell, there is no reason to set VMS pipesize.h differently
+than the default in Linux.
+
+
+source_root:[gnv213.bash.builtins]read.def is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]read.def;1
+
+Fix syntax issue on VMS.
+
+
+source_root:[gnv213.bash.builtins]source.def is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]source.def;1
+
+VMS can not trust .st_size member as it is not accurate for VFC and some
+other commonly used file formats.
+
+
+
+source_root:[gnv213.bash.builtins]ulimit.def is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.builtins]ulimit.def;1
+
+work_root:[gnv.bash.builtins]ulimit.def is different from
+SOURCE_ROOT:[gnu.bash-4^.2.builtins]ulimit.def;1
+
+Some minor changes, probably just to get it to compile.
+None of the changes appear to be needed to get it to compile.
+
+work_root:[gnv.bash.include]posixwait.h is different from
+SOURCE_ROOT:[gnu.bash-4^.2.include]posixwait.h;1
+
+VMS specific changes, reasons unknown.
+
+
+work_root:[gnv.bash.include]shmbutil.h is different from
+SOURCE_ROOT:[gnu.bash-4^.2.include]shmbutil.h;1
+
+
+Remove wchar_t definition, reasons unknown.  Why?
+
+
+work_root:[gnv.bash.include]shtty.h is different from
+SOURCE_ROOT:[gnu.bash-4^.2.include]shtty.h;1
+
+vms specific change for NEW_TTY_DRIVER.
+
+
+
+SOURCE_ROOT:[gnv.bash-4^.2.lib.intl]localcharset.c has existing
+VMS specific code.
+
+It states that it is avoiding charset.alias_vms and is based on 7.3-1.
+Need to verify this.
+
+
+source_root:[gnv213.bash.lib.glob]fnmatch.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.glob]fnmatch.c;1
+
+Changed to be case insensitive and then the change backed out because
+it broke expections of shell scripts.
+
+
+work_root:[gnv.bash.lib.glob]glob.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.glob]glob.c;1
+
+Header file and definition fixes.
+None of the changes appear to be needed for VMS.
+
+Bash 4.2 patch 3 lib/glob/gmisc.c
+
+
+work_root:[gnv.bash.lib.glob]ndir.h is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.glob]ndir.h;1
+
+Removed a header file, added a VMS specific definition.
+Looks like the VMS specific change is incorrect, directory/file names have been
+longer than 80 characters for quite some time.
+
+
+SOURCE_ROOT:[GNU.bash-4^.2.lib.glob]ndir.h has existing VMS specific code.
+Existing VMS specific code that can not handle ODS-5 filenames.
+
+
+source_root:[gnv213.bash.lib.malloc]alloca.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.malloc]alloca.c;1
+
+work_root:[gnv.bash.lib.malloc]alloca.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.malloc]alloca.c;1
+
+Fixes to get it to compile, but this module should not be used since
+VMS has a built-in.  So why the changes?
+
+
+source_root:[gnv213.bash.lib.malloc]malloc.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.malloc]malloc.c;1
+
+Fixes to silence compiler diagnostics.
+
+
+source_root:[gnv213.bash.lib.readline]bind.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]bind.c;1
+
+work_root:[gnv.bash.lib.readline]bind.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]bind.c;1
+
+Force to use vms bash special getenv()
+Handle with wrappers and /first_include instead.
+
+
+source_root:[gnv213.bash.lib.readline]complete.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]complete.c;1
+
+work_root:[gnv.bash.lib.readline]complete.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]complete.c;1
+
+VMS is lowercasing filenames.  This is probably a bug.
+
+
+source_root:[gnv213.bash.lib.readline]display.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]display.c;
+
+work_root:[gnv.bash.lib.readline]display.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]display.c;1
+
+Looks like minor changes that probably can be done better.
+
+
+work_root:[gnv.bash.lib.readline]histexpand.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]histexpand.c;1
+
+Change appears to be syntax only, unknown as to why.
+Change does not appear to be needed for VMS.
+
+source_root:[gnv213.bash.lib.readline]history.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]history.c;1
+
+work_root:[gnv.bash.lib.readline]histfile.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]histfile.c;1
+
+Module needs to include config.h conditionally. (1.4.8 port)
+
+Minor hack to get vms bash specific getenv.
+Handle with wrappers and /first_include instead.
+
+
+source_root:[gnv213.bash.lib.readline]parens.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]parens.c;1
+
+work_root:[gnv.bash.lib.readline]parens.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]parens.c;1
+
+Unclear why this VMS change is present, maybe to fix a compile defintion
+issue.
+Second look, does not look like any changes are needed for VMS.
+
+
+work_root:[gnv.bash.lib.readline]posixdir.h is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]posixdir.h;1
+
+Unknown why this change is present, should not be needed.
+
+
+source_root:[gnv213.bash.lib.readline]readline.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]readline.c;
+
+Massive VMS changes, not sure why.  One of them claims is to stop
+CPU looping.
+
+
+source_root:[gnv213.bash.lib.readline]rldefs.h is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]rldefs.h;
+
+work_root:[gnv.bash.lib.readline]rldefs.h is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]rldefs.h;1
+
+Hack for vms_term.h definitions.
+Use config.h, sgtty.h or /first_include instead.
+
+
+source_root:[gnv213.bash.lib.readline]rltty.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]rltty.c;1
+
+work_root:[gnv.bash.lib.readline]rltty.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]rltty.c;1
+
+VMS curses hacks.
+Use config.h, sgtty.h or /first_include instead.
+
+
+work_root:[gnv.bash.lib.readline]rltty.h is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]rltty.h;1
+
+Not sure why this is needed.  Change does not appear to be needed.
+
+
+source_root:[gnv213.bash.lib.readline]search.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]search.c;1
+
+Fix up to not overwrite macros and add missing prototypes.
+
+
+work_root:[gnv.bash.lib.readline]signals.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]signals.c;1
+
+Unsure why this change is needed.
+
+
+work_root:[gnv.bash.lib.readline]tcap.h is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]tcap.h;1
+
+Unknown why this change is needed.
+
+
+work_root:[gnv.bash.lib.readline]terminal.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]terminal.c;1
+
+Unknown why this change is needed.
+
+
+source_root:[gnv213.bash.lib.readline]tilde.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]tilde.c;1
+
+work_root:[gnv.bash.lib.readline]tilde.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]tilde.c;1
+
+Fixup for getting path information from getpwuid/getpwname()
+Use /first_include instead for wrappers on getpw*()
+
+
+work_root:[gnv.bash.lib.readline]util.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]util.c;1
+
+Appears to be a whitespace change only.
+
+
+source_root:[gnv213.bash.lib.readline]vi_mode.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.readline]vi_mode.c;1
+
+Fix for missing parameters in routine call.
+
+bash 4.2 patch 2 updates vi_mode.c, callback.c
+
+
+work_root:[gnv.bash.lib.readline]xmalloc.h is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.readline]xmalloc.h;1
+
+Unknown why these changes.
+
+
+work_root:[gnv.bash.lib.sh]fmtulong.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]fmtulong.c;
+
+Looks like whitespace changes only.
+
+
+work_root:[gnv.bash.lib.sh]fpurge.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]fpurge.c;
+
+VMS specific change, reason uknown.
+Followup: Discovered VMS does not have an fpurge() routine.  Need to simulate.
+Can be done with out changing this file.
+
+
+work_root:[gnv.bash.lib.sh]getcwd.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]getcwd.c;1
+
+Many changes, too many for a quick look.
+VMS should not need that many changes.  VMS should probably need no changes
+at all.
+
+
+work_root:[gnv.bash.lib.sh]getenv.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]getenv.c;1
+
+Minor syntax fix.
+
+
+work_root:[gnv.bash.lib.sh]mailstat.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]mailstat.c;
+
+Minor change, but probably does not work on VMS anyway since
+we need to interogate the UAF for pending mail count.
+
+
+work_root:[gnv.bash.lib.sh]makepath.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]makepath.c;1
+
+Commented out unused include file.  Why?
+Change does not appear needed for VMS.
+
+
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]mktime.c has existing VMS specific code
+
+Code is not done according to normal practice and is probably not needed.
+
+
+work_root:[gnv.bash.lib.sh]oslib.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]oslib.c;1
+
+Not sure why all these changes.  None appear to be needed for VMS.
+
+
+work_root:[gnv.bash.lib.sh]pathcanon.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]pathcanon.c;1
+
+Commented out missing header file.  Why?
+Change does not appear needed for VMS.
+
+
+work_root:[gnv.bash.lib.sh]pathphys.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]pathphys.c;
+
+Commented out missing header file.  Why?
+Change does not appear needed for VMS.
+
+
+work_root:[gnv.bash.lib.sh]shquote.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]shquote.c;1
+
+Only whitespace change.
+
+
+work_root:[gnv.bash.lib.sh]snprintf.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]snprintf.c;1
+
+Many changes, not sure why most of them are needed.
+
+
+work_root:[gnv.bash.lib.sh]spell.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]spell.c;1
+
+Commented out missing header file, looks like whitespace changes.
+Change does not appear needed for VMS.
+
+
+
+SOURCE_ROOT:[GNU.bash-4^.2.lib.sh]strftime.c has existing VMS specific code.
+
+VMS specific date handling coding.
+
+
+work_root:[gnv.bash.lib.sh]strtoimax.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]strtoimax.c;1
+
+Some unused code appears to be commented out.
+
+
+work_root:[gnv.bash.lib.sh]strtoumax.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.sh]strtoumax.c;1
+
+Some unused code appears to be commented out.
+
+
+work_root:[gnv.bash.lib.termcap]termcap.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.termcap]termcap.c;1
+
+Changes done for finding VMS termcap library.
+Bad ideal to hard code "emacs_library" for rooted logical name.  BUG.
+This violates VMS naming conventions.
+Probably should use gnv$termcap or use wrapper for open() to look for the
+specific call when an "/etc/* file is looked for.
+Wrapper can map /etc/<file> to gnv$file or gnv$etc:<file>.
+
+
+SOURCE_ROOT:[GNU.bash-4^.2.lib.termcap]termcap.c has existing VMS specific code.
+It has a VMS specific terminal speed table and a function to test if a
+filename is valid.  Older VMS code can not handle ODS-5 filenames.
+
+
+source_root:[gnv213.bash.lib.termcap]termcap.h is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.lib.termcap]termcap.h;1;
+
+
+work_root:[gnv.bash.lib.termcap]termcap.h is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.termcap]termcap.h;1
+
+VMS curses fixups.  Not the place to do this, use config.h or /first_include.
+
+
+work_root:[gnv.bash.lib.termcap]tparam.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.termcap]tparam.c;1
+
+Minor header file fixup, commented out #else.  Why?
+
+
+work_root:[gnv.bash.lib.tilde]tilde.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.lib.tilde]tilde.c;1
+
+Minor change to remove an include ansi_stdlib.h directive.
+VMS does not need this change.
+
+
+source_root:[gnv213.bash.support]getcppsyms.c is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.support]getcppsyms.c;1
+
+Unknown VMS specific change, module appears not to be used.
+
+
+source_root:[gnv213.bash.support]inpath. is different from
+SOURCE_ROOT:[gnu.bash-1^.14^.7.support]inpath.;1
+
+Unknown changes, do not appear to be VMS specific.
+
+
+work_root:[gnv.bash.support]signames.c is different from
+SOURCE_ROOT:[gnu.bash-4^.2.support]signames.c;1
+
+Some code is commented out, reason unknown.

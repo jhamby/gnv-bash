@@ -1,0 +1,420 @@
+! File nojobs.tpu
+!
+! $Id: nojobs.tpu,v 1.4 2013/06/14 04:49:33 robertsonericw Exp $
+!
+! Copyright 2012, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+! 
+! Define the whitespace pattern.
+!
+ws := SPAN("    ");
+!
+! Fake out the VMS fork
+!-------------------------
+VMS_INSERT_BEFORE('#define DEFAULT_CHILD_MAX', '#ifdef __VMS');
+COPY_TEXT('#define waitpid(a, b, c) vms_fake_waitpid(a, b, c)');
+SPLIT_LINE;
+COPY_TEXT("#endif");
+SPLIT_LINE;
+!
+! Add the OpenVMS-specific field that will hold the real OpenVMS
+! process ID generated in calls to vms_vfork_exec() to the Bash
+! process status structure.
+!
+POSITION(END_OF(SEARCH_QUIETLY('struct proc_status {', FORWARD, EXACT)));
+VMS_INSERT_AFTER(ws + 'pid;', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  pid_t vms_pid;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */'); 
+SPLIT_LINE;
+!
+! Allow the function set_pid_status() to be callable from outside
+! the nojobs module. This is needed so that in places were exit()
+! is used while in a fake subshell, this routine can be called
+! instead to record the result of the fake subshell in Bash's
+! NOJOBS\pid_list array. Also, add the related find_index_by_vms_pid(),
+! v_set_pid_list_vms_pid(), and vms_fake_waitpid() declarations. These
+! functions will be used when OpenVMS process ID's must be used for
+! keeping track of Bash "background" subshells.
+!
+VMS_INSERT_BEFORE('static void set_pid_status __P((pid_t, WAIT));', '#ifdef __VMS');
+COPY_TEXT('void set_pid_status __P((pid_t, WAIT));');
+SPLIT_LINE;
+COPY_TEXT('void v_set_pid_list_vms_pid __P((pid_t, pid_t));');
+SPLIT_LINE;
+COPY_TEXT('pid_t get_vms_pid_from_fake_pid __P((pid_t fake_pid));');
+SPLIT_LINE;
+COPY_TEXT('static int find_index_by_vms_pid __P((pid_t));');
+SPLIT_LINE;
+COPY_TEXT('pid_t vms_fake_waitpid __P((pid_t, int *, int));');
+SPLIT_LINE;
+COPY_TEXT('pid_t decc$waitpid(pid_t, int *, int);');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('static void set_pid_status __P((pid_t, WAIT));', '#endif /* __VMS */');
+!
+! Remove the static storage modifier for the definition of set_pid_status() to
+! correspond with the its declaration modified earlier.
+!
+old_pattern := 'static void' + LINE_END + LINE_BEGIN +
+	       'set_pid_status (pid, status)';
+VMS_INSERT_BEFORE(old_pattern, '#ifdef __VMS');
+COPY_TEXT('void');
+SPLIT_LINE;
+COPY_TEXT('set_pid_status (pid, status)');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER(old_pattern, '#endif /* __VMS */');
+!
+! Make sure that the exit status of a fake child is only set once and only if there is
+! no associated OpenVMS process ID. When there is an associated OpenVMS process ID,
+! the process status is set through a call to wait(-1,...) or wait_for(). This is
+! necessary because multiple exits cannot always be avoided when returning back
+! through the call stack and because the methods of setting fake process status for
+! the case of spawning and not spawning a real OpenVMS process must be kept separate.
+!
+VMS_INSERT_BEFORE('pid_list[slot].status = process_exit_status (status);',
+                  '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  if ((pid_list[slot].vms_pid == NO_PID) && (pid_list[slot].flags & PROC_RUNNING))');
+SPLIT_LINE;
+COPY_TEXT('     {');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+VMS_INSERT_BEFORE(LINE_BEGIN + '}', '#ifdef __VMS');
+COPY_TEXT('     }');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+! Modify add_pid() to initialize the additional OpenVMS process ID field in the
+! process status structure that was added above.
+!
+old_pattern := 'static void' + LINE_END + LINE_BEGIN + 'add_pid (pid, async)';
+POSITION(END_OF(SEARCH_QUIETLY(old_pattern, FORWARD, EXACT)));
+VMS_INSERT_AFTER(LINE_BEGIN + (ws @ ws_range) + 'pid_list[slot].pid = pid;', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('pid_list[slot].vms_pid = NO_PID;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+! No fork on VMS so the block starting here is not used.
+VMS_INSERT_BEFORE('/* Create the child,', '#ifndef __VMS');
+
+! End of block, just before the child procsing
+! Need to terminate the conditional exclusion and add some VMS specific stuff
+! VMS_INSERT_BEFORE leaves the editing cursor just before the line beginning
+! the text that was searched for.
+VMS_INSERT_BEFORE('if (pid == 0)', '#else');
+
+! Put VMS specific hacks here.  Set pid to one to skip the child side.  Then
+! save the current child's values for last_made_pid and last_asynchronous_pid.
+
+COPY_TEXT('    pid = 1;');
+SPLIT_LINE;
+COPY_TEXT('    vms_fake_fork();');
+SPLIT_LINE;
+COPY_TEXT('    PushPid(last_asynchronous_pid);');
+SPLIT_LINE;
+COPY_TEXT('    PushPid(last_made_pid);');
+SPLIT_LINE;
+COPY_TEXT("#endif");
+SPLIT_LINE;
+
+! We have to be both the parent and the child here
+VMS_INSERT_BEFORE('else', '#ifndef __VMS');
+VMS_INSERT_BEFORE('{', '#endif');
+
+!
+! In the parent, we need to simulate a PID
+! Which we will return as the parent.
+VMS_INSERT_BEFORE('/* In the parent. */','#ifdef __VMS');
+COPY_TEXT('      /* Simulate a PID in the range 0x10000 to 0x1FFFF */');
+SPLIT_LINE;
+COPY_TEXT('      /* We should never have to worry about an overlap */');
+SPLIT_LINE;
+COPY_TEXT('      static vms_pid_count = 0x10000;');
+SPLIT_LINE;
+COPY_TEXT('      vms_pid_count+= 0x1;');
+SPLIT_LINE;
+COPY_TEXT('      if (vms_pid_count > 0x1FFFF)');
+SPLIT_LINE;
+COPY_TEXT('	{');
+SPLIT_LINE;
+COPY_TEXT('	  vms_pid_count = 0x10000;');
+SPLIT_LINE;
+COPY_TEXT('	}');
+SPLIT_LINE;
+COPY_TEXT('      pid = vms_pid_count;');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+
+! Exchange the values for last_made_pid and last_asynchronous_pid so that
+! the current values are the child's and the parents are saved to be
+! restored later when the call to vms_restore_bash_environ is made.
+
+VMS_INSERT_BEFORE('return (pid);', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  ExchangeParentChildPids();');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+! Look for the wait_for() function and insert a call to PopPid to restore
+! the value in last_made_pid.
+!
+!old_pattern :=  LINE_BEGIN + 'int' + LINE_END +
+!		 LINE_BEGIN + 'wait_for (pid)' +
+!		 LINE_END + LINE_BEGIN + '     pid_t pid;' +
+!		 LINE_END + LINE_BEGIN + '{';
+!POSITION(END_OF(SEARCH_QUIETLY(old_pattern, FORWARD, EXACT)));
+!VMS_INSERT_AFTER('pstatus = find_status_by_pid (pid);', '');
+!COPY_TEXT('#ifdef __VMS');
+!SPLIT_LINE;
+!COPY_TEXT('  last_made_pid = PopPid();');
+!SPLIT_LINE;
+!COPY_TEXT('#endif /* __VMS */');
+!
+! Modify kill_pid() to attempt to convert the fake process ID to its
+! corresponding real OpenVMS Process ID before attempting to invoke
+! kill() on it.
+!
+old_pattern := LINE_BEGIN + 'int' + LINE_END +
+               LINE_BEGIN + 'kill_pid (pid, signal, group)' + LINE_END;
+POSITION(END_OF(SEARCH_QUIETLY(old_pattern, FORWARD, EXACT)));
+VMS_INSERT_AFTER('int result;', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  pid_t vms_pid;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+VMS_INSERT_AFTER('}', '');
+SPLIT_LINE;
+COPY_TEXT('#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('  if ((vms_pid = get_vms_pid_from_fake_pid(pid)) != NO_PID)');
+SPLIT_LINE;
+COPY_TEXT('     pid = vms_pid;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+! Add new OpenVMS-specific function definitions to the end of the file.
+!
+POSITION(END_OF(CURRENT_BUFFER));
+SPLIT_LINE;
+COPY_TEXT('#ifdef __VMS');
+SPLIT_LINE;
+!
+! Add the function that will lookup the process status entry for a specified
+! OpenVMS process ID.
+!
+COPY_TEXT('/* Return the offset within the PID_LIST array of a slot containing a');
+SPLIT_LINE;
+COPY_TEXT('   specified OpenVMS process ID, or the value NO_PID if the ID wasn''t');
+SPLIT_LINE;
+COPY_TEXT('   found. */');
+SPLIT_LINE;
+COPY_TEXT('static int');
+SPLIT_LINE;
+COPY_TEXT('find_index_by_vms_pid (pid)');
+SPLIT_LINE;
+COPY_TEXT('     pid_t pid;');
+SPLIT_LINE;
+COPY_TEXT('{');
+SPLIT_LINE;
+COPY_TEXT('  register int i;');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('  for (i = 0; i < pid_list_size; i++)');
+SPLIT_LINE;
+COPY_TEXT('    if (pid_list[i].vms_pid == pid)');
+SPLIT_LINE;
+COPY_TEXT('      return (i);');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('  return (NO_PID);');
+SPLIT_LINE;
+COPY_TEXT('}');
+SPLIT_LINE;
+!
+! Add the function that will be used to set the real OpenVMS process ID for a
+! given fake subshell process ID in the Bash NOJOBS\pid_list array.
+!
+SPLIT_LINE;
+COPY_TEXT('void');
+SPLIT_LINE;
+COPY_TEXT('v_set_pid_list_vms_pid(fake_pid, vms_pid)');
+SPLIT_LINE;
+COPY_TEXT('     pid_t fake_pid;');
+SPLIT_LINE;
+COPY_TEXT('     pid_t vms_pid;');
+SPLIT_LINE;
+COPY_TEXT('{');
+SPLIT_LINE;
+COPY_TEXT('  int i;');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('  if ((i = find_index_by_pid(fake_pid)) != NO_PID)');
+SPLIT_LINE;
+COPY_TEXT('    pid_list[i].vms_pid = vms_pid;');
+SPLIT_LINE;
+COPY_TEXT('}');
+SPLIT_LINE;
+!
+! Add the function that will be used to obtain the real OpenVMS process ID given its
+! corresponding fake process ID.
+!
+SPLIT_LINE;
+COPY_TEXT('pid_t');
+SPLIT_LINE;
+COPY_TEXT('get_vms_pid_from_fake_pid(fake_pid)');
+SPLIT_LINE;
+COPY_TEXT('pid_t fake_pid;');
+SPLIT_LINE;
+COPY_TEXT('{');
+SPLIT_LINE;
+COPY_TEXT('  int i;');
+SPLIT_LINE;
+COPY_TEXT('  pid_t vms_pid = NO_PID;');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('  if ((i = find_index_by_pid(fake_pid)) != NO_PID)');
+SPLIT_LINE;
+COPY_TEXT('     vms_pid = pid_list[i].vms_pid;');
+SPLIT_LINE;
+COPY_TEXT('  return vms_pid;');
+SPLIT_LINE;
+COPY_TEXT('}');
+SPLIT_LINE;
+!
+! Add the function that will be used to wait for real OpenVMS processes but will accept
+! and return the corresponding fake process ID's.
+!
+SPLIT_LINE;
+COPY_TEXT('pid_t');
+SPLIT_LINE;
+COPY_TEXT('vms_fake_waitpid(fake_pid, pstatus, options)');
+SPLIT_LINE;
+COPY_TEXT('     pid_t fake_pid;');
+SPLIT_LINE;
+COPY_TEXT('     int *pstatus;');
+SPLIT_LINE;
+COPY_TEXT('     int options;');
+SPLIT_LINE;
+COPY_TEXT('{');
+SPLIT_LINE;
+COPY_TEXT('pid_t vms_pid = NO_PID;');
+SPLIT_LINE;
+COPY_TEXT('pid_t pid_return = NO_PID;');
+SPLIT_LINE;
+COPY_TEXT('int slot = NO_PID;');
+SPLIT_LINE;
+COPY_TEXT('int temp_status;');
+SPLIT_LINE;
+COPY_TEXT('int done = 0;');
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('  errno = 0;');
+SPLIT_LINE;
+COPY_TEXT('  if (fake_pid != NO_PID) slot = find_index_by_pid(fake_pid);');
+SPLIT_LINE;
+COPY_TEXT('  if (slot != NO_PID)');
+SPLIT_LINE;
+COPY_TEXT('    {');
+SPLIT_LINE;
+COPY_TEXT('    vms_pid = pid_list[slot].vms_pid;');
+SPLIT_LINE;
+COPY_TEXT('    if ((vms_pid == NO_PID) && !(pid_list[slot].flags & PROC_RUNNING))');
+SPLIT_LINE;
+COPY_TEXT('      {');
+SPLIT_LINE;
+COPY_TEXT('      *pstatus = pid_list[slot].status;');
+SPLIT_LINE;
+COPY_TEXT('      pid_return = fake_pid;');
+SPLIT_LINE;
+COPY_TEXT('      }');
+SPLIT_LINE;
+COPY_TEXT('    done = 1;');
+SPLIT_LINE;
+COPY_TEXT('    }');
+SPLIT_LINE;
+SPLIT_LINE;
+SPLIT_LINE;
+COPY_TEXT('  if (!done && (vms_pid == NO_PID && fake_pid == NO_PID) || vms_pid != NO_PID)');
+SPLIT_LINE;
+COPY_TEXT('    {');
+SPLIT_LINE;
+COPY_TEXT('    pid_return = fake_pid;');
+SPLIT_LINE;
+COPY_TEXT('    vms_pid = decc$waitpid(vms_pid, &temp_status, options);');
+SPLIT_LINE;
+COPY_TEXT('    if (vms_pid != NO_PID)');
+SPLIT_LINE;
+COPY_TEXT('      {');
+SPLIT_LINE;
+COPY_TEXT('      if (fake_pid == NO_PID) slot = find_index_by_vms_pid(vms_pid);');
+SPLIT_LINE; 
+COPY_TEXT('      if (slot != NO_PID);');
+SPLIT_LINE;
+COPY_TEXT('        {');
+SPLIT_LINE;
+COPY_TEXT('        *pstatus = temp_status;');
+SPLIT_LINE;
+COPY_TEXT('        pid_list[slot].status = process_exit_status (temp_status);');
+SPLIT_LINE;
+COPY_TEXT('        pid_list[slot].flags &= ~PROC_RUNNING;');
+SPLIT_LINE;
+COPY_TEXT('        if (WIFSIGNALED(temp_status))');
+SPLIT_LINE;
+COPY_TEXT('          pid_list[slot].flags |= PROC_SIGNALED;');
+SPLIT_LINE;
+COPY_TEXT('  /* If it''s not a background process, mark it as notified so it gets');
+SPLIT_LINE;
+COPY_TEXT('     cleaned up. */');
+SPLIT_LINE;
+COPY_TEXT('        if ((pid_list[slot].flags & PROC_ASYNC) == 0)');
+SPLIT_LINE;
+COPY_TEXT('          pid_list[slot].flags |= PROC_NOTIFIED;');
+SPLIT_LINE;
+COPY_TEXT('        pid_return = pid_list[slot].pid;');
+SPLIT_LINE;
+COPY_TEXT('        }');
+SPLIT_LINE;
+COPY_TEXT('      }');
+SPLIT_LINE;
+COPY_TEXT('    else');
+SPLIT_LINE;
+COPY_TEXT('      pid_return = NO_PID; ');
+SPLIT_LINE;
+COPY_TEXT('    }');
+SPLIT_LINE;
+COPY_TEXT('  else');
+SPLIT_LINE;
+COPY_TEXT('    errno = ECHILD;');
+SPLIT_LINE;
+COPY_TEXT('  return pid_return;');
+SPLIT_LINE;
+COPY_TEXT('}');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;

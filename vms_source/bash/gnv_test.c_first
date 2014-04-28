@@ -1,0 +1,49 @@
+/* File: gnv$test.c_first gnv_test.c_first
+ *
+ * $Id: gnv_test.c_first,v 1.2 2013/06/29 14:36:23 wb8tyw Exp $
+ *
+ * Copyright 2013, John Malmberg
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+ */
+
+/* Put a wrapper around the access() function, because it is not working
+   with root directories */
+
+/* This bug has been seen in VMS 8.3 Alpha and VMS 8.4 Alpha */
+
+#pragma message save
+#pragma message disable dollarid
+#pragma message disable valuepres
+#define isatty hide_isatty
+#include <unistd.h>
+#undef isatty
+
+int  decc$isatty (int __file_desc);
+
+
+static int  vms_isatty (int file_desc) {
+int result;
+
+    /* First try the isatty() call and see if it works */
+    result = decc$isatty(file_desc);
+    if (result == 1) {
+	return result;
+    } else {
+	return 0;
+    }
+}
+
+
+#define isatty(__file_desc) vms_isatty(__file_desc)

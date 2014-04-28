@@ -1,0 +1,54 @@
+/* File: gnv$version.c_first gnv_version.c_first
+ *
+ * $Id: gnv_version.c_first,v 1.3 2013/06/14 05:04:57 robertsonericw Exp $
+ *
+ * Copyright 2011, John Malmberg
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+ */
+
+#include <vms_sys_library/stdio.h>
+
+#include "vms_eco_level.h"
+
+/* Allow the text of the version to be set at build time */
+/* Default it to a standard text */
+#ifndef GNV_VMS_VERSION
+#define GNV_VMS_VERSION "GNV-3.0-1-EWR-1"
+#endif
+
+
+void gnu_bash_show_shell_version(int extended);
+
+void
+show_shell_version (int extended)
+{
+    /* Write out the GNU Bash information */
+    gnu_bash_show_shell_version(extended);
+
+    /* Append the variant information for this build */
+#ifdef __DECC_VER
+    printf ("PACKAGE %s ECO %s %s %s VMS %lu HP/DECC %lu\n",
+            GNV_VMS_VERSION, VMS_BASH_ECO, __DATE__, __TIME__,
+	   __VMS_VER, __DECC_VER);
+#else
+    printf ("PACKAGE %s ECO %s %s %s Unknown VMS version and Compiler\n",
+            GNV_VMS_VERSION, VMS_BASH_ECO,  __DATE__, __TIME__);
+#endif
+
+}
+
+/* Rename the original internal version name */
+#define show_shell_version gnu_bash_show_shell_version
+

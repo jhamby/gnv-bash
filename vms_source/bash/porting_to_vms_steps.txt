@@ -1,0 +1,53 @@
+File: porting_to_vms_steps.txt
+
+$Id: porting_to_vms_steps.txt,v 1.1.1.1 2012/12/02 19:25:22 wb8tyw Exp $
+
+Steps for starting/updating a VMS port.
+
+ 1. Set up build environment with three directory trees for the unmodified
+    source, the VMS changed source and the build output.
+
+ 2. Get unmodified reference copy from the repository of project.
+
+ 3. Find all VMS specific changes in previous ports and evaluate
+    why they were made.
+
+   These issues generally show up:
+
+   a. Change not needed for modern VMS.
+   b. Change never needed for VMS.
+   c. Change breaks VMS.
+   d. Compile/defitions issues:
+        i: Illegal ODS-2 include file names.
+       ii: Inproper checking for header file present
+      iii: Syntax errors.
+       iv: Missing header files.
+        v: Bugs detected by VMS compiler/linker.
+   e. Filenames not expected on VMS:  Put in wrappers for I/O calls.
+   f. fork(): Need special code.
+   g. pipe(): Need wrappers for EOF handling / VM pipes.
+   h. VMS api missing or not functioning the way expected.
+        i: curses not fully implemented.
+       ii: stat st_size can not be trusted.
+      iii: getenv() hacks.
+   i. VMS specific conventions fix-up.
+
+ 4. Generate a config.h and makefile.
+
+ 5. Get modules to compile with the mininum number of VMS changes possible
+
+ 6. Start reapplying the VMS specific code to get minimally functional.
+    Preferably by adding wrapper routines external to original modules
+    and using the /FIRST_INCLUDE to pull in a header file that provides
+    redefinitions.
+
+ 7. Start attempting to run self tests.
+
+ 8. Fixes needed for self-tests.
+
+ 9. Build PCSI kit.  (BETA)
+
+10. Start building against (head/trunk/blead/unstable)
+
+11. Start feeding code back to the original project.
+

@@ -1,0 +1,40 @@
+! File print_cmd.tpu
+!
+! $Id: print_cmd.tpu,v 1.1 2013/06/09 18:05:03 wb8tyw Exp $
+!
+! Copyright 2013, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+! VMS specific patches needed.
+!
+!
+! VAX needs an ODS-2 legal file
+!-------------------------------
+VMS_INSERT_BEFORE('#include <y.tab.h>', '#ifndef __VMS');
+VMS_INSERT_AFTER('#include <y.tab.h>', '#else');
+SPLIT_LINE;
+COPY_TEXT('#ifdef __VAX');
+SPLIT_LINE;
+COPY_TEXT('#include <y_tab.h>');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+COPY_TEXT('#include <y.tab.h>');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;

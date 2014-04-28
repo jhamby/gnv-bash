@@ -1,0 +1,90 @@
+! File shell.tpu
+!
+! $Id: exec.tpu,v 1.2 2013/07/11 23:56:47 robertsonericw Exp $
+!
+! Copyright 2012, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+! VMS specific patches needed.
+!
+! Add a new local variable to the function exec_builtin() to store the
+! result of the vfork/execve function calls. Add checks that determine
+! the success or failure of the vfork/execve functions as distinct from
+! the status of the child of the vfork/execve. These checks serve to
+! to qualify the execution of some of the code in the return path following
+! the call to exec_builtin which must only execute on OpenVMS and then only
+! in the case where the vfork/execve fails. Also, for the special case when
+! the exec builtin is executed in a subshell on OpenVMS, the return status
+! of the exec builtin becomes the return value of the vfork/exec from within
+! vms_shell_execve while the exit status of the child that executes the target
+! of the exec command is saved in the (fake) process list (see NOJOBS.C).
+!
+LOCAL find_range, match_pattern, old_text, new_text;
+
+VMS_INSERT_AFTER('', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('#include "vms_fakefork.h"');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+match_pattern := 'exec_builtin (list)' + LINE_END + LINE_BEGIN + '     WORD_LIST *list;' + LINE_END + LINE_BEGIN + '{' + LINE_END;
+find_range := SEARCH_QUIETLY(match_pattern, FORWARD, EXACT);
+IF find_range <> 0
+THEN
+    POSITION(END_OF(find_range));
+    SPLIT_LINE;
+    COPY_TEXT('#ifdef __VMS');
+    SPLIT_LINE;
+    COPY_TEXT('  int exec_status=EXECUTION_SUCCESS;');
+    SPLIT_LINE;
+    COPY_TEXT('#endif /* __VMS */');
+    SPLIT_LINE;
+    VMS_PATCH('  exit_value = shell_execve (command, args, env);', '   exit_value = vms_shell_execve(command, args, env, NULL, VMS_WAIT_CHILD, &exec_status);');
+    VMS_INSERT_BEFORE('  if (exit_value == EX_NOTFOUND)', '#ifdef __VMS');
+    COPY_TEXT('  if (exec_status)');
+    SPLIT_LINE;
+    COPY_TEXT('     {');
+    SPLIT_LINE;
+    COPY_TEXT('#endif /* __VMS */');
+    SPLIT_LINE;
+    match_pattern := '  else' + LINE_END + LINE_BEGIN + '    file_error (command);' + LINE_END;
+    find_range := SEARCH_QUIETLY(match_pattern, FORWARD, EXACT);
+    IF find_range <> 0
+    THEN
+       POSITION(END_OF(find_range));
+       SPLIT_LINE;
+       COPY_TEXT('#ifdef __VMS');
+       SPLIT_LINE;
+       COPY_TEXT('     } /* if (exec_status) */');
+       SPLIT_LINE;
+       COPY_TEXT('#endif /* __VMS */');
+    ENDIF;
+!
+! Make sure that OpenVMS does not perform a shell exit unless the exec status is bad.
+!
+    old_text := 'if (subshell_environment || (interactive == 0 && no_exit_on_failed_exec == 0))';
+    new_text := 'if (exec_status && (subshell_environment || (interactive == 0 && no_exit_on_failed_exec == 0)))';
+    VMS_PATCH(old_text, new_text);
+!    VMS_INSERT_BEFORE('return (exit_value);', '#ifdef __VMS');
+!
+! On OpenVMS, only return the status of the exec'd commmand directly when 
+! not executing in a subshell environment.
+!
+!    COPY_TEXT('  if (subshell_environment) exit_value = exec_status;');
+!    SPLIT_LINE;
+!    COPY_TEXT('#endif /* __VMS */');
+!    SPLIT_LINE;
+ENDIF;
