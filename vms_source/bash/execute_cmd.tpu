@@ -1,6 +1,6 @@
 ! File execute_cmd.tpu
 !
-! $Id: execute_cmd.tpu,v 1.6 2013/07/11 23:47:02 robertsonericw Exp $
+! $Id: execute_cmd.tpu,v 1.5 2013/06/14 04:44:05 robertsonericw Exp $
 !
 ! Copyright 2012, John Malmberg
 !
@@ -17,6 +17,10 @@
 ! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 !
 !============================================================================
+!
+! Initialization for white space definition
+!
+ws := SPAN(" 	");
 !
 ! VMS specific patches needed.
 !
@@ -65,11 +69,6 @@ SPLIT_LINE;
 COPY_TEXT('#endif');
 SPLIT_LINE;
 COPY_TEXT('#define ferror(__x)  (*__x ? ferror(__x) : 0)');
-SPLIT_LINE;
-COPY_TEXT('/* VMS does not fork, so do not exit */');
-SPLIT_LINE;
-COPY_TEXT('#define exit(foo) vms_fake_child_status = vms_fake_fork_exit(foo)');
-SPLIT_LINE;
 SPLIT_LINE;
 COPY_TEXT('/* Need special handling of wait_for for fake child pids */');
 SPLIT_LINE;
@@ -125,7 +124,9 @@ COPY_TEXT('#endif /* __VMS */');
 SPLIT_LINE;
 !
 ! Bugfix, savestring is a macro, so do not pass it a function
-VMS_INSERT_BEFORE('pid_t paren_pid','      char *cmd_str;');
+! This bugfix is no longer needed because it is already include
+! in bash 4.3.x.
+!VMS_INSERT_BEFORE('pid_t paren_pid','      char *cmd_str;');
 VMS_INSERT_AFTER('pid_t paren_pid', '#ifdef __VMS');
 SPLIT_LINE;
 COPY_TEXT('      VMS_BASH_ENVIRON * old_envbuf = NULL;');
@@ -142,48 +143,33 @@ COPY_TEXT('      old_envbuf = vms_save_bash_environ (VMS_SAVE_SUBSHELL);');
 SPLIT_LINE;
 COPY_TEXT('#endif /* __VMS */');
 SPLIT_LINE;
-SPLIT_LINE;
 
 ! Bugfix, savestring continuing.
 ! Todo: Fix Macro, not here.
-VMS_INSERT_BEFORE('savestring (',
-'      cmd_str = make_command_string (command);');
-VMS_REPLACE('make_command_string (command)', 'cmd_str');
+! This bugfix is no longer needed because it is already include
+! in bash 4.3.x.
+!VMS_INSERT_BEFORE('savestring (',
+!'      cmd_str = make_command_string (command);');
+!VMS_REPLACE('make_command_string (command)', 'cmd_str');
 !
 !
-! VMS patch - Execute child, section, add braces for a block.
+! VMS patch - Remove the "if" check for parent, Execute child code, unite
+!             the "then" and "else" blocks of the if statement into one
+!             code block, execute vms_restore_bash_environ() followed by the
+!             remaining parent code block.
+!
 VMS_INSERT_BEFORE('if (paren_pid == 0)', '#ifndef __VMS');
-! for 1.14.8 port:
-! save the old_trap_list and signal modes
-! cancel the exit trap
-! for 4.2, probably do this in execute_in_subshell()
-
-VMS_INSERT_BEFORE('exit (', '#endif /* __VMS */');
-!COPY_TEXT(
-!' fprintf(stderr, "*DEBUG* exec*_com*_int* ret from exec*_in_subshell\n\n");');
-!SPLIT_LINE;
+VMS_INSERT_AFTER('if (paren_pid == 0)', '#endif /* !__VMS */');
+old_pattern := LINE_BEGIN + ws + '}' + LINE_END + LINE_BEGIN + ws + 'else' +
+               LINE_END + LINE_BEGIN + (ws @ ws_range) + '{';
+VMS_INSERT_BEFORE(old_pattern, '#ifndef __VMS');
+VMS_INSERT_AFTER(old_pattern, '#else');
 SPLIT_LINE;
-COPY_TEXT('        {');
+COPY_TEXT(ws_range);
+COPY_TEXT('  vms_restore_bash_environ (old_envbuf);');
 SPLIT_LINE;
-
-
-!
-! Close the braces, Then execute the parent cleanup by always executing
-! the else clause.
-VMS_INSERT_BEFORE('else', '        }');
-!COPY_TEXT(
-!   '  fprintf(stderr, "*DEBUG* execute_command_internal - parent side\n");');
-!SPLIT_LINE;
-COPY_TEXT('#ifndef __VMS');
+COPY_TEXT('#endif /* !__VMS */');
 SPLIT_LINE;
-VMS_INSERT_BEFORE('{', '#endif /* __VMS */');
-VMS_INSERT_AFTER('{', '#ifdef __VMS');
-SPLIT_LINE;
-COPY_TEXT('	  vms_restore_bash_environ (old_envbuf);');
-SPLIT_LINE;
-COPY_TEXT('#endif /* __VMS */');
-SPLIT_LINE;
-
 !
 ! before the '    }' before #if defined (COMMAND_TIMING)
 ! VMS needs to return (EXECUTION_SUCCESS) according to 1.14.8
@@ -214,18 +200,22 @@ THEN
     SPLIT_LINE;
 ENDIF;
 !
+! Bash 4.3 removed some needed logic for builds without job control
+! The script block below puts it back in for OpenVMS.
 !
-!
-! For case cm_simple: Bash 1.14.8 is saving a fake child status of -1
-! before actually executing the command.  Assume that this is needed.
-VMS_INSERT_BEFORE("/* We can't rely", '#ifdef __VMS');
-!COPY_TEXT(
-!'  fprintf(stderr, "*DEBUG* execute_command_internal cm_simple:\n\n");');
-!SPLIT_LINE;
-COPY_TEXT('	vms_fake_child_status = -1;');
+VMS_INSERT_BEFORE(LINE_BEGIN + (ws @ ws_range) +
+                  'if (already_making_children && pipe_out == NO_PIPE)',
+                  '#ifndef __VMS');
+VMS_INSERT_AFTER('if (already_making_children && pipe_out == NO_PIPE)',
+                 '#else');
 SPLIT_LINE;
-COPY_TEXT('#endif /* __VMS */');
+COPY_TEXT(ws_range);
+COPY_TEXT('if (already_making_children && pipe_out == NO_PIPE &&');
 SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('    last_made_pid != last_pid)');
+SPLIT_LINE;
+COPY_TEXT('#endif /* !__VMS */');
 
 ! execute_in_subshell
 !
@@ -266,12 +256,12 @@ COPY_TEXT('	return (invert ? EXECUTION_SUCCESS : EXECUTION_FAILURE);');
 SPLIT_LINE;
 COPY_TEXT('#else');
 SPLIT_LINE;
-COPY_TEXT('#endif /* __VMS */');
+VMS_INSERT_AFTER('exit (invert', '#endif /* __VMS */');
 SPLIT_LINE;
-VMS_INSERT_AFTER('exit (invert', '       }');
+COPY_TEXT('       }');
 SPLIT_LINE;
 
-find_range := SEARCH_QUIETLY('setjmp (return_catch)', FORWARD, EXACT);
+find_range := SEARCH_QUIETLY('setjmp_nosigs (return_catch)', FORWARD, EXACT);
 IF find_range <> 0
 THEN
     POSITION(END_OF(find_range));
@@ -327,13 +317,11 @@ VMS_INSERT_BEFORE('return (return_code)', '#ifdef __VMS');
 !COPY_TEXT('      debug_var_context_table(old_envbuf->shell_variables);');
 !SPLIT_LINE;
 !COPY_TEXT('      debug_var_context_table(old_envbuf->global_variables);');
-SPLIT_LINE;
-COPY_TEXT('  vms_fake_child_status = return_code << 8;');
-SPLIT_LINE;
-COPY_TEXT('  /* restore signal */');
-SPLIT_LINE;
-COPY_TEXT('  restore_default_signal (0);');
-SPLIT_LINE;
+!SPLIT_LINE;
+!COPY_TEXT('  /* restore signal */');
+!SPLIT_LINE;
+!COPY_TEXT('  restore_default_signal (0);');
+!SPLIT_LINE;
 COPY_TEXT('  /* restore arg list */');
 SPLIT_LINE;
 COPY_TEXT('  dispose_command (command);');
@@ -373,8 +361,18 @@ COPY_TEXT('#endif /* __VMS */');
 SPLIT_LINE;
 VMS_INSERT_BEFORE('if (coproc_pid == 0)', '#ifndef __VMS');
 VMS_INSERT_AFTER('if (coproc_pid == 0)', '#endif /* !__VMS */');
+!
+! Cannot close the childs copy of the pipes because they are not copies;
+! they are the real thing!
+!
+VMS_INSERT_BEFORE('close (rpipe[0])', '#ifndef __VMS');
+VMS_INSERT_AFTER('close (wpipe[1])', '#endif /* !__VMS */');
 
 VMS_INSERT_BEFORE('close (rpipe[1])', '#ifdef __VMS');
+COPY_TEXT('  close(0);');
+SPLIT_LINE;
+COPY_TEXT('  close(1);');
+SPLIT_LINE;
 COPY_TEXT('  /* restore fd, jmp_buf, current directory, */');
 SPLIT_LINE;
 COPY_TEXT('  /* global variables */');
@@ -820,11 +818,7 @@ ENDIF;
 ! Then handle the fake exit()
 VMS_INSERT_AFTER('if (do_redirections', '   {');
 SPLIT_LINE;
-COPY_TEXT('#ifndef __VMS');
-SPLIT_LINE;
-VMS_INSERT_AFTER('exit (EXECUTION_FAILURE)', '#else /* __VMS */');
-SPLIT_LINE;
-COPY_TEXT('    vms_fake_fork_exit1(EXECUTION_FAILURE);');
+VMS_INSERT_AFTER('exit (EXECUTION_FAILURE)', '#ifdef __VMS');
 SPLIT_LINE;
 COPY_TEXT('    return;');
 SPLIT_LINE;
@@ -837,11 +831,7 @@ SPLIT_LINE;
 
 VMS_INSERT_BEFORE('exit (last_command_exit_value', '	{');
 SPLIT_LINE;
-COPY_TEXT('#ifndef __VMS');
-SPLIT_LINE;
-VMS_INSERT_AFTER('exit (last_command_exit_value', '#else /* __VMS */');
-SPLIT_LINE;
-COPY_TEXT('	vms_fake_fork_exit1(last_command_exit_value);');
+VMS_INSERT_AFTER('exit (last_command_exit_value', '#ifdef __VMS');
 SPLIT_LINE;
 COPY_TEXT('	return;');
 SPLIT_LINE;
@@ -852,11 +842,7 @@ SPLIT_LINE;
 
 VMS_INSERT_BEFORE('exit (EXECUTION_FAILURE', '	{');
 SPLIT_LINE;
-COPY_TEXT('#ifndef __VMS');
-SPLIT_LINE;
-VMS_INSERT_AFTER('exit (EXECUTION_FAILURE)', '#else /* __VMS */');
-SPLIT_LINE;
-COPY_TEXT('	vms_fake_fork_exit1(EXECUTION_FAILURE);');
+VMS_INSERT_AFTER('exit (EXECUTION_FAILURE)', '#ifdef __VMS');
 SPLIT_LINE;
 COPY_TEXT('	return;');
 SPLIT_LINE;
@@ -867,11 +853,7 @@ SPLIT_LINE;
 
 VMS_INSERT_BEFORE('exit (return_catch_value', '	{');
 SPLIT_LINE;
-COPY_TEXT('#ifndef __VMS');
-SPLIT_LINE;
-VMS_INSERT_AFTER('exit (return_catch_value)', '#else /* __VMS */');
-SPLIT_LINE;
-COPY_TEXT('	vms_fake_fork_exit1(return_catch_value);');
+VMS_INSERT_AFTER('exit (return_catch_value)', '#ifdef __VMS');
 SPLIT_LINE;
 COPY_TEXT('	return;');
 SPLIT_LINE;
@@ -882,11 +864,7 @@ SPLIT_LINE;
 
 VMS_INSERT_BEFORE('exit (r);', '	{');
 SPLIT_LINE;
-COPY_TEXT('#ifndef __VMS');
-SPLIT_LINE;
-VMS_INSERT_AFTER('exit (r)', '#else /* __VMS */');
-SPLIT_LINE;
-COPY_TEXT('	  vms_fake_fork_exit1(r);');
+VMS_INSERT_AFTER('exit (r)', '#ifdef __VMS');
 SPLIT_LINE;
 COPY_TEXT('	  return;');
 SPLIT_LINE;
@@ -897,11 +875,7 @@ SPLIT_LINE;
 
 VMS_INSERT_BEFORE('exit (r);', '	{');
 SPLIT_LINE;
-COPY_TEXT('#ifndef __VMS');
-SPLIT_LINE;
-VMS_INSERT_AFTER('exit (r)', '#else /* __VMS */');
-SPLIT_LINE;
-COPY_TEXT('      vms_fake_fork_exit1(r);');
+VMS_INSERT_AFTER('exit (r)', '#ifdef __VMS');
 SPLIT_LINE;
 COPY_TEXT('      return;');
 SPLIT_LINE;
@@ -1011,21 +985,15 @@ SPLIT_LINE;
 ! It is not going back in here because it badly breaks just about all
 ! shell scripts.
 
-VMS_INSERT_BEFORE('exit (EX_NOTFOUND)', '#ifdef __VMS');
+VMS_INSERT_AFTER('exit (EX_NOTFOUND)', '#ifdef __VMS');
 SPLIT_LINE;
 COPY_TEXT('	      if (vms_env_saved)');
 SPLIT_LINE;
 COPY_TEXT('	        {');
 SPLIT_LINE;
-COPY_TEXT('	          exit(EX_NOTFOUND);');
-SPLIT_LINE;
 COPY_TEXT('	          vms_restore_bash_environ (old_envbuf);');
 SPLIT_LINE;
 COPY_TEXT('	          vms_env_saved = 0;');
-SPLIT_LINE;
-COPY_TEXT('	        } else { ');
-SPLIT_LINE;
-COPY_TEXT('	          vms_fake_fork_exit1(EX_NOTFOUND);');
 SPLIT_LINE;
 COPY_TEXT('	        }');
 SPLIT_LINE;
@@ -1088,13 +1056,8 @@ COPY_TEXT('      if (vms_command_not_found == 0)');
 SPLIT_LINE;
 COPY_TEXT('        {');
 SPLIT_LINE;
-COPY_TEXT('          if (pid != VMS_SPECIAL_PID)');
+COPY_TEXT('          exit(vms_child_status); /* Fake exit */');
 SPLIT_LINE;
-COPY_TEXT('              exit(vms_child_status); /* Fake exit */');
-SPLIT_LINE;
-COPY_TEXT('          else');
-SPLIT_LINE;
-COPY_TEXT('              vms_fake_fork_exit1(vms_child_status);');
 COPY_TEXT('        }');
 SPLIT_LINE;
 COPY_TEXT('      if (vms_env_saved)');
@@ -1174,11 +1137,114 @@ SPLIT_LINE;
 
 VMS_INSERT_AFTER(', larry;', '#ifdef __VMS');
 SPLIT_LINE;
+COPY_TEXT('  char *saved_execname;');
+SPLIT_LINE;
+COPY_TEXT('  char *new_execname;');
+SPLIT_LINE;
+COPY_TEXT('  int new_i;');
+SPLIT_LINE;
 COPY_TEXT('  int result;');
 SPLIT_LINE;
 COPY_TEXT('#endif /* __VMS */');
 SPLIT_LINE;
-
+!
+! Put in the OpenVMS optimization for shebang scripts specifying
+! /bin/env or /usr/bin/env
+!
+old_pattern := LINE_BEGIN + (ws @ ws_range) + 'execname = getinterp';
+VMS_INSERT_AFTER(old_pattern, '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('/* For OpenVMS, calling any of the CRTL exec functions incurs the overhead');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   of creating a subprocess. In order to avoid the unnecessary overhead');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   of an extra call to execvp via the the env executable in the special');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   case of processing the shebang line, we specifically check for the');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   most common case of the shebang line specifying the "interpreter" path');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   of "/bin/env" or "/usr/bin/env". If either of these matches the initial');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   string of the shebang line, we skip over it and directly exec the next');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   argument in the shebang line. */');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('if ((!strncmp(execname, "/usr/bin/env", 13)) ||');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('    (!strncmp(execname, "/bin/env", 9)))');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   {');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   new_execname = getinterp (sample + i - 2, sample_len - i + 2, &new_i);');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   if (new_execname != NULL)');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('      {');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('      saved_execname = execname;');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('      execname = search_for_command (new_execname, 1);');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('      FREE (new_execname);');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('      if (execname != NULL)');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('         {');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('         FREE (saved_execname);');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('         sample += i - 2;');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('         sample_len -= i - 2;');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('         i = new_i;');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('         }');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('      else');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('         {');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('         execname = saved_execname;');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('         }');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('      }');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('   }');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
 VMS_INSERT_BEFORE('return (shell_execve', '#ifndef __VMS');
 VMS_INSERT_AFTER('return (shell_execve', '#else');
 SPLIT_LINE;

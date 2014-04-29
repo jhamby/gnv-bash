@@ -43,6 +43,19 @@ SPLIT_LINE;
 COPY_TEXT('#endif /* __VMS */'); 
 SPLIT_LINE;
 !
+! Allow the function find_status_by_pid() to be callable from outside
+! the nojobs module. This is needed to allow the subst module to determine
+! whether or not fake fork processes involved in process substitution
+! are still active so that the temporary files associated with the named
+! pipes being used for the process substitution are not prematurely unlinked.
+!
+VMS_INSERT_BEFORE('static int find_status_by_pid __P((pid_t));', '#ifdef __VMS');
+COPY_TEXT('int find_status_by_pid __P((pid_t));');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('static int find_status_by_pid __P((pid_t));', '#endif /* __VMS */');
+!
 ! Allow the function set_pid_status() to be callable from outside
 ! the nojobs module. This is needed so that in places were exit()
 ! is used while in a fake subshell, this routine can be called
@@ -68,6 +81,20 @@ SPLIT_LINE;
 COPY_TEXT('#else');
 SPLIT_LINE;
 VMS_INSERT_AFTER('static void set_pid_status __P((pid_t, WAIT));', '#endif /* __VMS */');
+!
+! Remove the static storage modifier for the definition of find_status_by_pid() to
+! correspond with the its declaration modified earlier.
+!
+old_pattern := 'static int' + LINE_END + LINE_BEGIN +
+	       'find_status_by_pid (pid)';
+VMS_INSERT_BEFORE(old_pattern, '#ifdef __VMS');
+COPY_TEXT('int');
+SPLIT_LINE;
+COPY_TEXT('find_status_by_pid (pid)');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER(old_pattern, '#endif /* __VMS */');
 !
 ! Remove the static storage modifier for the definition of set_pid_status() to
 ! correspond with the its declaration modified earlier.

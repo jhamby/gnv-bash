@@ -1,7 +1,7 @@
 #   bash_completion - programmable completion functions for bash 3.x
 #		      (backwards compatible with bash 2.05b)
 #
-#   $Id: bash_completion,v 1.1.1.1 2012/12/02 15:23:29 wb8tyw Exp $
+#   $Id: bash_completion,v 1.872 2006/03/01 16:20:18 ianmacd Exp $
 #
 #   Copyright (C) Ian Macdonald <ian@caliban.org>
 #

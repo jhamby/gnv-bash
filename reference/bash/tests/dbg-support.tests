@@ -2,7 +2,7 @@
 #
 # Test correct functioning bash debug support not via the bashdb
 # debugger but merely by printing via print_trap()
-# $Id: dbg-support.tests,v 1.1.1.1 2012/12/02 15:24:50 wb8tyw Exp $
+# $Id: dbg-support.tests,v 1.13 2003/02/17 22:02:25 rockyb Exp $
 shopt -s extdebug
 print_debug_trap() {
    echo "debug lineno: $1 ${FUNCNAME[1]}"

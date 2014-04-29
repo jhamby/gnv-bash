@@ -555,3 +555,22 @@ Bug
 Ticket #	Title
 --------	------------------------------------------------------------------
 66		Bash 4.2.45(3) does not preserve process umask across subshells
+
+
+Bash 4.3.0.(1)
+---------------
+
+Bugs fixed in this  release:
+
+Bug
+Ticket #	Title
+--------	------------------------------------------------------------------
+72		Simple Unpathed Disk Commands are not Found
+73		Shebang Scripts Don't Execute Properly
+74		Bash Command Name Hash Table is Always Empty
+75		Execution of Functions with an exit Command from within a Process
+		Substitution Construct Terminates Bash
+76		Special Cases of Environment Variable Assignment Execute Incorrectly
+77		Bash Process Substitution Construct Executes Incorrectly
+78		Nested Process Substitution Fails Using Bash 4.2.45(4)
+79		Bash Executes <command name>.COM commands instead of <command name>.

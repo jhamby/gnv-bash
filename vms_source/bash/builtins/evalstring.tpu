@@ -18,6 +18,10 @@
 !
 !============================================================================
 !
+! Initialization for white space definition
+!
+ws := SPAN(" 	");
+!
 ! VMS specific patches needed.
 !
 !
@@ -38,3 +42,49 @@ COPY_TEXT('#endif');
 SPLIT_LINE;
 COPY_TEXT('#endif');
 SPLIT_LINE;
+!
+! Add extern declarations for globals needed in modifications to
+! parse_and_execute below.
+!
+VMS_INSERT_AFTER('extern char *the_printed_command_except_trap;','#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('extern int subshell_level;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+!
+! Changes for the parse_and_execute function.
+!
+old_pattern := LINE_BEGIN + 'int' + LINE_END + LINE_BEGIN + 'parse_and_execute (string, from_file, flags)';
+find_range := SEARCH_QUIETLY(old_pattern, FORWARD, EXACT);
+old_pattern := (ws @ ws_range) + 'goto out';
+VMS_INSERT_BEFORE(old_pattern, '#ifdef __VMS');
+COPY_TEXT(ws_range);
+COPY_TEXT('last_result = last_command_exit_value;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+find_range := SEARCH_QUIETLY(old_pattern, FORWARD, EXACT);
+POSITION(END_OF(find_range));
+VMS_INSERT_BEFORE(old_pattern, '#ifdef __VMS');
+COPY_TEXT(ws_range);
+COPY_TEXT('last_result = last_command_exit_value;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+find_range := SEARCH_QUIETLY(old_pattern, FORWARD, EXACT);
+POSITION(END_OF(find_range));
+VMS_INSERT_BEFORE(old_pattern, '#ifdef __VMS');
+COPY_TEXT(ws_range);
+COPY_TEXT('last_result = last_command_exit_value;');
+SPLIT_LINE;
+COPY_TEXT('#endif /* __VMS */');
+SPLIT_LINE;
+old_pattern := (ws @ ws_range) + 'if (should_jump_to_top_level)';
+VMS_INSERT_BEFORE(old_pattern,'#ifndef __VMS');
+VMS_INSERT_AFTER(old_pattern,'#else');
+SPLIT_LINE;
+COPY_TEXT(ws_range);
+COPY_TEXT('if (should_jump_to_top_level && !subshell_level && !vms_fake_fork_level)');
+SPLIT_LINE;
+COPY_TEXT('#endif');

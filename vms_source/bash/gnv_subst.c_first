@@ -1,0 +1,61 @@
+/* File: gnv$findcmd.c_first gnv_findcmd.c_first
+ *
+ * $Id: gnv_findcmd.c_first,v 1.0 2014/03/08 18:17:21 robertsonericw Exp $
+ *
+ * Copyright 2012, John Malmberg
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+ */
+
+/* Need a wrapper around the CRTL kill() function for the SUBST module to  */
+/* return an appropriate value. This is mainly for calls of the form       */
+/*    kill(pid, 0)                                                         */
+/* This form of call is used to manage the entries of the fifo_list in the */
+/* SUBST module for Bash. However, calls with a pid equal to that of the   */
+/* calling process with non-zero signal specified will be acted upon. This */
+/* is mainly to allow for future implementation of job control for Bash.   */
+/* This substitution of kill is specifically intended only for the narrow  */
+/* context of its use within the SUBST module. It is not intended to be    */
+/* a generic substitute for any other use of kill().                       */
+
+#include "config.h"
+#include <errno.h>
+#include <unistd.h>
+#include <signal.h>
+
+int find_status_by_pid (pid_t pid);
+
+int vms_fake_kill (__pid_t pid, int sig)
+   {
+   int ret_val;
+   if (pid != getpid())
+      {
+      if (find_status_by_pid(pid) == -2)
+         {
+         ret_val = 0;
+         }
+      else
+         {
+         ret_val = -1;
+         errno = ESRCH;
+         }
+      }
+   else
+      {
+      ret_val = raise(sig);
+      }
+   return ret_val;
+}
+
+#define kill(p,s) vms_fake_kill(p,s)

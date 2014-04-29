@@ -1,6 +1,6 @@
 $! File: version_h.com
 $!
-$! $Id: version_h.com,v 1.4 2013/07/28 12:14:55 robertsonericw Exp $
+$! $Id: version_h.com,v 1.2 2013/06/14 05:06:43 robertsonericw Exp $
 $!
 $! This procedure builds the version.h file.
 $!
@@ -38,8 +38,8 @@ $ plvl_loop_end:
 $ close plvl
 $!
 $ maj_ver = "4"
-$ min_ver = "2"
-$ bv = "4"
+$ min_ver = "3"
+$ bv = "1"
 $ rel = "unknown"
 $ if f$search("configure.") .nes. ""
 $ then

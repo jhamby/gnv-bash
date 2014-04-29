@@ -1,6 +1,6 @@
 /* File: vms_main_wrapper.c
  *
- * $Id: vms_main_wrapper.c,v 1.3 2013/06/29 17:14:47 wb8tyw Exp $
+ * $Id: vms_main_wrapper.c,v 1.2 2013/06/09 17:07:00 wb8tyw Exp $
  *
  * This module provides a wrapper around the main() function of a ported
  * program for two functions:
@@ -72,6 +72,13 @@ int SYS$FILESCAN
     struct dsc$descriptor_s *auxout,
     unsigned short * retlen);
 
+void *MemoryAllocations[2]={NULL,NULL};
+
+void DeallocMainWrapperMemory()
+   {
+   for (int i=0; (i < sizeof(MemoryAllocations)/sizeof(void *)); i++)
+      if (MemoryAllocations[i] != NULL) free(MemoryAllocations[i]);
+   }
 
 int original_main(int argc, char ** argv, char **env);
 
@@ -80,6 +87,13 @@ int status;
 int result;
 char arg_nam[256];
 char **new_argv;
+char *cpos;
+char *one_cmd_arg=NULL;
+int in_opts;
+int do_one_cmd=0;
+int arg_len;
+int new_arg_size;
+int exit_value;
 
 #ifdef TEST_MAIN
     printf("original argv[0] = %s\n", argv[0]);
@@ -140,18 +154,9 @@ char **new_argv;
 		dvi_iosb,
 		NULL, 0, 0);
 	    if (!$VMS_STATUS_SUCCESS(status)) {
-		/* If the sys$getdviw fails, then this path was passed by */
-		/* An exec() program and not from DCL, so do nothing */
-		/* An example is "/tmp/program" where tmp: does not exist */
-#ifdef TEST_MAIN
 		printf("sys$getdviw failed with status %d\n", status);
-#endif
-		result = 0;
 	    } else if (!$VMS_STATUS_SUCCESS(dvi_iosb[0])) {
-#ifdef TEST_MAIN
 		printf("sys$getdviw failed with iosb %d\n", dvi_iosb[0]);
-#endif
-		result = 0;
 	    } else {
 		char * devnam;
 		int devnam_len;
@@ -367,23 +372,71 @@ char **new_argv;
 		}
 	    }
 
-	    /* Need a new argv array */
-	    new_argv = malloc((argc + 1) * (sizeof(char *)));
-	    new_argv[0] = arg_nam;
-	    i = 1;
-	    while (i < argc) {
+                    if (argc > 2)
+                       {
+                       in_opts=1;
+                       do_one_cmd = 1;
+	       new_arg_size = 0;
+	       for (i=1; ((i < argc) && do_one_cmd); i++)
+	          {
+	          arg_len = strlen(argv[i]);
+	          /* Check if we are still in the midst of command options. */
+	          if (argv[i][0] != '-') in_opts = 0;
+	          if  (in_opts && (arg_len == 2) && (strcmp(argv[i], "-c") == 0)) do_one_cmd = 0;
+	          new_arg_size += arg_len + 1;
+	          } 
+	       }
+
+                    if (do_one_cmd)
+                       {
+                       new_argv = malloc(4 * sizeof(char *));
+                       new_argv[0] = arg_nam;
+                       new_argv[1] = "-c";
+                       one_cmd_arg = malloc (new_arg_size);
+                       *one_cmd_arg = '\0';
+                       cpos = one_cmd_arg;
+                       for (i=1; (i < argc); i++)
+                          {
+                          arg_len = strlen(argv[i]);
+                          strcpy(cpos, argv[i]);
+                          cpos += arg_len;
+                          *cpos = ' ';
+                          cpos++;
+                          }
+                       one_cmd_arg[new_arg_size - 1] = '\0';
+                       new_argv[2] = one_cmd_arg;
+                       new_argv[3] = NULL;
+                       argc = 3;
+                       }
+                    else
+                       {                
+	       /* Need a new argv array */
+	       new_argv = malloc((argc + 1) * (sizeof(char *)));
+	       new_argv[0] = arg_nam;
+	       i = 1;
+	       while (i < argc) {
 		new_argv[i] = argv[i];
 		i++;
-	    }
-	    new_argv[i] = 0;
-
-	} else {
-	    /* There is no way that the code should ever get here */
-	    /* As we already verified that the '/' was present */
-	    fprintf(stderr, "Sanity failure somewhere we lost a '/'\n");
-	}
-
+	          }
+	       new_argv[i] = 0;
+                       }
+       } 
+    else
+       {
+       /* There is no way that the code should ever get here */
+       /* As we already verified that the '/' was present */
+       fprintf(stderr, "Sanity failure somewhere we lost a '/'\n");
+       }
     }
+    
+    if (new_argv != argv)
+       {
+       MemoryAllocations[0] = (void *)new_argv;
+       MemoryAllocations[1] = (void *)one_cmd_arg;
+       if (atexit(DeallocMainWrapperMemory))
+          printf("WARNING: Unable to register function to deallocate "
+                 "memory for main() wrapper arguments array!\r\n");
+       }
 
     exit(original_main(argc, new_argv, env));
     return 1; /* Needed to silence compiler diagnostic */

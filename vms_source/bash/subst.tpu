@@ -1,6 +1,6 @@
 ! File subst.tpu
 !
-! $Id: subst.tpu,v 1.5 2013/07/11 23:48:03 robertsonericw Exp $
+! $Id: subst.tpu,v 1.4 2013/06/14 04:59:48 robertsonericw Exp $
 !
 ! Copyright 2012, John Malmberg
 !
@@ -39,7 +39,7 @@ SPLIT_LINE;
 VMS_INSERT_BEFORE('/* The size that strings change', '#ifdef __VMS');
 COPY_TEXT('/* VMS does not fork, so do not exit */');
 SPLIT_LINE;
-COPY_TEXT('#define exit(foo) vms_fake_child_status = vms_fake_fork_exit(foo)');
+COPY_TEXT('#define exit(foo) vms_fake_fork_exit(foo)');
 SPLIT_LINE;
 SPLIT_LINE;
 COPY_TEXT('int vms_fifo_write_pipe(int * pipe_fd);');
@@ -105,10 +105,20 @@ COPY_TEXT('#endif /* __VMS */');
 SPLIT_LINE;
 
 !
-! For OpenVMS, change the call to open() to include the mode argument and
-! optional RMS file attributes.
+! For OpenVMS, enter the current childs PID into the current fifo list entry so that this
+! and subsequent children know that the fifo entry is in use. Also, change the call to
+! open() to include the mode argument and optional RMS file attributes.
 !
 VMS_INSERT_AFTER('Open the named pipe in the child', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('/* For OpenVMS, enter the PID into the fifo list now so that this and subsequent */');
+SPLIT_LINE;
+COPY_TEXT('/* children will know this fifo entry is in use. Otherwise, children executing   */');
+SPLIT_LINE;
+COPY_TEXT('/* commands will delete the entry before the parent gets a chance to use it.     */');
+SPLIT_LINE;
+COPY_TEXT('  fifo_list[nfifo-1].proc = pid;');
+SPLIT_LINE;
 SPLIT_LINE;
 COPY_TEXT('  if (open_for_read_in_child) file_share_attr="shr=get";');
 SPLIT_LINE;
@@ -118,11 +128,8 @@ COPY_TEXT('             0660, "rfm=stmlf", "rat=none", "ctx=rec,eol", file_share
 SPLIT_LINE;
 COPY_TEXT('#else');
 SPLIT_LINE;
-old_pattern := 'fd = open (pathname, open_for_read_in_child ? O_RDONLY|O_NONBLOCK : O_WRONLY);' +
-               LINE_END;
-POSITION(END_OF(SEARCH_QUIETLY(old_pattern, FORWARD, EXACT)));
-SPLIT_LINE;
-COPY_TEXT('#endif /* __VMS */');
+VMS_INSERT_AFTER('fd = open (pathname, open_for_read_in_child ? O_RDONLY : O_WRONLY);',
+                 '#endif /* __VMS */');
 SPLIT_LINE;
 
 find_range := SEARCH_QUIETLY(

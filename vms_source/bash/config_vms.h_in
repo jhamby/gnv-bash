@@ -171,7 +171,7 @@
 /* Define COPROCESS_SUPPORT if you want support for ksh-like coprocesses and
    the `coproc' reserved word */
 /* On VMS for now, this is disabled */
-/* #undef COPROCESS_SUPPORT */
+#define COPROCESS_SUPPORT 1
 
 /* Define ARITH_FOR_COMMAND if you want the ksh93-style
         for (( init; test; step )) do list; done

@@ -1,6 +1,6 @@
 $! File: Clean_bash.com
 $!
-$! $Id: clean_bash.com,v 1.4 2013/07/12 12:29:28 wb8tyw Exp $
+$! $Id: clean_bash.com,v 1.3 2013/06/12 04:21:47 wb8tyw Exp $
 $!
 $! This procedure cleans up the Bash project of unneeded files.
 $!
@@ -638,12 +638,6 @@ $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "TEST"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
-$   if f$search("''file'.C1") .nes. "" then delete 'file'.C1;*
-$   file = "gnv$test"
-$   if f$search("lcl_root:''file'.c_first") .nes. ""
-$   then
-$	delete lcl_root:'file'.c_first;*
-$   endif
 $   file = "TEXT"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
@@ -815,10 +809,6 @@ $   file = "[.BUILTINS]COMMAND"
 $   if f$search("''file'.C") .nes. "" then delete 'file'.C;*
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
-$   if f$search("lcl_root:''file'.def") .nes. ""
-$   then
-$	delete lcl_root:'file'.def;*
-$   endif
 $   file = "[.BUILTINS]COMMON"
 $   if f$search("lcl_root:''file'.c") .nes. ""
 $   then
@@ -930,11 +920,8 @@ $   if f$search("''file'.STB") .nes. "" then delete 'file'.STB;*
 $   if f$search("''file'.DSF") .nes. "" then delete 'file'.DSF;*
 $   file = "[.BUILTINS]PRINTF"
 $   if f$search("''file'.C") .nes. "" then delete 'file'.C;*
-$   if f$search("''file'.C1") .nes. "" then delete 'file'.C1;*
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
-$   file = "lcl_root:[.builtins]GNV$PRINTF.C_FIRST"
-$   if f$search("''file'") .nes. "" then delete 'file';*
 $   file = "[.BUILTINS]PUSHD"
 $   if f$search("''file'.C") .nes. "" then delete 'file'.C;*
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*

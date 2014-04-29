@@ -1,6 +1,6 @@
 /* File: vms_fakefork.c
  *
- * $Id: vms_fakefork.c,v 1.6 2013/07/28 12:45:08 robertsonericw Exp $
+ * $Id: vms_fakefork.c,v 1.4 2013/06/14 05:02:56 robertsonericw Exp $
  *
  * Copyright 2012, John Malmberg
  *
@@ -45,6 +45,8 @@
 #include "bashhist.h"
 #include "history.h"
 #include "shell.h"
+#include "hashlib.h"
+#include "hashcmd.h"
 
 /* For debugging routines */
 #include <unixio.h>
@@ -115,9 +117,9 @@ static void DestroyStackStore(struct vms_pid_stack *stp_StackStore) {
 
 extern int vms_child_exit_pid = -1;
 
-extern int vms_fake_child_status = 0;
-
 extern int vms_fake_fork_level = 0;
+
+extern int vms_fake_exit_seen = 0;
 
 extern WORD_LIST *subst_assign_varlist;
 extern pid_t last_made_pid;
@@ -140,16 +142,17 @@ extern char *this_command_name;
 extern int xtrace_fd;
 extern int xtrace_fp;
 extern char *rl_completer_word_break_characters;
+extern int startup_state;
 extern int funcnest_max;
 extern int eof_encountered;
 extern int eof_encountered_limit;
 extern int ignoreeof;
 
 extern void * unwind_protect_list;
+extern HASH_TABLE *hashed_filenames;
 
 void dispose_variable (SHELL_VAR *);
 
-static int vms_fake_exit_seen = 0;
 static pid_t vms_fake_child_pid = -1;
 
 static char vms_imagename[256] = {0};
@@ -605,10 +608,12 @@ vms_save_shell_variables (VMS_BASH_ENVIRON * buf) {
 	shell_functions = hash_copy (shell_functions,
 				 (sh_string_func_t *)copy_variable);
 
-#if 0
+#if 1
 	buf->temporary_env = temporary_env;
-	temporary_env = hash_copy (temporary_env,
-			       (sh_string_func_t *)copy_variable);
+	temporary_env = (temporary_env != NULL) ? hash_copy (temporary_env,
+			       (sh_string_func_t *)copy_variable) : NULL;
+#endif
+#if 0
 	buf->export_env = export_env;
 	if (export_env != NULL) {
 	    export_env = strvec_copy (buf->export_env);
@@ -687,9 +692,12 @@ vms_restore_shell_variables (VMS_BASH_ENVIRON * buf) {
 	vms_dispose_shell_variables_hash_table(shell_functions, 0);
 	shell_functions = buf->shell_functions;
 
-#if 0
-	vms_dispose_shell_variables_hash_table(temporary_env, 0);
+#if 1
+	if (temporary_env != NULL)
+	   vms_dispose_shell_variables_hash_table(temporary_env, 0);
 	temporary_env = buf->temporary_env;
+#endif
+#if 0
 	free (export_env);
 	export_env = buf->export_env;
 	export_env_index = buf->export_env_index;
@@ -706,6 +714,8 @@ vms_restore_shell_variables (VMS_BASH_ENVIRON * buf) {
     subst_assign_varlist = buf->subst_assign_varlist;
 }
 
+/* This function saves (or copies) all global extern variables in */
+/* preparation for subshell activity. */
 static void
 vms_save_extern_variables (VMS_BASH_ENVIRON * buf) {
     int i;
@@ -724,8 +734,9 @@ vms_save_extern_variables (VMS_BASH_ENVIRON * buf) {
 	buf->rl_completer_word_break_characters = NULL;
     }
 #endif
+    buf->startup_state             = startup_state;
     buf->funcnest_max              = funcnest_max;
-    buf->ifs_var		   = ifs_var;
+    buf->ifs_var                   = ifs_var;
     buf->ifs_value                 = ifs_value;
     buf->history_control           = history_control;
     buf->history_lines_this_session = history_lines_this_session;
@@ -773,8 +784,27 @@ vms_save_extern_variables (VMS_BASH_ENVIRON * buf) {
     buf->restricted                = restricted;
     buf->restricted_shell          = restricted_shell;
     buf->unbound_vars_is_error     = unbound_vars_is_error;
+    buf->vms_fake_fork_level       = vms_fake_fork_level;
+    buf->vms_fake_exit_seen        = vms_fake_exit_seen;
     buf->this_command_name         = this_command_name;
+    buf->hashed_filenames          = hashed_filenames;
 }
+
+/* With the exception of the global variable hashed_filenames, this   */
+/* function restores all global, extern variables after subshell      */
+/* activity is completed. The lone exception for the global variable  */
+/* hashed_variables is necessary because this variable references a   */
+/* hash table the contents of which are cleared by the restoration    */
+/* of the special environment variable PATH. If hashed_filenames were */
+/* to be restored here, the contents of the hash table to which it    */
+/* refers would be cleared by the restoration of the value for PATH   */
+/* thus destroying its information instead of restoring it as desired.*/
+/* Instead, we leave hashed_filenames pointing to the copy of the hash*/
+/* table left by the completed subshell and let the later restoration */
+/* of PATH clear the subshell's copy of the hash table which is no    */
+/* longer needed. Then, after PATH is restored, the value of global   */
+/* hashed_filenames (along with its referenced hash table values) is  */
+/* restored to the state prior to subshell invocation. */
 
 static void
 vms_restore_extern_variables (VMS_BASH_ENVIRON * buf) {
@@ -793,6 +823,7 @@ int i;
     rl_completer_word_break_characters =
 	buf->rl_completer_word_break_characters;
 #endif
+    startup_state             = buf->startup_state;
     funcnest_max              = buf->funcnest_max;
     sv_globignore("GLOBIGNORE");
     history_control           = buf->history_control;
@@ -841,6 +872,12 @@ int i;
     restricted                = buf->restricted;
     restricted_shell          = buf->restricted_shell;
     unbound_vars_is_error     = buf->unbound_vars_is_error;
+    if (vms_fake_exit_seen == 0)
+       printf("\r\n!!!restoring fork before exit!!!\r\n");
+    if (vms_fake_fork_level != buf->vms_fake_fork_level)
+       printf("\r\n!!!fork_level != saved fork_level (%ld != %ld)!!!\r\n",vms_fake_fork_level,buf->vms_fake_fork_level);
+    vms_fake_fork_level       = buf->vms_fake_fork_level;
+    vms_fake_exit_seen        = buf->vms_fake_exit_seen;
     this_command_name         = buf->this_command_name;
     last_made_pid             = PopPid();
     last_asynchronous_pid     = PopPid();
@@ -882,6 +919,24 @@ vms_restore_bash_input(VMS_BASH_ENVIRON * buf) {
     bash_input.ungetter = buf->bash_input.ungetter;
 }
 
+/* This is the copy function to be used by the code in hashlib to copy */
+/* the hash entry payload from one hash entry to another within the    */
+/* hashlib\hash_copy() function when copying the hash entries pointed  */
+/* to by hashed_filenames. */
+
+char *vms_copy_path_data(char *cpdata)
+   {
+   PATH_DATA *Src=(PATH_DATA *)cpdata;
+   PATH_DATA *Dest=(PATH_DATA *)xmalloc (sizeof (PATH_DATA));
+   
+   if (Dest != NULL)
+      {
+      Dest->path = savestring (Src->path);
+      Dest->flags = Src->flags;
+      }
+   return (char *)Dest;
+   }
+   
 VMS_BASH_ENVIRON *
 vms_save_bash_environ(int subshell_save) {
     VMS_BASH_ENVIRON *buf;
@@ -900,6 +955,12 @@ vms_save_bash_environ(int subshell_save) {
     vms_save_current_directory (buf);
     vms_save_extern_variables (buf);
     vms_save_shell_variables (buf);
+    
+    /* The above call to vms_save_extern_variables() saved the original */
+    /* hash table pointer contained in hashed_filenames. Now, we create */
+    /* a copy of this hash table for use by the subshell. */
+    hashed_filenames = hash_copy (buf->hashed_filenames, vms_copy_path_data);
+    
     vms_save_bash_input (buf);
     buf->global_command = global_command;
     if (global_command) {
@@ -959,12 +1020,22 @@ vms_restore_bash_environ(VMS_BASH_ENVIRON * buf) {
 /* storage locations of shell variables change after saving/restoring */
 /* the variables.                                                     */
     vms_restore_special_vars();
+    
+/* The above call to vms_restore_special_vars() restored the cached value*/
+/* for the special environment variable PATH. This also caused the sub-  */
+/* shell's filename hash table (pointed to by hashed_filenames) to be    */
+/* cleared. So, now we can deallocate the subshell's hash table and re-  */
+/* store the original value of the global hashed_filenames which points  */
+/* to the original hash table associated with the restored value of PATH.*/
+    if (hashed_filenames != NULL) hash_dispose(hashed_filenames);
+    hashed_filenames = buf->hashed_filenames;
     free(buf);
 }
 
 
 int vms_fake_fork(void) {
     vms_fake_fork_level++;
+    vms_fake_exit_seen = 0;
 /*    fprintf(stderr,
 	     "\n*DEBUG* vms_fake_fork level %d\n", vms_fake_fork_level);
 */
@@ -976,27 +1047,25 @@ int vms_fake_fork_exit(int status) {
 	    "\n*DEBUG* vms_fake_fork_exit level %d status %d\n",
 	    vms_fake_fork_level, status);
 */
-    vms_fake_fork_level--;
-    vms_fake_exit_seen = 1;
-    vms_fake_child_status = status << 8;
-    set_pid_status(GetCurrentChildExitPid(), vms_fake_child_status);
-
-    if (vms_fake_fork_level < 0) {
-	   /* Serious error */
-	fprintf(stderr, "Exited more times than we forked!\n");
-	vms_fake_fork_level = 0;
-    }
-    return vms_fake_child_status;
+    if (vms_fake_fork_level || vms_fake_exit_seen)
+       {
+       if (vms_fake_exit_seen == 0)
+          {
+          if (subshell_level) subshell_skip_commands = 1;
+          vms_fake_fork_level--;
+          vms_fake_exit_seen = 1;
+          set_pid_status(GetCurrentChildExitPid(), status << 8);
+          }
+       }
+    else
+#if !defined(__VAX)
+       __posix_exit(status);
+#else
+       decc$exit(status);
+#endif
+    
+    return status;
 }
-
-/* Deeper exits need to be faked with out changing the level count */
-int vms_fake_fork_exit1(int status) {
-    vms_fake_exit_seen = 1;
-    vms_fake_child_status = status << 8;
-    set_pid_status(GetCurrentChildExitPid(), vms_fake_child_status);
-    return vms_fake_child_status;
-}
-
 
 /* Need to set the pid that Bash is checking the status of */
 int vms_fake_wait_for(pid_t child_pid) {

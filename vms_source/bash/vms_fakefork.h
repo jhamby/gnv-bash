@@ -1,6 +1,6 @@
 /* File: VMS_FAKEFORK.H
  *
- * $Id: vms_fakefork.h,v 1.7 2013/07/28 12:45:08 robertsonericw Exp $
+ * $Id: vms_fakefork.h,v 1.5 2013/06/14 05:02:56 robertsonericw Exp $
  *
  * Copyright 2012, John Malmberg
  *
@@ -50,11 +50,11 @@ void ExchangeParentChildPids();
 
 extern int vms_child_exit_pid;
 
-extern int vms_fake_child_status;
+extern int vms_fake_fork_level;
+
+extern int vms_fake_exit_seen;
 
 int vms_fake_fork(void);
-
-int vms_fake_fork_exit1(int status);
 
 int vms_fake_fork_exit(int status);
 
@@ -92,6 +92,7 @@ vms_shell_execve(char * command,
 		 int async, int *pExecSatus);
 
 extern int vms_fake_fork_level;
+extern int vms_fake_exit_seen;
 
 #if defined(MOD_EXECUTE_CMD) || defined(MOD_SUBST)
 
@@ -116,7 +117,6 @@ extern int vms_fake_fork_level;
 
 /* When we really want to exit, we want to use the posix exit only */
 #define vms_posix_exit(__p1) __posix_exit(__p1)
-int __posix_exit(int __status);
 
 extern int interactive;
 extern int interactive_shell;
@@ -147,6 +147,7 @@ typedef struct vms_bash_environ {
 #endif
     char * rl_completer_word_break_characters;
 #endif
+    int startup_state;
     int funcnest_max;
 #if defined (HISTORY)
     int history_control;
@@ -174,8 +175,10 @@ typedef struct vms_bash_environ {
     procenv_t subshell_top_level;
     procenv_t return_catch;
 
-#if 0
+#if 1
     HASH_TABLE *temporary_env;
+#endif
+#if 0
     char **export_env;
     int export_env_index;
     int export_env_size;
@@ -206,6 +209,8 @@ typedef struct vms_bash_environ {
     int restricted;
     int restricted_shell;
     int unbound_vars_is_error;
+    int vms_fake_fork_level;
+    int vms_fake_exit_seen;
     char *this_command_name;
 
     int fds[3];
@@ -216,6 +221,7 @@ typedef struct vms_bash_environ {
     int default_buffered_input;
     COMMAND *global_command;
     mode_t umask;
+    HASH_TABLE *hashed_filenames;
     struct VMS_trapnsigstate trapnsig_state;
 } VMS_BASH_ENVIRON;
 
@@ -278,14 +284,46 @@ static int vms_vfork_exec(char * command,
 			  int *status) {
     pid_t real_pid;
     char* cp_ccend=NULL;
+    struct stat chkexe_stat;
+    int cmd_len;
+    char *vms_command = command;
+    char *dotptr = strrchr(command, '.');
     unsigned long IsCompiler=0;
-
+    
+    /* The OpenVMS CRTL exec* functions favor .exe and then .com files when */
+    /* the command string does not have an explicit extension. This can be  */
+    /* a problem when the directory in which a command resides has both the */
+    /* file with the command name and no extension as well as the file with */
+    /* a .com extension. In this case the file with the .com extension will */
+    /* be executed by the OpenVMS CRTL instead of the intended file with no */
+    /* extension. So, in the cases where the command does not contain an    */
+    /* explicit extension, an explicit "." is appended at the end of the    */
+    /* command when the file with the .exe extension does not exist. This   */
+    /* will prevent the .com file from executing under these circumstances. */
+    
+    if ((dotptr == NULL) || (dotptr < strrchr(command, '/')))
+       {
+       cmd_len = strlen(command);
+       vms_command = (char *)malloc(cmd_len + 5);
+       strcpy(vms_command, command);
+       strcat(vms_command, ".exe");
+       if (stat(vms_command, &chkexe_stat) != 0)
+          {
+          vms_command[cmd_len + 1] = '\0';
+          }
+       else
+          {
+          free(vms_command);
+          vms_command=command;
+          }
+       }
     *status = 0;
     real_pid = vfork ();
      /* execve() always returns here with success or failure */
     if (real_pid == 0) {
-	*status = execve (command, args, env);
+	*status = execve (vms_command, args, env);
     }
+    if (vms_command != command) free(vms_command);
 
     /* Are we a successful child? */
     if (real_pid > 0) {
@@ -307,7 +345,7 @@ static int vms_vfork_exec(char * command,
 	    /* Intends to exit parent when child exits */
 	    /* Wait for child */
 	    waitpid (real_pid, status, 0);
-	    vms_posix_exit (EXIT_SUCCESS);
+	    exit (EXIT_SUCCESS);
 	    break;
 	default:
 	    internal_error(
@@ -323,3 +361,8 @@ static int vms_vfork_exec(char * command,
 }
 
 #endif
+
+#include <stdlib.h> /* We redefine the usual exit() to account for fake forks */
+
+/* VMS does not actually fork, so do not actually exit. */
+#define exit(foo) vms_fake_fork_exit(foo)

@@ -1,0 +1,77 @@
+/* File: gnv$findcmd.c_first gnv_findcmd.c_first
+ *
+ * $Id: gnv_findcmd.c_first,v 1.0 2014/03/08 18:17:21 robertsonericw Exp $
+ *
+ * Copyright 2012, John Malmberg
+ *
+ * Permission to use, copy, modify, and/or distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+
+ */
+
+/* Need a wrapper around the CRTL stat() function to fallback to looking for  */
+/* the specified filename with a ".exe" extension when stat returns with      */
+/* errno set to ENOENT and the original file name has no explicit extension.  */
+
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stat.h>
+
+int do_exe_stat(const char *path, struct stat *buf)
+   {
+   char *exepath = (char *)malloc(strlen(path) + 5);
+   int retvalue;
+   
+   if (exepath != NULL)
+      {
+      strcpy(exepath, path);
+      strcat(exepath, ".exe");
+      retvalue = stat(exepath, buf);
+      free(exepath);
+      }
+   else
+      {
+      retvalue = -1;
+      errno = ENOMEM;
+      }
+   return retvalue;
+   }
+   
+int vms_stat_exe_fallback  (const char *path, struct stat *buf)
+   {
+   int retvalue = stat(path, buf);
+   char *slashptr = NULL;
+   char *dotptr = NULL;
+   
+   if (retvalue == -1)
+      {
+      if (errno == ENOENT)
+         {
+         if ((dotptr = strrchr(path, '.')) == NULL)
+            {
+            retvalue = do_exe_stat(path, buf);
+            }
+         else
+            {
+            if (((slashptr = strrchr(path, '/')) != NULL) &&
+                (dotptr < slashptr))
+               {
+               retvalue = do_exe_stat(path, buf);
+               }
+            }
+         }
+      }
+   return retvalue;
+   }
+
+#define stat(p,b) vms_stat_exe_fallback(p,b)

@@ -1,6 +1,6 @@
 /* File: gnv$eaccess.c_first gnv_eaccess.c_first
  *
- * $Id: gnv_eaccess.c_first,v 1.2 2013/06/18 04:22:48 wb8tyw Exp $
+ * $Id: gnv_eaccess.c_first,v 1.1.1.1 2012/12/02 19:25:23 wb8tyw Exp $
  *
  * Copyright 2012, John Malmberg
  *
@@ -58,9 +58,8 @@ gid_t maxsysgroup;
 	/* If stat fails, return original access status */
 	return result;
     }
-    if (!S_ISDIR(st.st_mode) && !S_ISCHR(st.st_mode)) {
-	/* If this is not a directory, or character special file */
-	/* return original access status */
+    if (!S_ISDIR(st.st_mode)) {
+	/* If this is not a directory, return original access status */
 	return result;
     }
 

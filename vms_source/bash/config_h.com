@@ -1,12 +1,13 @@
 $! File: config_h.com
 $!
-$! $Id: config_h.com,v 1.2 2013/06/09 16:55:01 wb8tyw Exp $
+$! $Id: config_h.com,v 1.1.1.1 2012/12/02 19:25:21 wb8tyw Exp $
 $!
 $! This procedure attempts to figure out how to build a config.h file
 $! for the current project.
 $!
-$! P1 specifies the config.h.in file or equivalent.  If it is not specified
-$! then this procedure will search for several common names of the file.
+$! The P1 parameter of "NOBUILTINS" inhibits the default #include <builtins.h>
+$! that is normally added.  This include can cause side effects if
+$! special VMS compiler settings are used.
 $!
 $! The CONFIGURE shell script will be examined for hints and a few symbols
 $! but most of the tests will not produce valid results on OpenVMS.  Some
@@ -49,8 +50,9 @@ $! 30-Apr-2001	J. Malmberg	Update for SAMBA checks
 $! 09-Apr-2005	J. Malmberg	Update for RSYNC and large file.
 $! 29-Sep-2011	J. Malmberg	Update for Bash 4.2
 $! 01-Mar-2012	J. Malmberg	Warn about getcwd(0,0)
-$! 21-Dec-2012	J. Malmberg	Update for gawk
-$! 29-Dec-2012	J. Malmberg	Update for curl
+$! 21-Dec-2014	J. Malmberg	Update for coreutils
+$! 14-Jan-2014	J. Malmberg	Update for sed
+$! 29-Jan-2014  J. Malmberg	Update for gawk
 $!============================================================================
 $!
 $ss_normal = 1
@@ -59,7 +61,6 @@ $ss_control_y = 1556
 $status = ss_normal
 $on control_y then goto control_y
 $on warning then goto general_error
-$!on warning then set ver
 $!
 $! Some information for writing timestamps to created files
 $!----------------------------------------------------------
@@ -72,7 +73,6 @@ $!
 $pid = f$getjpi("","PID")
 $tfile1 = "SYS$SCRATCH:config_h_temp1_''pid'.TEMP"
 $dchfile = "SYS$SCRATCH:config_h_decc_''pid'.TEMP"
-$starhfile = "SYS$SCRATCH:config_h_starlet_''pid'.TEMP"
 $configure_script = "SYS$SCRATCH:configure_script_''pid'.TEMP"
 $!
 $!  Get the system type
@@ -97,13 +97,7 @@ $! On some platforms, DCL search has problems with searching a file
 $! on a NFS mounted volume.  So copy it to sys$scratch:
 $!
 $if f$search(configure_script) .nes. "" then delete 'configure_script';*
-$copy sys$disk:[]configure 'configure_script'
-$!
-$ssl_header_dir = "OPENSSL:"
-$if f$trnlnm("OPENSSL") .eqs. ""
-$then
-$    ssl_header_dir = "SSL$INCLUDE:"
-$endif
+$copy PRJ_ROOT:configure 'configure_script'
 $!
 $!
 $! Write out the header
@@ -115,26 +109,25 @@ $!
 $! config.h.in could have at least five different names depending
 $! on how it was transferred to OpenVMS
 $!------------------------------------------------------------------
-$if p1 .nes. ""
+$cfile = f$search("sys$disk:[]config.h.in")
+$if cfile .eqs. ""
 $then
-$   cfile = p1
-$else
-$   cfile = f$search("sys$disk:[]config.h.in")
+$   cfile = f$search("sys$disk:[]config.h_in")
 $   if cfile .eqs. ""
 $   then
-$	cfile = f$search("sys$disk:[]config.h_in")
+$	cfile = f$search("sys$disk:[]configh.in")
 $	if cfile .eqs. ""
 $	then
-$	    cfile = f$search("sys$disk:[]configh.in")
+$	    cfile = f$search("sys$disk:[]config_h.in")
 $	    if cfile .eqs. ""
 $	    then
-$		cfile = f$search("sys$disk:[]config__2eh.in")
+$		cfile = f$search("sys$disk:[]config.hin")
 $		if cfile .eqs. ""
 $		then
-$		    cfile = f$search("sys$disk:[]config.h__2ein")
+$		    cfile = f$search("sys$disk:[]config__2eh.in")
 $		    if cfile .eqs. ""
 $		    then
-$			cfile = f$search("sys$disk:[]config.h$5nin")
+$			cfile = f$search("sys$disk:[]config.h__2ein")
 $		    endif
 $		endif
 $	    endif
@@ -149,13 +142,17 @@ $   then
 $	cfile = f$search("PRJ_INCLUDE:config.h_in")
 $	if cfile .eqs. ""
 $	then
-$	    cfile = f$search("PRJ_INCLUDE:config__2eh.in")
+$	    cfile = f$search("PRJ_INCLUDE:config_h.in")
 $	    if cfile .eqs. ""
 $	    then
 $		cfile = f$search("PRJ_INCLUDE:config__2eh.in")
 $		if cfile .eqs. ""
 $		then
-$		    cfile = f$search("PRJ_INCLUDE:config.h__2ein")
+$		    cfile = f$search("PRJ_INCLUDE:config__2eh.in")
+$		    if cfile .eqs. ""
+$		    then
+$			cfile = f$search("PRJ_INCLUDE:config.h__2ein")
+$		    endif
 $		endif
 $	    endif
 $	endif
@@ -194,7 +191,6 @@ $!
 $! Locate the DECC libraries in use
 $!-----------------------------------
 $decc_rtldef = f$parse("decc$rtldef","sys$library:.tlb;0")
-$decc_starletdef = f$parse("sys$starlet_c","sys$library:.tlb;0")
 $decc_shr = f$parse("decc$shr","sys$share:.exe;0")
 $!
 $! Dump the DECC header names into a file
@@ -215,28 +211,6 @@ $   if key2 .nes. " " .and. key2 .nes. "" then goto rtldef_loop1
 $   write tf2 "|",key1,"|"
 $   goto rtldef_loop1
 $rtldef_loop1_end:
-$if f$trnlnm("tf1","lnm$process",,"SUPERVISOR") .nes. "" then close tf1
-$if f$trnlnm("tf2","lnm$process",,"SUPERVISOR") .nes. "" then close tf2
-$if f$search(tfile1) .nes. "" then delete 'tfile1';*
-$!
-$! Dump the STARLET header names into a file
-$!----------------------------------------
-$if f$search(starhfile) .nes. "" then delete 'starhfile';*
-$if f$search(tfile1) .nes. "" then delete 'tfile1';*
-$define/user sys$output 'tfile1'
-$library/list 'decc_starletdef'
-$open/read/error=stardef_loop1_end tf1 'tfile1'
-$open/write/error=stardef_loop1_end tf2 'starhfile'
-$stardef_loop1:
-$   read/end=stardef_loop1_end tf1 line_in
-$   line_in = f$edit(line_in,"TRIM,COMPRESS")
-$   key1 = f$element(0," ",line_in)
-$   key2 = f$element(1," ",line_in)
-$   if key1 .eqs. " " .or. key1 .eqs. "" then goto stardef_loop1
-$   if key2 .nes. " " .and. key2 .nes. "" then goto stardef_loop1
-$   write tf2 "|",key1,"|"
-$   goto stardef_loop1
-$stardef_loop1_end:
 $if f$trnlnm("tf1","lnm$process",,"SUPERVISOR") .nes. "" then close tf1
 $if f$trnlnm("tf2","lnm$process",,"SUPERVISOR") .nes. "" then close tf2
 $if f$search(tfile1) .nes. "" then delete 'tfile1';*
@@ -290,11 +264,12 @@ $   if f$locate("64", xline) .lt. xlen then key64 = 1
 $!
 $!write sys$output "xline = ''xline'"
 $!
+$!
 $!  Comment out this section of the ifblock
 $!-----------------------------------------
 $   if if_block .ge. 3
 $   then
-$	write tf "/* ", xline, " */"
+$	gosub comment_out_xline
 $	if keyif .eqs. "#en" then if_block = 0
 $	goto cfgh_in_loop1
 $   endif
@@ -314,7 +289,7 @@ $!	Manual check for _ALL_SOURCE on AIX error
 $!-----------------------------------------------
 $	if key2 .eqs. "_ALL_SOURCE"
 $	then
-$	   write tf "/* ", xline, " */"
+$	    gosub comment_out_xline
 $!
 $!	   Ignore the rest of the block
 $!--------------------------------------
@@ -326,13 +301,30 @@ $!
 $!
 $!  Default action for an #if/#else/#endif
 $!------------------------------------------
-$   if keyif .eqs. "#if" .or. keyif .eqs. "#el"
+$   if keyif .eqs. "#if" .or. keyif .eqs. "#el" .or. key1 .eqs. "#"
 $   then
 $	if_block = 1
+$if_loop:
 $	write tf xline
+$	xline_len = f$length(xline)
+$	last_char = f$extract(xline_len - 1, 1, xline)
+$	if last_char .eqs. "\"
+$	then
+$	    read/end=cfgh_in_loop1_end inf line_in
+$	    xline = f$edit(line_in,"TRIM,COMPRESS")
+$	    goto if_loop
+$	endif
 $	goto cfgh_in_loop1
 $   endif
 $!
+$   if keyif .eqs. "#de"
+$   then
+$	if key2 .eqs. "_UNUSED_PARAMETER_"
+$       then
+$	    write tf xline
+$	    goto cfgh_in_loop1
+$	endif
+$   endif
 $!
 $!  Process "normal?" stuff
 $!---------------------------
@@ -354,59 +346,6 @@ $	    endif
 $	endif
 $!
 $	double_under = 0
-$!
-$!	Process FCNTL directives
-$!-------------------------------------
-$	if (key2b .eqs. "FCNTL") .and. (key2c .eqs. "O") .and. -
-	   (key2d .eqs. "NONBLOCK")
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' 1"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$!	Process GETADDRINFO directives
-$!-------------------------------------
-$	if key2 .eqs. "GETADDRINFO_THREADSAFE"
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' 1"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$!	Process IOCTL directives
-$!-------------------------------------
-$	if (key2b .eqs. "IOCTL") .and. (key2c .nes. "")
-$	then
-$	    if (key2c .eqs. "FIONBIO") .or. (key2c .eqs. "SIOCGIFADDR")
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' 1"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	endif
-$!
-$!
-$!	Manual check for LL on
-$!-----------------------------------------------
-$	if key2 .eqs. "LL"
-$	then
-$	   write tf "#ifndef __VAX
-$	   write tf "#define HAVE_''key2' 1"
-$	   write tf "#endif"
-$	   goto cfgh_in_loop1
-$	endif
-$!
-$	if key2 .eqs. "bool_t"
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' short"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
 $!
 $	if key2 .eqs. "bits16_t"
 $	then
@@ -488,6 +427,26 @@ $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
 $!
+$!
+$!	Special for USE_UNLOCKED_IO
+$!---------------------------------------
+$	if key2 .eqs. "HAVE_DECL_CLEARERR_UNLOCKED" .or. -
+	   key2 .eqs. "HAVE_DECL_FEOF_UNLOCKED" .or. -
+	   key2 .eqs. "HAVE_DECL_GETCHAR_UNLOCKED" .or. -
+	   key2 .eqs. "HAVE_DECL_FERROR_UNLOCKED" .or. -
+	   key2 .eqs. "HAVE_DECL_FPUTC_UNLOCKED" .or. -
+	   key2 .eqs. "HAVE_DECL_PUTCHAR_UNLOCKED" .or. -
+	   key2 .eqs. "HAVE_DECL_GETC_UNLOCKED" .or. -
+	   key2 .eqs. "HAVE_DECL_PUTC_UNLOCKED"
+$	then
+$	    write tf "#if __CRTL_VER >= 80200000"
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
 $	if key2 .eqs. "HAVE_SYS_ERRLIST"
 $	then
 $	    write tf "#ifndef ''key2'"
@@ -496,7 +455,8 @@ $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
 $!
-$	if key2 .eqs. "HAVE_STRUCT_DIRENT_D_INO"
+$	if key2 .eqs. "HAVE_STRUCT_DIRENT_D_INO" .or. -
+	   key2 .eqs. "HAVE_STRUCT_DECIMAL_POINT"
 $	then
 $	    write tf "#ifndef ''key2'"
 $	    write tf "#define ''key2' 1"
@@ -504,13 +464,31 @@ $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
 $!
-$	if key2 .eqs. "HAVE_STRUCT_TIMEVAL"
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' 1"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
+$        if key2 .eqs. "HAVE_STRUCT_TIMESPEC"
+$        then
+$           write tf "#ifndef ''key2'"
+$           write tf "#define ''key2' 1"
+$           write tf "#endif"
+$           goto cfgh_in_loop1
+$        endif
+$!
+$        if key2 .eqs. "TIME_H_DEFINES_STRUCT_TIMESPEC"
+$        then
+$           write tf "#ifndef ''key2'"
+$           write tf "#define ''key2' 1"
+$           write tf "#endif"
+$           goto cfgh_in_loop1
+$        endif
+$!
+$        if key2 .eqs. "PTHREAD_H_DEFINES_STRUCT_TIMESPEC"
+$        then
+$           write tf "#ifndef ''key2'"
+$           write tf "#if __CRTL_VER > 70311000
+$           write tf "#define ''key2' 1"
+$           write tf "#endif"
+$           write tf "#endif"
+$           goto cfgh_in_loop1
+$        endif
 $!
 $!	! The header files have this information, however
 $!      ! The ioctl() call only works on sockets.
@@ -542,7 +520,17 @@ $!	    write tf "#endif"
 $!	    goto cfgh_in_loop1
 $!	endif
 $!
-$	if key2 .eqs. "HAVE_STRUCT_TM_TM_ZONE"
+$!
+$	if key2 .eqs. "HAVE_TM_ZONE" .or. -
+	   key2 .eqs. "HAVE_STRUCT_TM_TM_ZONE" .or. -
+	   key2 .eqs. "HAVE_TIMEVAL" .or. -
+	   key2 .eqs. "HAVE_MALLOC_GNU" .or. -
+	   key2 .eqs. "HAVE_MALLOC_POSIX" .or. -
+	   key2 .eqs. "HAVE_REALLOC_POSIX" .or. -
+	   key2 .eqs. "HAVE_MAP_ANONYMOUS" .or. -
+	   key2 .eqs. "HAVE_STRUCT_LCONV_DECIMAL_POINT" .or. -
+	   key2 .eqs. "HAVE_SIGNED_SIG_ATOMIC_T" .or. -
+	   key2 .eqs. "HAVE_SIGNED_WINT_T"
 $	then
 $	    write tf "#ifndef ''key2'"
 $	    write tf "#define ''key2' 1"
@@ -550,18 +538,12 @@ $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
 $!
-$	if key2 .eqs. "HAVE_TM_ZONE"
+$	if key2 .eqs. "HAVE_TZNAME"
 $	then
+$	    write tf "#if __CRTL_VER >= 70000000"
 $	    write tf "#ifndef ''key2'"
 $	    write tf "#define ''key2' 1"
 $	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$	if key2 .eqs. "HAVE_TIMEVAL"
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' 1"
 $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
@@ -729,7 +711,15 @@ $!
 $	if key2 .eqs. "HAVE_LANGINFO_CODESET"
 $	then
 $	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' 0"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+$	if key2 .eqs. "HAVE_LC_MESSAGES"
+$	then
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
 $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
@@ -785,10 +775,8 @@ $	endif
 $!
 $	if key2 .eqs. "HAVE_DECL_SETREGID"
 $	then
-$	    write tf "#if !defined(__VAX) && (__CRTL_VER >= 70301000)"
 $	    write tf "#ifndef ''key2'"
 $	    write tf "#define ''key2' 1"
-$	    write tf "#endif"
 $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
@@ -807,58 +795,6 @@ $	    write tf "#ifndef ''key2'"
 $	    write tf "#define ''key2' 1"
 $	    write tf "#endif"
 $	    goto cfgh_in_loop1
-$	endif
-$!
-$	if key2 .eqs. "HAVE_ENGINE_LOAD_BUILTIN_ENGINES"
-$	then
-$	    if f$search("''ssl_header_dir'engine.h") .nes. ""
-$	    then
-$		search_key = key2 - "HAVE_"
-$		define/user sys$output nl:
-$		define/user sys$error nl:
-$		search/output=nl: 'ssl_header_dir'engine.h 'search_key'
-$		if '$severity' .eq. 1
-$		then
-$		    write tf "#ifndef ''key2'"
-$		    write tf "#define ''key2' 1"
-$		    write tf "#endif"
-$		else
-$		    write tf "/* #undef ''key2' */"
-$		endif
-$	    else
-$		write tf "/* #undef ''key2' */"
-$	    endif
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$	if key2 .eqs. "HAVE_SSL_GET_SHUTDOWN"
-$	then
-$	    if f$search("''ssl_header_dir'ssl.h") .nes. ""
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' 1"
-$		write tf "#endif"
-$	    else
-$		write tf "/* #undef ''key2' */"
-$	    endif
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$	if key2b .eqs. "RAND" .and. key2c .nes. "" .and. key2d .eqs. ""
-$	then
-$	    if (key2c .eqs. "EGD") .or. -
-	       (key2c .eqs. "STATUS") .or. -
-	       (key2c .eqs. "SCREEN")
-$	    then
-$		if f$search("''ssl_header_dir'rand.h") .nes. ""
-$		then
-$		    write tf "#ifndef ''key2'"
-$		    write tf "#define ''key2' 1"
-$		    write tf "#endif"
-$		else
-$		    write tf "/* #undef ''key2' */"
-$		endif
-$	    endif
 $	endif
 $!
 $	if key2 .eqs. "STRCOLL_BROKEN"
@@ -904,8 +840,7 @@ $
 $	    goto cfgh_in_loop1
 $	endif
 $!
-$	if (key2a .eqs. "HAVE") .or. (key2a .eqs. "STAT") .or. -
-	   (key2 .eqs. "ENABLE_IPV6") .or. (key2b .eqs. "LDAP")
+$	if key2a .eqs. "HAVE" .or. key2a .eqs. "STAT"
 $	then
 $!
 $!	    Process extra underscores
@@ -924,8 +859,7 @@ $		    double_under = 1
 $		endif
 $	    endif
 $!
-$	    if (key2_h .eqs. "_H") .or. (key2 .eqs. "ENABLE_IPV6") .or. -
-	       (key2b .eqs. "LDAP")
+$	    if key2_h .eqs. "_H"
 $	    then
 $!
 $!		Looking for a header file
@@ -950,21 +884,6 @@ $		endif
 $!
 $!		And of course what's life with out some special cases
 $!--------------------------------------------------------------------
-$		if key2 .eqs. "ENABLE_IPV6"
-$		then
-$		    headf = "in6"
-$		endif
-$!
-$		if key2b .eqs. "LDAP"
-$		then
-$		    if (key2 .eqs. "HAVE_LDAP_SSL") .or. -
-		       (key2 .eqs. "HAVE_LDAP_URL_PARSE")
-$		    then
-$			headf = "ldap"
-$		    endif
-$		endif
-$!
-$!
 $		if key2b .eqs. "FILE"
 $		then
 $		   write sys$output ""
@@ -1003,62 +922,9 @@ $		    write tf "#define ''key2' 1"
 $if p2 .nes. "" then write sys$output "''dchfile' - #define ''key2' 1"
 $		    write tf "#endif"
 $		    if key64 then write tf "#endif"
-$set nover
 $		    goto cfgh_in_loop1
 $		endif
 $!
-$!
-$!		Now look it up in the DEC C STARLET_C
-$!---------------------------------------------
-$		define/user sys$output nl:
-$		define/user sys$error nl:
-$		search/output=nl: 'starhfile' |'headf'|/exact
-$		if '$severity' .eq. 1
-$		then
-$		    if key64 then write tf "#ifndef __VAX"
-$		    write tf "#ifndef ''key2'"
-$		    write tf "#define ''key2' 1"
-$if p2 .nes. "" then write sys$output "''starfile' - #define ''key2' 1"
-$		    write tf "#endif"
-$		    if key64 then write tf "#endif"
-$set nover
-$		    goto cfgh_in_loop1
-$		endif
-$!
-$!		Now look for OPENSSL headers
-$!---------------------------------------------------------
-$		if key2b .eqs. "OPENSSL"
-$		then
-$		    headf = headf - "OPENSSL_"
-$		    header = f$search("''ssl_header_dir'''headf'.h")
-$		    if header .nes. ""
-$		    then
-$			write tf "#ifndef ''key2'"
-$			write tf "#define ''key2' 1"
-$			write tf "#endif"
-$set nover
-$			goto cfgh_in_loop1
-$		    endif
-$		endif
-$!
-$!		Now look for Kerberos
-$!------------------------------------------------------------
-$		if key2b .eqs. "GSSAPI"
-$		then
-$		    header_dir = "sys$sysroot:[kerberos.include]"
-$		    headf = headf - "GSSAPI_"
-$		    header = f$search("''header_dir'''headf'.h")
-$		    if header .nes. ""
-$		    then
-$			write tf "#ifndef ''key2'"
-$			write tf "#define ''key2' 1"
-$			write tf "#endif"
-$set nover
-$			goto cfgh_in_loop1
-$		    endif
-$		endif
-$!
-$set nover
 $	    else
 $!
 $!		Looking for a routine or a symbol
@@ -1259,12 +1125,13 @@ $		endif
 $!
 $!		May need to test compiler version
 $!-----------------------------------------------
-$		if keysym .eqs. "LONG_LONG"
+$		if (keysym .eqs. "LONG_LONG") .or. -
+                   (keysym .eqs. "LONG_LONG_INT")
 $		then
 $		    write tf "#ifndef __VAX"
 $		    write tf "#pragma message disable longlongtype"
-$		    write tf "#ifndef HAVE_LONG_LONG"
-$		    write tf "#define HAVE_LONG_LONG 1"
+$		    write tf "#ifndef HAVE_''keysym'"
+$		    write tf "#define HAVE_''keysym' 1"
 $		    write tf "#endif"
 $		    write tf "#endif"
 $		    goto cfgh_in_loop1
@@ -1330,6 +1197,7 @@ $		    write tf "#endif
 $		    goto cfgh_in_loop1
 $		endif
 $!
+$!
 $		if keysym .eqs. "HERRNO" then keysym = "h_errno"
 $		if keysym .eqs. "UTIMBUF" then keysym = "utimbuf"
 $		if key2c .eqs. "STRUCT"
@@ -1376,18 +1244,6 @@ $		    search/out=nl: 'tfile1' -
    "$''keysym'decc$","$G''keysym'decc$","$GX''keyterm'"
 $		    severity = '$severity'
 $!
-$!		    VAX may have an alternate suffix of <SOH>
-$!-----------------------------------------------------------
-$		    if severity .ne. 1 .and. arch_type .eq. 1
-$		    then
-$			keyterm = "''keysym'<soh>"
-$			define/user sys$output nl:
-$		        define/user sys$error nl:
-$			search/out=nl: 'tfile1' "decc$''keyterm'"
-$!			search/out 'tfile1' "decc$''keyterm'"
-$			severity = '$severity'
-$		    endif
-$!
 $!
 $!		    Of course the 64 bit stuff is different
 $!---------------------------------------------------------
@@ -1407,7 +1263,18 @@ $		    then
 $			define/user sys$output nl:
 $			define/user sys$error nl:
 $			search/out=nl: 'tfile1' -
-    "$__unix_''keyterm'","$__vms_''keyterm'","$_posix_''keyterm'"
+    "$__unix_''keyterm'","$__vms_''keyterm'","$_posix_''keyterm'",-
+    "decc$''keysym'decc$"
+$			severity = '$severity'
+$		    endif
+$!
+$!		    VAX special handling routines
+$!---------------------------------------------
+$		    if (severity .ne. 1) .and. (arch_type .eq. 1)
+$		    then
+$			define/user sys$output nl:
+$			define/user sys$error nl:
+$			search/out=nl: 'tfile1' "DECC$''keysym'<SOH>"
 $			severity = '$severity'
 $		    endif
 $!
@@ -1444,142 +1311,77 @@ $		    if key64 then write tf "#endif"
 $		    goto cfgh_in_loop1
 $		endif
 $!
-$!		Check kerberos
-$!--------------------------------------------
-$		if f$search("SYS$SYSROOT:[kerberos]include.dir") .nes. ""
-$		then
-$		    test_mit = "SYS$SYSROOT:[kerberos.include]gssapi_krb5.h"
-$		    if (key2 .eqs. "HAVE_GSSAPI")
-$		    then
-$			write tf "#ifndef ''key2'"
-$			write tf "#define ''key2' 1"
-$			write tf "#endif"
-$			goto cfgh_in_loop1
-$		    endif
-$!
-$!		    This is really do we have the newer MIT Kerberos
-$!----------------------------------------------------------------------
-$		    if (key2 .eqs. "HAVE_GSSMIT")
-$		    then
-$			if f$search(test_mit) .nes. ""
-$			then
-$			    write tf "#ifndef ''key2'"
-$			    write tf "#define ''key2' 1"
-$			else
-$			    write tf "#ifdef ''key2'"
-$			    write tf "#undef ''key2'"
-$			endif
-$			write tf "#endif"
-$			goto cfgh_in_loop1
-$		    endif
-$!
-$!		    Older MIT looks like Heimdal
-$!------------------------------------------------
-$		    if (key2 .eqs. "HAVE_HEIMDAL")
-$		    then
-$			if f$search(test_mit) .eqs. ""
-$			then
-$			    write tf "#ifndef ''key2'"
-$			    write tf "#define ''key2' 1"
-$			else
-$			    write tf "#ifdef ''key2'"
-$			    write tf "#undef ''key2'"
-$			endif
-$			write tf "#endif"
-$			goto cfgh_in_loop1
-$		    endif
-$		endif
-$!
 $	    endif
-$	    write tf "/* ", xline, " */"
+$	    gosub comment_out_xline
 $	    goto cfgh_in_loop1
 $	endif
 $!
 $!
-$!	Process SIZEOF directives found in SAMBA and others
-$!----------------------------------------------------------
+$!	Process SIZEOF directives found in SAMBA
+$!------------------------------------------------
 $	if key2a .eqs. "SIZEOF"
 $	then
 $	    if key2b .eqs. "INO" .and. key2_h .eqs. "_T"
 $	    then
-$		write tf "#ifndef SIZEOF_INO_T"
-$		write tf "#if !__USING_STD_STAT
-$		write tf "#define SIZEOF_INO_T 6"
-$		write tf "#else
-$		write tf "#define SIZEOF_INO_T 8"
-$		write tf "#endif
+$		write tf "#ifndef ''key2a'_INO_T"
+$		write tf "#if __CRTL_VER >= 80200000"
+$		write tf "#define ''key2a'_INO_T (8)"
+$		write tf "#else"
+$		write tf "#define ''key2a'_INO_T (6)"
+$		write tf "#endif"
 $		write tf "#endif"
 $		goto cfgh_in_loop1
 $	    endif
 $	    if key2b .eqs. "INTMAX" .and. key2_h .eqs. "_T"
 $	    then
-$		write tf "#ifndef SIZEOF_INTMAX_T"
+$		write tf "#ifndef ''key2a'_INTMAX_T"
 $		write tf "#ifdef __VAX"
-$		write tf "#define SIZEOF_INTMAX_T 4"
+$		write tf "#define ''key2a'_INTMAX_T (4)"
 $		write tf "#else"
-$		write tf "#define SIZEOF_INTMAX_T 8"
+$		write tf "#define ''key2a'_INTMAX_T (8)"
 $		write tf "#endif"
 $		write tf "#endif"
 $		goto cfgh_in_loop1
 $	    endif
 $	    if key2b .eqs. "OFF" .and. key2_h .eqs. "_T"
 $	    then
-$		write tf "#ifndef SIZEOF_OFF_T"
-$		write tf "#if __USE_OFF64_T"
-$		write tf "#define SIZEOF_OFF_T 8"
+$		write tf "#ifndef ''key2a'_OFF_T"
+$		write tf "#ifdef _LARGEFILE"
+$		write tf "#define ''key2a'_OFF_T (4)"
 $		write tf "#else"
-$		write tf "#define SIZEOF_OFF_T 4"
+$		write tf "#define ''key2a'_OFF_T (8)"
 $		write tf "#endif"
 $		write tf "#endif"
 $		goto cfgh_in_loop1
 $	    endif
 $	    if key2b .eqs. "CHAR" .and. key2_h .eqs. "_P"
 $	    then
-$		write tf "#ifndef SIZEOF_CHAR_P"
-$		write tf "#if __INITIAL_POINTER_SIZE == 64"
-$		write tf "#define SIZEOF_CHAR_P 8"
-$		write tf "#else"
-$		write tf "#define SIZEOF_CHAR_P 4"
-$		write tf "#endif"
+$		write tf "#ifndef ''key2a'_CHAR_P"
+$		write tf "#define ''key2a'_CHAR_P (4)"
 $		write tf "#endif"
 $		goto cfgh_in_loop1
 $	    endif
-$	    if key2b .eqs. "VOIDP"
+$	    if (key2b .eqs. "INT")
 $	    then
-$		write tf "#ifndef SIZEOF_VOIDP"
-$		write tf "#if __INITIAL_POINTER_SIZE == 64"
-$		write tf "#define SIZEOF_VOIDP 8"
-$		write tf "#else"
-$		write tf "#define SIZEOF_VOIDP 4"
-$		write tf "#endif"
+$		write tf "#ifndef ''key2a'_''key2b'"
+$		write tf "#define ''key2a'_''key2b' (4)"
 $		write tf "#endif"
 $		goto cfgh_in_loop1
 $	    endif
-$	    if key2b .eqs. "INT"
+$	    if key2b .eqs. "UNSIGNED"
 $	    then
-$		write tf "#ifndef SIZEOF_INT"
-$		write tf "#define SIZEOF_INT 4"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2b .eqs. "SIZE" .and. key2_h .eqs. "_T"
-$	    then
-$		write tf "#ifndef SIZEOF_SIZE_T"
-$		write tf "#define SIZEOF_SIZE_T 4"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2b .eqs. "TIME" .and. key2_h .eqs. "_T"
-$	    then
-$		write tf "#ifndef SIZEOF_TIME_T"
-$		write tf "#define SIZEOF_TIME_T 4"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
+$               if key2c .eqs. "INT" .or. key2c .eqs. "LONG"
+$               then
+$		    write tf "#ifndef ''key2a'_''key2b'_''key2c'"
+$		    write tf "#define ''key2a'_''key2b'_''key2c' (4)"
+$		    write tf "#endif"
+$		    goto cfgh_in_loop1
+$               endif
 $	    endif
 $	    if key2b .eqs. "DOUBLE"
 $	    then
-$		write tf "#ifndef SIZEOF_DOUBLE"
-$		write tf "#define SIZEOF_DOUBLE 8"
+$		write tf "#ifndef ''key2a'_DOUBLE"
+$		write tf "#define ''key2a'_DOUBLE (8)"
 $		write tf "#endif"
 $		goto cfgh_in_loop1
 $	    endif
@@ -1587,13 +1389,13 @@ $	    if key2b .eqs. "LONG"
 $	    then
 $		if key2c .eqs. ""
 $		then
-$		    write tf "#ifndef SIZEOF_LONG"
-$		    write tf "#define SIZEOF_LONG 4"
+$		    write tf "#ifndef ''key2a'_LONG"
+$		    write tf "#define ''key2a'_LONG (4)"
 $		    write tf "#endif"
 $		else
-$		    write tf "#ifndef SIZEOF_LONG_LONG"
+$		    write tf "#ifndef ''key2a'_LONG_LONG"
 $		    write tf "#ifndef __VAX"
-$		    write tf "#define SIZEOF_LONG_LONG 8"
+$		    write tf "#define ''key2a'_LONG_LONG (8)"
 $		    write tf "#endif"
 $		    write tf "#endif"
 $		endif
@@ -1601,12 +1403,129 @@ $		goto cfgh_in_loop1
 $	    endif
 $	    if key2b .eqs. "SHORT"
 $	    then
-$		write tf "#ifndef SIZEOF_SHORT"
-$		write tf "#define SIZEOF_SHORT 2"
+$		write tf "#ifndef ''key2a'_SHORT"
+$		write tf "#define ''key2a'_SHORT (2)"
 $		write tf "#endif"
 $		goto cfgh_in_loop1
 $	    endif
-$	    write tf "/* ", xline, " */"
+$	    gosub comment_out_xline
+$	    goto cfgh_in_loop1
+$	endif
+$!
+$!      Process BITSIZEOF directives
+$	if key2a .eqs. "BITSIZEOF"
+$	then
+$	    if key2b .eqs. "INO" .and. key2_h .eqs. "_T"
+$	    then
+$		write tf "#ifndef ''key2a'_INO_T"
+$		write tf "#if __CRTL_VER >= 80200000"
+$		write tf "#define ''key2a'_INO_T (64)"
+$		write tf "#else"
+$		write tf "#define ''key2a'_INO_T (48)"
+$		write tf "#endif"
+$		write tf "#endif"
+$		goto cfgh_in_loop1
+$	    endif
+$	    if key2b .eqs. "INTMAX" .and. key2_h .eqs. "_T"
+$	    then
+$		write tf "#ifndef ''key2a'_INTMAX_T"
+$		write tf "#ifdef __VAX"
+$		write tf "#define ''key2a'_INTMAX_T (32)"
+$		write tf "#else"
+$		write tf "#define ''key2a'_INTMAX_T (64)"
+$		write tf "#endif"
+$		write tf "#endif"
+$		goto cfgh_in_loop1
+$	    endif
+$	    if key2b .eqs. "SIZE" .and. key2_h .eqs. "_T"
+$	    then
+$		write tf "#ifndef ''key2a'_''key2b'_T"
+$		write tf "#define ''key2a'_''key2b'_T (32)"
+$		write tf "#endif"
+$		goto cfgh_in_loop1
+$	    endif
+$	    if key2b .eqs. "OFF" .and. key2_h .eqs. "_T"
+$	    then
+$		write tf "#ifndef ''key2a'_OFF_T"
+$		write tf "#ifdef _LARGEFILE"
+$		write tf "#define ''key2a'_OFF_T (32)"
+$		write tf "#else"
+$		write tf "#define ''key2a'_OFF_T (64)"
+$		write tf "#endif"
+$		write tf "#endif"
+$		goto cfgh_in_loop1
+$	    endif
+$	    if key2b .eqs. "CHAR" .and. key2_h .eqs. "_P"
+$	    then
+$		write tf "#ifndef ''key2a'_CHAR_P"
+$		write tf "#define ''key2a'_CHAR_P (32)"
+$		write tf "#endif"
+$		goto cfgh_in_loop1
+$	    endif
+$	    if key2b .eqs. "PTRDIFF" .and. key2_h .eqs. "_T"
+$	    then
+$		write tf "#ifndef ''key2a'_''key2b'''key2_h'"
+$		write tf "#define ''key2a'_''key2b'''key2_h' (32)"
+$		write tf "#endif"
+$		goto cfgh_in_loop1
+$	    endif
+$	    if key2b .eqs. "SIG" .and. key2c .eqs. "ATOMIC" -
+		.and. key2_h .eqs. "_T"
+$	    then
+$		write tf "#ifndef ''key2a'_''key2b'_''key2c'''key2_h'"
+$		write tf "#define ''key2a'_''key2b'_''key2c'''key2_h' (32)"
+$		write tf "#endif"
+$		goto cfgh_in_loop1
+$	    endif
+$	    if key2b .eqs. "INT" .or. key2b .eqs. "WCHAR" .or. -
+	       key2b .eqs. "WINT" .or. key2b .eqs. "SIZE"
+$	    then
+$		write tf "#ifndef ''key2a'_''key2b'"
+$		write tf "#define ''key2a'_''key2b' (32)"
+$		write tf "#endif"
+$		goto cfgh_in_loop1
+$	    endif
+$	    if key2b .eqs. "UNSIGNED"
+$	    then
+$               if key2c .eqs. "INT" .or. key2c .eqs. "LONG"
+$               then
+$		    write tf "#ifndef ''key2a'_''key2b'_''key2c'"
+$		    write tf "#define ''key2a'_''key2b'_''key2c' (32)"
+$		    write tf "#endif"
+$		    goto cfgh_in_loop1
+$               endif
+$	    endif
+$	    if key2b .eqs. "DOUBLE"
+$	    then
+$		write tf "#ifndef ''key2a'_DOUBLE"
+$		write tf "#define ''key2a'_DOUBLE (64)"
+$		write tf "#endif"
+$		goto cfgh_in_loop1
+$	    endif
+$	    if key2b .eqs. "LONG"
+$	    then
+$		if key2c .eqs. ""
+$		then
+$		    write tf "#ifndef ''key2a'_LONG"
+$		    write tf "#define ''key2a'_LONG (32)"
+$		    write tf "#endif"
+$		else
+$		    write tf "#ifndef ''key2a'_LONG_LONG"
+$		    write tf "#ifndef __VAX"
+$		    write tf "#define ''key2a'_LONG_LONG (64)"
+$		    write tf "#endif"
+$		    write tf "#endif"
+$		endif
+$		goto cfgh_in_loop1
+$	    endif
+$	    if key2b .eqs. "SHORT"
+$	    then
+$		write tf "#ifndef ''key2a'_SHORT"
+$		write tf "#define ''key2a'_SHORT (16)"
+$		write tf "#endif"
+$		goto cfgh_in_loop1
+$	    endif
+$	    gosub comment_out_xline
 $	    goto cfgh_in_loop1
 $	endif
 $!
@@ -1621,263 +1540,8 @@ $		write tf "#define NEED_STRINGS_H 1"
 $		write tf "#endif"
 $		goto cfgh_in_loop1
 $	    endif
-$	    write tf "/* ", xline, " */"
+$	    gosub comment_out_xline
 $	    goto cfgh_in_loop1
-$	endif
-$!
-$!	Process GETHOSTNAME directives
-$!-------------------------------------
-$	if key2 .eqs. "GETHOSTNAME_TYPE_ARG2"
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#ifdef _DECC_V4_SOURCE"
-$	    write tf "#define ''key2' int"
-$	    write tf "#else"
-$	    write tf "#define ''key2' size_t"
-$	    write tf "#endif"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$!	Process GETNAMEINFO directives
-$!-------------------------------------
-$	if key2a .eqs. "GETNAMEINFO"
-$	then
-$	    if key2 .eqs. "GETNAMEINFO_QUAL_ARG1"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' const"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "GETNAMEINFO_TYPE_ARG1"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' struct sockaddr *"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "GETNAMEINFO_TYPE_ARG2"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' size_t"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "GETNAMEINFO_TYPE_ARG46"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' size_t"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "GETNAMEINFO_TYPE_ARG7"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	endif
-$!
-$!	Process RECV directives
-$!-------------------------------------
-$	if key2a .eqs. "RECV"
-$	then
-$	    if key2 .eqs. "RECV_TYPE_ARG1"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECV_TYPE_ARG2"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' void *"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECV_TYPE_ARG3"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' size_t"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECV_TYPE_ARG4"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECV_TYPE_RETV"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	endif
-$!
-$!
-$!	Process RECVFROM directives
-$!-------------------------------------
-$	if key2a .eqs. "RECVFROM"
-$	then
-$	    if key2 .eqs. "RECVFROM_QUAL_ARG5"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2'"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECVFROM_TYPE_ARG1"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECVFROM_TYPE_ARG2"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' void *"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECVFROM_TYPE_ARG3"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' size_t"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECVFROM_TYPE_ARG4"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECVFROM_TYPE_ARG5"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' struct sockaddr"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECVFROM_TYPE_ARG6"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' unsigned int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "RECVFROM_TYPE_RETV"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	endif
-$!
-$!	Process SELECT directives
-$!-------------------------------------
-$	if key2a .eqs. "SELECT"
-$	then
-$	    if key2 .eqs. "SELECT_QUAL_ARG5"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' const"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "SELECT_TYPE_ARG1"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "SELECT_TYPE_ARG2"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' void *"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "SELECT_TYPE_ARG234"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' fd_set *"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "SELECT_TYPE_ARG5"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' struct timeval *"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "SELECT_TYPE_RETV"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	endif
-$!
-$!	Process SEND directives
-$!-------------------------------------
-$	if key2a .eqs. "SEND"
-$	then
-$	    if key2 .eqs. "SEND_QUAL_ARG2"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' const"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "SEND_TYPE_ARG1"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "SEND_TYPE_ARG2"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' void *"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "SEND_TYPE_ARG3"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' size_t"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "SEND_TYPE_ARG4"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
-$	    if key2 .eqs. "SEND_TYPE_RETV"
-$	    then
-$		write tf "#ifndef ''key2'"
-$		write tf "#define ''key2' int"
-$		write tf "#endif"
-$		goto cfgh_in_loop1
-$	    endif
 $	endif
 $!
 $!
@@ -1885,7 +1549,7 @@ $!	Process STATFS directives
 $!-------------------------------
 $!	if key2a .eqs. "STATFS"
 $!	then
-$!	    write tf "/* ", xline, " */"
+$!	    gosub comment_out_xline
 $!	    goto cfgh_in_loop1
 $!	endif
 $!
@@ -1909,43 +1573,107 @@ $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
 $!
-$!	Process RETSIGTYPE directive
-$!----------------------------------
-$	if key2 .eqs. "RETSIGTYPE"
+$!	Process RETSIGTYPE and GETTIMEOFDAY_TIMEZONE directive
+$!------------------------------------------------------------
+$	if key2 .eqs. "RETSIGTYPE" .or. key2 .eqs. "GETTIMEOFDAY_TIMEZONE"
 $	then
-$	    write tf "#ifndef RETSIGTYPE"
-$	    write tf "#define RETSIGTYPE void"
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' void"
 $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
 $!
-$!	Process STDC_HEADERS (SAMBA!)
-$!---------------------------
-$	if key2 .eqs. "STDC_HEADERS"
-$	then
-$	    write tf "#ifndef STDC_HEADERS"
-$	    write tf "#define STDC_HEADERS 1"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$!	Process PROTOTYPES directive
-$!-------------------------------------
-$	if key2 .eqs. "PROTOTYPES"
-$	then
-$	    write tf "#ifndef PROTOTYPES"
-$	    write tf "#define PROTOTYPES 1"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$!	Special for SEEKDIR_RETURNS_VOID
+$!	Specials
 $!---------------------------------------
-$	if key2 .eqs. "SEEKDIR_RETURNS_VOID"
+$	if key2 .eqs. "SEEKDIR_RETURNS_VOID" .or. -
+	   key2 .eqs. "PROTOTYPES" .or. -
+	   key2 .eqs. "STDC_HEADERS" .or. -
+	   key2 .eqs. "DOUBLE_SLASH_IS_DISTINCT_ROOT" .or. -
+	   key2 .eqs. "MALLOC_0_IS_NONNULL"
 $	then
-$	    write tf "#ifndef SEEKDIR_RETURNS_VOID"
-$	    write tf "#define SEEKDIR_RETURNS_VOID 1"
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
 $	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+$!	Special suffix types 1
+$!---------------------------------------
+$	if key2 .eqs. "SIG_ATOMIC_T_SUFFIX" .or. -
+	   key2 .eqs. "WINT_T_SUFFIX"
+$	then
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2'"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+$!	Special suffix types 2
+$!---------------------------------------
+$	if key2 .eqs. "SIZE_T_SUFFIX" .or. -
+	   key2 .eqs. "WCHAR_T_SUFFIX"
+$	then
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' u"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+$!	Special for FUNC_NL_LANGINFO_YESEXPR_WORKS
+$!---------------------------------------
+$	if key2 .eqs. "FUNC_NL_LANGINFO_YESEXPR_WORKS"
+$	then
+$	    write tf "#if __CRTL_VER >= 60200000"
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+$!	Special for USE_UNLOCKED_IO
+$!---------------------------------------
+$	if key2 .eqs. "USE_UNLOCKED_IO"
+$	then
+$	    write tf "#if __CRTL_VER >= 80200000"
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+$!	Special for SIZE_MAX
+$!---------------------------------------
+$	if key2 .eqs. "SIZE_MAX"
+$	then
+$	    write tf "#define ''key2' (((1U << 31) - 1) * 2 + 1)"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+$!	Special for SYMLINKS
+$!---------------------------------------
+$	if key2 .eqs. "ENABLE_FOLLOW_SYMLINKS" .or. -
+	   key2 .eqs. "LSTAT_FOLLOWS_SLASHED_SYMLINK"
+$	then
+$	    write tf "#if __CRTL_VER >= 80300000"
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+$!      TIME_WITH_SYS_TIME note:  On VMS time.h and sys/time.h are same module.
+$!
+$!      TIME_T_IN_SYS_TYPES_H
+$!------------------------------
+$	if key2 .eqs. "TIME_T_IN_TYPES_H"
+$	then
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
 $	endif
 $!
 $!	Unknown - See if CONFIGURE can give a clue for this
@@ -1973,16 +1701,19 @@ $	    if skey1 .eqs. key2
 $	    then
 $		skey2 = f$element(1,"=",line_in)
 $		skey2a = f$extract(0,2,skey2)
-$!
-$!
-$!		We can not handle assignment to shell symbols.
-$!		For now skip them.
-$!------------------------------------------------------------
-$		if f$locate("$", skey2) .lt. f$length(skey2)
+$		skey2a1 = f$extract(0,1,skey2)
+$		skey2_nq = skey2 - """" - """"
+$		skey2_len = f$length(skey2_nq)
+$		semicol = f$extract(skey2_len - 1, 1, skey2_nq)
+$		if semicol .eqs. ";"
 $		then
-$		    write tf "/* ", xline, " */"
-$		    set_flag = 1
-$		    goto found_in_configure
+$		    skey2_nq = f$extract(0, skey2_len -1, skey2_nq)
+$		    skey2_len = skey2_len - 1
+$		endif
+$               is_int = 0
+$		if f$string(f$integer(skey2_nq)) .eqs. skey2_nq
+$		then
+$		    is_int = 1
 $		endif
 $!
 $!		Keep these two cases separate to make it easier to add
@@ -1998,12 +1729,12 @@ $!			write tf "#endif"
 $!		    else
 $!			Ignore this for now
 $!------------------------------------------
-$			write tf "/* ", xline, " */"
+$			gosub comment_out_xline
 $!		    endif
 $		    set_flag = 1
 $		    goto found_in_configure
 $		endif
-$		if skey2a .eqs. """$"
+$		if (skey2a1 .eqs. "$") .or. (skey2a .eqs. """$")
 $		then
 $!		    if pflag .eq. 1
 $!		    then
@@ -2013,35 +1744,21 @@ $!			write tf "#endif"
 $!		    else
 $!			Ignore this for now
 $!-------------------------------------------
-$			write tf "/* ", xline, " */"
+$			gosub comment_out_xline
 $!		    endif
 $		    set_flag = 1
 $		    goto found_in_configure
 $		endif
-$!
-$!		Remove multiple layers of quotes if present
-$!----------------------------------------------------------
 $		if f$extract(0, 1, skey2) .eqs. "'"
 $		then
-$		    skey2 = skey2 - "'" - "'" - "'" - "'"
-$		endif
-$		if f$extract(0, 1, skey2) .eqs. """"
-$		then
-$		    skey2 = skey2 - """" - """" - """" - """"
+$		    skey2 = skey2 - "'" - "'"
 $		endif
 $		write tf "#ifndef ''key2'"
-$		if skey2 .eqs. ""
+$		if is_int .eq. 0
 $		then
-$		    write tf "#define ",key2
+$		    write tf "#define ",key2," """,skey2,""""
 $		else
-$!		    Only quote non-numbers
-$!----------------------------------------
-$		    if f$string(skey2+0) .eqs. skey2
-$		    then
-$			write tf "#define ",key2," ",skey2
-$		    else
-$			write tf "#define ",key2," """,skey2,""""
-$		    endif
+$		    write tf "#define ",key2," (",skey2_nq,")"
 $		endif
 $		write tf "#endif"
 $		set_flag = 1
@@ -2070,7 +1787,7 @@ $!
 $!
 $!  If it falls through everything else, comment it out
 $!-----------------------------------------------------
-$   write tf "/* ", xline, " */"
+$   gosub comment_out_xline
 $   goto cfgh_in_loop1
 $cfgh_in_loop1_end:
 $close inf
@@ -2101,10 +1818,6 @@ $if f$type(dchfile) .eqs. "STRING"
 $then
 $   if f$search(dchfile) .nes. "" then delete 'dchfile';*
 $endif
-$if f$type(starhfile) .eqs. "STRING"
-$then
-$   if f$search(starhfile) .nes. "" then delete 'starhfile';*
-$endif
 $if f$type(configure_script) .eqs. "STRING"
 $then
 $   if f$search(configure_script) .nes. "" then delete 'configure_script';*
@@ -2116,6 +1829,21 @@ $control_y:
 $   status = ss_control_y
 $   goto all_exit
 $!
+$!
+$!
+$! Gosub to write out a comment xline
+$comment_out_xline:
+$   xline_len = f$length(xline)
+$   comment_start = f$locate("/*", xline)
+$   if comment_start .ge. xline_len
+$   then
+$	write tf "/* ", xline, " */"
+$   else
+$	xline_start = f$extract(0, comment_start - 1, xline)
+$       xline_end = f$extract(comment_start, xline_len - comment_start, xline)
+$       write tf "/* ", xline_start, " */ ", xline_end
+$   endif
+$return
 $!
 $!
 $! Gosub to write a new config_vms.h
@@ -2180,11 +1908,14 @@ $write tf "#endif"
 $write tf "#endif"
 $write tf ""
 $!
-$write tf " /* Allow compiler builtins */"
-$write tf "/*-------------------------*/"
-$write tf "#ifdef __DECC_VER"
-$write tf "#include <non_existant_dir:builtins.h>"
-$write tf "#endif"
+$if P1 .nes. "NOBUILTINS"
+$then
+$   write tf " /* Allow compiler builtins */"
+$   write tf "/*-------------------------*/"
+$   write tf "#ifdef __DECC_VER"
+$   write tf "#include <non_existant_dir:builtins.h>"
+$   write tf "#endif"
+$endif
 $!
 $write tf ""
 $return
@@ -2195,7 +1926,7 @@ $write_config_h_tail:
 $write tf ""
 $write tf " /* Include the hand customized settings */"
 $write tf "/*--------------------------------------*/"
-$write tf "#include ""config_vms.h"""
+$write tf "#include ""sys$disk:config_vms.h"""
 $write tf ""
 $write tf "#endif /* CONFIG_H */"
 $close tf

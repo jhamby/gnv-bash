@@ -1,6 +1,6 @@
 $! File: stage_bash_install.com
 $!
-$! $Id: stage_bash_install.com,v 1.5 2013/07/18 00:26:57 wb8tyw Exp $
+$! $Id: stage_bash_install.com,v 1.4 2013/06/13 12:42:24 wb8tyw Exp $
 $!
 $! This updates or removes the GNV$BASH.EXE and related files for the
 $! new_gnu:[*...] directory tree for running the self tests.
@@ -270,7 +270,6 @@ $   if f$search(in_file) .eqs. ""
 $   then
 $	in_file = "$''in_file'"
 $   endif
-$   copy 'in_file' 'new_gnu'[usr.share.doc.bash]'out_file'
 $   in_file = "README."
 $   out_file = in_file
 $   if f$search(in_file) .eqs. ""

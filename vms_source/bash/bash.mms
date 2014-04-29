@@ -1,6 +1,6 @@
 # File: Bash.mms
 #
-# $Id: bash.mms,v 1.7 2013/07/12 12:29:28 wb8tyw Exp $
+# $Id: bash.mms,v 1.5 2013/06/18 04:22:47 wb8tyw Exp $
 #
 # Quick and dirty Make file for building Bash 4.2 on VMS
 #
@@ -201,6 +201,7 @@ libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
 		"fnxform"=[.lib.sh]fnxform.obj,\
                 "unicode"=[.lib.sh]unicode.obj,\
 		"wcswidth"=[.lib.sh]wcswidth.obj,\
+		"wcsnwidth"=[.lib.sh]wcsnwidth.obj,\
                 "shmbchar"=[.lib.sh]shmbchar.obj
 
 #		"memset"=[.lib.sh]memset.obj,\
@@ -212,6 +213,7 @@ libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
 #
 libreadline_objs = "bind"=[.lib.readline]bind.obj,\
                    "callback"=[.lib.readline]callback.obj,\
+                   "colors"=[.lib.readline]colors.obj,\
                    "compat"=[.lib.readline]compat.obj,\
                    "complete"=[.lib.readline]complete.obj,\
                    "display"=[.lib.readline]display.obj,\
@@ -229,6 +231,7 @@ libreadline_objs = "bind"=[.lib.readline]bind.obj,\
 		   "misc"=[.lib.readline]misc.obj,\
                    "nls"=[.lib.readline]nls.obj,\
                    "parens"=[.lib.readline]parens.obj,\
+                   "parse-colors"=[.lib.readline]parse-colors.obj,\
                    "readline"=[.lib.readline]readline.obj,\
                    "rltty"=[.lib.readline]rltty.obj,\
                    "savestring"=[.lib.readline]savestring.obj,\
@@ -2118,14 +2121,14 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def \
 		[.builtins]gnv$printf.c_first
    $set def prj_root:[.builtins]
 .ifdef __VAX__
-   $type/noheader lcl_root:[]gnv$printf.c_first, lcl_root:[]printf.c \
-	/output=lcl_root:[]printf.c1
+   $type/noheader lcl_root:[]gnv$printf.c_first, src_root:[]printf.c \
+	/output=lcl_root:[]printf.c
    $define/user decc$user_include prj_root:[]
    $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
-   $(CC)$(CFLAGS)/OBJ=printf.obj printf.c1
+   $(CC)$(CFLAGS)/OBJ=printf.obj printf.c
 .else
    $define/user decc$user_include prj_root:[]
    $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
@@ -2134,7 +2137,7 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def \
    $define/user tilde prj_root:[-.lib.tilde]
    $(CC)$(CFLAGS)/OBJ=printf.obj printf.c \
 	/first_include=gnv$printf.c_first
-.endif
+.endif   
    $set def prj_root:[-]
 
 [.builtins]pushd.c : [.builtins]pushd.def [.builtins]mkbuiltins.exe
@@ -2476,10 +2479,37 @@ execute_cmd.obj : lcl_root:execute_cmd.c $(config_h) \
 expr.obj : expr.c $(config_h) $(bashansi_h) [.include]chartypes.h \
 		$(bashintl_h)  $(shell_h)
 
-findcmd.obj : findcmd.c $(config_h) [.include]chartypes.h bashtypes.h \
+gnv$findcmd.c_first : gnv_findcmd.c_first
+    $type $(MMS$SOURCE)/output=$(MMS$TARGET)
+
+findcmd.obj : findcmd.c gnv$findcmd.c_first $(config_h) \
+		[.include]chartypes.h bashtypes.h \
 		[.include]filecntl.h [.include]posixstat.h $(bashansi_h) \
 		[.include]memalloc.h $(shell_h) flags.h hashlib.h \
 		pathexp.h $(hashcmd_h) findcmd.h
+.ifdef __VAX__
+   $type/noheader lcl_root:gnv$findcmd.c_first,\
+	src_root:findcmd.c \
+	/output=lcl_root:findcmd.c
+   $define/user readline prj_root:[.lib.readline]
+   $define/user glob prj_root:[.lib.glob]
+   $define/user tilde prj_root:[.lib.tilde]
+   $define/user decc$system_include prj_root:[],prj_root:[.include]
+   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
+	prj_root:[.lib.glob]
+   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
+.else
+   $define/user readline prj_root:[.lib.readline]
+   $define/user glob prj_root:[.lib.glob]
+   $define/user tilde prj_root:[.lib.tilde]
+   $define/user decc$system_include prj_root:[],prj_root:[.include]
+   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
+	prj_root:[.lib.glob]
+   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET)/first_include=gnv$findcmd.c_first \
+	$(MMS$SOURCE)
+.endif
 
 flags.obj : flags.c $(config_h) $(shell_h) flags.h bashhist.h
 
@@ -2594,16 +2624,7 @@ redir.obj : lcl_root:redir.c $(config_h) bashtypes.h [.include]filecntl.h \
 gnv$shell.c_first : gnv_shell.c_first
     $type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
-.ifdef __VAX__
-shell_c = lcl_root:shell.c1
-.else
-shell_c = lcl_root:shell.c
-.endif
-$(shell_c) : src_root:shell.c, vms_root:shell.tpu
-		      $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-		      /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-shell.obj : $(shell_c) $(config_h) bashtypes.h [.include]posixstat.h \
+shell.obj : shell.c $(config_h) bashtypes.h [.include]posixstat.h \
 		[.include]posixtime.h $(bashansi_h) \
 		[.include]filecntl.h $(bashintl_h) $(shell_h) \
 		flags.h $(trap_h) $(jobs_h) input.h $(execute_cmd_h) \
@@ -2612,7 +2633,7 @@ shell.obj : $(shell_c) $(config_h) bashtypes.h [.include]posixstat.h \
 		[.lib.tilde]tilde.h [.lib.glob]strmatch.h \
 		$(gnv_shell_c_first) vms_main_wrapper.c
 .ifdef __VAX__
-   $type/noheader lcl_root:[]gnv$shell.c_first, lcl_root:[]shell.c1 \
+   $type/noheader lcl_root:[]gnv$shell.c_first, src_root:[]shell.c \
 	/output=lcl_root:shell.c
    $define/user readline prj_root:[.lib.readline]
    $define/user tilde prj_root:[.lib.tilde]
@@ -2649,11 +2670,15 @@ stringlib.obj : stringlib.c $(config_h) bashtypes.h $(bashansi_h) \
 		[.include]chartypes.h $(shell_h) pathexp.h [.lib.glob]glob.h \
 		[.lib.glob]strmatch.h
 
+gnv$subst.c_first : gnv_subst.c_first
+    $type $(MMS$SOURCE)/output=$(MMS$TARGET)
+
 lcl_root:subst.c : src_root:subst.c subst.tpu
     $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
 	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
 
-subst.obj : lcl_root:subst.c $(config_h) bashtypes.h [.include]chartypes.h \
+subst.obj : lcl_root:subst.c gnv$subst.c_first $(config_h) bashtypes.h \
+		[.include]chartypes.h \
 		$(bashansi_h) [.include]posixstat.h $(bashintl_h) \
 		$(shell_h) $(parser_h) flags.h $(jobs_h) $(execute_cmd_h) \
 		[.include]filecntl.h $(trap_h) pathexp.h mailcheck.h \
@@ -2661,6 +2686,27 @@ subst.obj : lcl_root:subst.c $(config_h) bashtypes.h [.include]chartypes.h \
 		[.builtins]getopt.h [.builtins]common.h \
 		[.builtins]builtext.h [.lib.tilde]tilde.h \
 		[.lib.glob]strmatch.h
+.ifdef __VAX__
+   $type/noheader lcl_root:gnv$subst.c_first,\
+	src_root:subst.c \
+	/output=lcl_root:subst.c
+   $define/user tilde prj_root:[.lib.tilde]
+   $define/user glob prj_root:[.lib.glob]
+   $define/user decc$system_include prj_root:[]
+   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
+	prj_root:[.lib.glob]
+   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
+.else
+   $define/user tilde prj_root:[.lib.tilde]
+   $define/user glob prj_root:[.lib.glob]
+   $define/user decc$system_include prj_root:[]
+   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
+	prj_root:[.lib.glob]
+   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
+   /first_include=gnv$subst.c_first $(MMS$SOURCE)
+.endif
 
 syntax.obj : syntax.c $(config_h) syntax.h
 
@@ -2672,8 +2718,8 @@ test.obj : test.c $(config_h) gnv$test.c_first \
 		[.include]filecntl.h $(bashintl_h) $(shell_h) \
 		pathexp.h test.h [.builtins]common.h [.lib.glob]strmatch.h
 .ifdef __VAX__
-   $type/noheader lcl_root:[]gnv$test.c_first, src_root:[]test.c \
-	/output=lcl_root:test.c1
+   $type/noheader lcl_root:[]gnv$test.c_first, lcl_root:[]test.c1 \
+	/output=lcl_root:test.c
    $define/user readline prj_root:[.lib.readline]
    $define/user tilde prj_root:[.lib.tilde]
    $define/user glob prj_root:[.lib.glob]
@@ -2714,7 +2760,7 @@ unwind_prot.obj : lcl_root:unwind_prot.c $(config_h) bashtypes.h $(bashansi_h) \
 		command.h $(general_h) unwind_prot.h quit.h sig.h \
 		error.h
 
-lcl_root:variables.c : src_root:variables.c variables.tpu
+lcl_root:variables.c : src_root:variables.c variables.tpu version.h
     $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
 	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
 

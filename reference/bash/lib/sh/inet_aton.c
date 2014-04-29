@@ -59,7 +59,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)inet_addr.c	8.1 (Berkeley) 6/17/93";
-static char rcsid[] = "$Id: inet_aton.c,v 1.1.1.1 2012/12/02 15:23:46 wb8tyw Exp $";
+static char rcsid[] = "$Id: inet_addr.c,v 1.5 1996/08/14 03:48:37 drepper Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <config.h>
@@ -67,7 +67,9 @@ static char rcsid[] = "$Id: inet_aton.c,v 1.1.1.1 2012/12/02 15:23:46 wb8tyw Exp
 #if !defined (HAVE_INET_ATON) && defined (HAVE_NETWORK) && defined (HAVE_NETINET_IN_H) && defined (HAVE_ARPA_INET_H)
 
 #include <sys/types.h>
+#if defined (HAVE_SYS_PARAM_H)
 #include <sys/param.h>
+#endif
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
