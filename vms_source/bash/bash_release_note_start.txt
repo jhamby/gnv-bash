@@ -574,3 +574,10 @@ Ticket #	Title
 77		Bash Process Substitution Construct Executes Incorrectly
 78		Nested Process Substitution Fails Using Bash 4.2.45(4)
 79		Bash Executes <command name>.COM commands instead of <command name>.
+
+
+Bash 4.3.11(1)
+---------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.11(1) is simply the
+OpenVMS build of the GNU Bash sources for that same version.

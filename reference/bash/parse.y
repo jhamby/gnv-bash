@@ -2424,7 +2424,7 @@ shell_getc (remove_quoted_newline)
 	 not already end in an EOF character.  */
       if (shell_input_line_terminator != EOF)
 	{
-	  if (shell_input_line_size < SIZE_MAX && shell_input_line_len > shell_input_line_size - 3)
+	  if (shell_input_line_size < SIZE_MAX-3 && (shell_input_line_len+3 > shell_input_line_size))
 	    shell_input_line = (char *)xrealloc (shell_input_line,
 					1 + (shell_input_line_size += 2));
 
@@ -3398,7 +3398,7 @@ parse_matched_pair (qc, open, close, lenp, flags)
          within a double-quoted ${...} construct "an even number of
          unescaped double-quotes or single-quotes, if any, shall occur." */
       /* This was changed in Austin Group Interp 221 */
-      if MBTEST(posixly_correct && shell_compatibility_level > 41 && dolbrace_state != DOLBRACE_QUOTE && (flags & P_DQUOTE) && (flags & P_DOLBRACE) && ch == '\'')
+      if MBTEST(posixly_correct && shell_compatibility_level > 41 && dolbrace_state != DOLBRACE_QUOTE && dolbrace_state != DOLBRACE_QUOTE2 && (flags & P_DQUOTE) && (flags & P_DOLBRACE) && ch == '\'')
 	continue;
 
       /* Could also check open == '`' if we want to parse grouping constructs
