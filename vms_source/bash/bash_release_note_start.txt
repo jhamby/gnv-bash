@@ -568,16 +568,31 @@ Ticket #	Title
 72		Simple Unpathed Disk Commands are not Found
 73		Shebang Scripts Don't Execute Properly
 74		Bash Command Name Hash Table is Always Empty
-75		Execution of Functions with an exit Command from within a Process
-		Substitution Construct Terminates Bash
-76		Special Cases of Environment Variable Assignment Execute Incorrectly
+75		Execution of Functions with an exit Command from within a
+		Process Substitution Construct Terminates Bash
+76		Special Cases of Environment Variable Assignment Execute
+		Incorrectly
 77		Bash Process Substitution Construct Executes Incorrectly
 78		Nested Process Substitution Fails Using Bash 4.2.45(4)
-79		Bash Executes <command name>.COM commands instead of <command name>.
+79		Bash Executes <command name>.COM commands instead of
+		<command name>.
 
 
-Bash 4.3.11(1)
+Bash 4.3.11(0)
 ---------------
 
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.11(1) is simply the
-OpenVMS build of the GNU Bash sources for that same version.
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.11(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+
+Bash 4.3.18(0)
+---------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.18(1) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+However, the OpenVMS build by default now enables the Bash Script Debugging
+capability by defining the macro DEBUGGER to have the value 1 in the OpenVMS
+specific file config_vms.h_in. Note that including this capability does not
+degrade Bash execution except when the Bash Script Debugger is invoked. Use
+of the Bash Script Debugger has not been tested.

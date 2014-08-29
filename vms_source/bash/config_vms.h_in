@@ -330,3 +330,5 @@ static struct group *getgrent(void) {return NULL; }
 /* Need to fake out setpwent() */
 static void setpwent(void) {}
 #endif
+
+#define DEBUGGER 1
