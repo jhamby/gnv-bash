@@ -154,9 +154,18 @@ int exit_value;
 		dvi_iosb,
 		NULL, 0, 0);
 	    if (!$VMS_STATUS_SUCCESS(status)) {
+		/* If the sys$getdviw fails, then this path was passed by */
+		/* An exec() program and not from DCL, so do nothing */
+		/* An example is "/tmp/program" where tmp: does not exist */
+#ifdef TEST_MAIN
 		printf("sys$getdviw failed with status %d\n", status);
+#endif
+		result = 0;
 	    } else if (!$VMS_STATUS_SUCCESS(dvi_iosb[0])) {
+#ifdef TEST_MAIN
 		printf("sys$getdviw failed with iosb %d\n", dvi_iosb[0]);
+#endif
+		result = 0;
 	    } else {
 		char * devnam;
 		int devnam_len;
