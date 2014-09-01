@@ -588,7 +588,7 @@ simply the OpenVMS build based on the GNU Bash sources for that same version.
 Bash 4.3.18(0)
 ---------------
 
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.18(1) is
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.18(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
 
 However, the OpenVMS build by default now enables the Bash Script Debugging
@@ -596,3 +596,21 @@ capability by defining the macro DEBUGGER to have the value 1 in the OpenVMS
 specific file config_vms.h_in. Note that including this capability does not
 degrade Bash execution except when the Bash Script Debugger is invoked. Use
 of the Bash Script Debugger has not been tested.
+
+
+Bash 4.3.18(1)
+---------------
+
+There was an inadvertent source code regression in the vms_main_wrapper.c
+file which reintroduced an earlier bug that produced extraneous
+"sys$getdviw failed with status 2312" messages to standard output. These
+extraneous messages would be produced when the program path specified for
+a disk command did not start with a slash. The fix for this bug was re-
+applied in this updated OpenVMS build for Bash 4.3.18.
+
+
+Bash 4.3.24(0)
+---------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.24(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
