@@ -176,7 +176,8 @@ With these search lists set up and the properly, bash can be built by
 setting your default to PRJ_ROOT:[bash] and then issuing the command:
 
 If you are installing a VMS specific patch, the file vms_eco_level.h needs
-to be updated.  If this is a first
+to be updated.  If this is a first release for a new version, then the
+vms_eco_level.h file needs to have its value set to 0.
 
    $ @build_bash.com.
 
