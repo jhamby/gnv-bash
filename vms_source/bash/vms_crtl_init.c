@@ -341,6 +341,8 @@ static void set_coe ( void )
 
         set_feature_default ("DECC$FILE_OWNER_UNIX"  	, ENABLE);
         set_feature_default ("DECC$POSIX_SEEK_STREAM_FILE", ENABLE);
+        set_feature_default("DECC$STREAM_PIPE", ENABLE);
+        set_feature_default("DECC$POPEN_NO_CRLF_REC_ATTR", ENABLE);
 
     } else {
 	 set_feature_default("DECC$FILENAME_UNIX_REPORT", ENABLE);
