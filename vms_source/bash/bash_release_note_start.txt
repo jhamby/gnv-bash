@@ -630,3 +630,8 @@ This release contains a change in the OpenVMS-specific vms_crtl_init.c module
 that is used to initialize UNIX compatibility of the OpenVMS CRTL functions
 prior to execution of the main() function. This release enables the following
 OpenVMS CRTL features: DECC$STREAM_PIPE and DECC$POPEN_NO_CRLF_REC_ATTR.
+
+Bash 4.2.27(0)
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.27(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
