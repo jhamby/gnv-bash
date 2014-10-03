@@ -637,3 +637,10 @@ Bash 4.3.27(0)
 
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.27(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+
+Bash 4.3.28(0)
+--------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.28(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
