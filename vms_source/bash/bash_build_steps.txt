@@ -203,7 +203,7 @@ filenames that have any upper case or special symbols in them.
 To remove the staged files, the procedure is run again with the parameter
 "REMOVE".  This makes sure that the alias links are removed.
 
-Building a PCSI kit for an archictecture takes the following steps after
+Building a PCSI kit for an architecture takes the following steps after
 making sure that you have a working build environment.
 
 Note that it requires manually creating two logical names as described
