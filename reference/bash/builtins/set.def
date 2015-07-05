@@ -763,10 +763,10 @@ unset_builtin (list)
       switch (opt)
 	{
 	case 'f':
-	  global_unset_function = 1;
+	  global_unset_func = 1;
 	  break;
 	case 'v':
-	  global_unset_variable = 1;
+	  global_unset_var = 1;
 	  break;
 	case 'n':
 	  nameref = 1;
@@ -779,7 +779,7 @@ unset_builtin (list)
 
   list = loptend;
 
-  if (unset_function && global_unset_variable)
+  if (unset_function && global_unset_var)
     {
       builtin_error (_("cannot simultaneously unset a function and a variable"));
       return (EXECUTION_FAILURE);
