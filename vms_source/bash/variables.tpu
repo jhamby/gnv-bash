@@ -122,13 +122,33 @@ THEN
     POSITION(END_OF(find_range));
 ENDIF;
 !
-! Bash 1.14.8 has a QUIT statement here.
-VMS_INSERT_BEFORE('printf','#ifdef __VMS');
-SPLIT_LINE;
-COPY_TEXT('      QUIT;');
-SPLIT_LINE;
-COPY_TEXT('#endif /* __VMS */');
-SPLIT_LINE;
+! Bash 1.14.8 had a QUIT statement here. But, subsequent fixes have rendered it 
+! obsolete.
+!VMS_INSERT_BEFORE('printf','#ifdef __VMS');
+!SPLIT_LINE;
+!COPY_TEXT('      QUIT;');
+!SPLIT_LINE;
+!COPY_TEXT('#endif /* __VMS */');
+!SPLIT_LINE;
+!
+! bind_variable_internal
+!
+old_pattern := LINE_BEGIN + 'static SHELL_VAR *' + LINE_END + LINE_BEGIN + 'bind_variable_internal (name, value, table, hflags, aflags)';
+find_range := SEARCH_QUIETLY(old_pattern, FORWARD, EXACT);
+IF find_range <> 0
+THEN
+   POSITION(END_OF(find_range));
+!
+! There is a source bug in the function bind_variable_internal that was introduced in
+! bash 4.3.31 that as of bash 4.3.39 has still not been fixed. So instead of waiting
+! any longer for the bash maintainer to fix it, the script below will make the bug fix
+! correction in the event the source code bug is still present. In the event the source
+! code bug is already fixed, the script below will have no effect.
+!
+   old_pattern := 'ind = array_expand_index (name, subp, sublen);';
+   new_pattern := 'ind = array_expand_index (entry, subp, sublen);';
+   VMS_REPLACE(old_pattern, new_pattern);
+ENDIF;
 !
 ! Add new function for restoring Bash "special" shell variables. The "special"
 ! shell variable POSIXLY_CORRECT is explicitly excluded from this blanket restore
