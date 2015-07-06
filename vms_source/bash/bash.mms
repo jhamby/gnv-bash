@@ -461,7 +461,7 @@ bash_objs = alias.obj,\
 
 # Add stdc.h to config.h since most things include both
 config_h = config.h config-top.h config-bot.h [.include]stdc.h \
-		vms_term.h
+		vms_term.h vms_lstat_hack.h
 
 alias_h = alias.h hashlib.h
 
@@ -787,17 +787,17 @@ libsh.olb : libsh($(libsh_objs))
 
 [.lib.sh]dprintf.obj : [.lib.sh]dprintf.c lcl_root:[.lib]sh.DIR $(config_h)
 
-[.lib.sh]gnv$eaccess.c_first : [.lib.sh]gnv_eaccess.c_first \
-	lcl_root:[.lib]sh.DIR
-    $type $(MMS$SOURCE)/output=$(MMS$TARGET)
+# moved to vms_lstat_hack.h
+#[.lib.sh]gnv$eaccess.c_first : [.lib.sh]gnv_eaccess.c_first \
+#	lcl_root:[.lib]sh.DIR
+#    $type $(MMS$SOURCE)/output=$(MMS$TARGET)
 
 [.lib.sh]eaccess.obj : [.lib.sh]eaccess.c lcl_root:[.lib]sh.DIR $(config_h) \
-	bashtypes.h $(bashansi_h) [.include]posixstat.h \
-	[.lib.sh]gnv$eaccess.c_first
+	bashtypes.h $(bashansi_h) [.include]posixstat.h
 .ifdef __VAX__
-   $type/noheader lcl_root:[.lib.sh]gnv$eaccess.c_first,\
-	src_root:[.lib.sh]eaccess.c \
-	/output=lcl_root:[.lib.sh]eaccess.c
+   $!$type/noheader lcl_root:[.lib.sh]gnv$eaccess.c_first,\
+   $!	src_root:[.lib.sh]eaccess.c \
+   $!	/output=lcl_root:[.lib.sh]eaccess.c
    $define/user decc$system_include prj_root:[]
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
@@ -808,8 +808,7 @@ libsh.olb : libsh($(libsh_objs))
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
-   /first_include=[.lib.sh]gnv$eaccess.c_first $(MMS$SOURCE)
+   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
 .endif
 
 [.lib.sh]fmtullong.obj : [.lib.sh]fmtullong.c, [.lib.sh]fmtulong.c, \
@@ -2137,7 +2136,7 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def \
    $define/user tilde prj_root:[-.lib.tilde]
    $(CC)$(CFLAGS)/OBJ=printf.obj printf.c \
 	/first_include=gnv$printf.c_first
-.endif   
+.endif
    $set def prj_root:[-]
 
 [.builtins]pushd.c : [.builtins]pushd.def [.builtins]mkbuiltins.exe
@@ -2479,18 +2478,19 @@ execute_cmd.obj : lcl_root:execute_cmd.c $(config_h) \
 expr.obj : expr.c $(config_h) $(bashansi_h) [.include]chartypes.h \
 		$(bashintl_h)  $(shell_h)
 
-gnv$findcmd.c_first : gnv_findcmd.c_first
-    $type $(MMS$SOURCE)/output=$(MMS$TARGET)
+# moved to vms_lstat_hack.h
+#gnv$findcmd.c_first : gnv_findcmd.c_first
+#    $type $(MMS$SOURCE)/output=$(MMS$TARGET)
 
-findcmd.obj : findcmd.c gnv$findcmd.c_first $(config_h) \
+findcmd.obj : findcmd.c $(config_h) \
 		[.include]chartypes.h bashtypes.h \
 		[.include]filecntl.h [.include]posixstat.h $(bashansi_h) \
 		[.include]memalloc.h $(shell_h) flags.h hashlib.h \
 		pathexp.h $(hashcmd_h) findcmd.h
 .ifdef __VAX__
-   $type/noheader lcl_root:gnv$findcmd.c_first,\
-	src_root:findcmd.c \
-	/output=lcl_root:findcmd.c
+   $!type/noheader lcl_root:gnv$findcmd.c_first,\
+   $!	src_root:findcmd.c \
+   $!	/output=lcl_root:findcmd.c
    $define/user readline prj_root:[.lib.readline]
    $define/user glob prj_root:[.lib.glob]
    $define/user tilde prj_root:[.lib.tilde]
@@ -2507,7 +2507,7 @@ findcmd.obj : findcmd.c gnv$findcmd.c_first $(config_h) \
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET)/first_include=gnv$findcmd.c_first \
+   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
 	$(MMS$SOURCE)
 .endif
 

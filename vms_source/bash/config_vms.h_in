@@ -283,6 +283,9 @@ mkfifo(const char * path, mode_t mode);
 /* Substitute our TERMCAP routines */
 #include "vms_term.h"
 
+/* Need to use our lstat/stat/rmdir, etc routines. */
+#include "vms_lstat_hack.h"
+
 /* Need to use the getenv() and friends supplied by bash */
 #define getenv decc_getenv
 #define putenv decc_putenv
@@ -330,5 +333,8 @@ static struct group *getgrent(void) {return NULL; }
 /* Need to fake out setpwent() */
 static void setpwent(void) {}
 #endif
+
+/* Get rid of a implicit function diagnostic. */
+void v_set_pid_list_vms_pid (pid_t, pid_t);
 
 #define DEBUGGER 1
