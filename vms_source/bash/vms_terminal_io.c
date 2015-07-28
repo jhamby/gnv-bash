@@ -1,7 +1,5 @@
 /* File: vms_terminal_io.c
  *
- * $Id: vms_terminal_io.c,v 1.2 2013/06/09 17:07:00 wb8tyw Exp $
- *
  * Wrappers to intercept IO to terminals to better emulate what Unix programs
  * expect.
  *
@@ -60,6 +58,10 @@
 #define __USE_MISC 1
 #endif
 
+#include "vms_lstat_hack.h"
+#include "vms_getcwd_hack.h"
+char * vms_to_unix(const char * vms_spec);
+
 #include <errno.h>
 #include <stropts.h>
 #include "vms_terminal_io.h"
@@ -80,6 +82,12 @@
 #if (__CRTL_VER >= 080200000) && !defined (__VAX)
 #include <tt3def.h>
 #endif
+#include <dirent.h>
+#include <stat.h>
+#include <stdarg.h>
+#include <fcntl.h>
+
+
 
 /* Eventually this may need to be conditionally compiled for
  * versions of VMS that do not have it, and also set the size of
@@ -245,8 +253,12 @@ struct vms_info_st {
 	struct termios * term_attr;	/* Unix terminal attributes */
 	struct term_char_st *vms_char;  /* VMS terminal characteristics */
 	struct term_mode_iosb_st * vms_iosb; /* IOSB from sense mode */
+	char * vmscwd;			/* VMS format Current Working Dir */
+	char * path;			/* Path dirfd simulation */
+	DIR * dirptr;			/* Pointer for dirfd simulation */
 	unsigned long vms_crtl;		/* VMS CRTL stuff */
 					/* Add info for signals here */
+	struct stat *st_buf;		/* Stat buffer for directories */
 };
 
 
@@ -258,6 +270,315 @@ static int vms_info_size = -1;
 static int vms_terminal_mode = -1;
 
  /* Internal routines */
+
+/* fd lookup routine.  We need our special data with some file descriptors */
+
+static struct vms_info_st * vms_lookup_fd(int fd) {
+
+    /* Make sure memory of file descriptors is set up. */
+    if (vms_info == NULL) {
+
+	/* Find out how many channels are possible */
+	vms_info_size = getdtablesize();
+
+	/* Allocate the array */
+	vms_info = malloc(vms_info_size * sizeof(struct vms_info_st));
+	if (vms_info == NULL) {
+
+	    /* We are probably out of memory, so degrade gracefully */
+	    vms_info_size = -1;
+	} else {
+	    memset(vms_info, 0, vms_info_size * sizeof(struct vms_info_st));
+	}
+    }
+    return &vms_info[fd];
+}
+
+
+int vms_open(const char *file_spec, int flags, ...) {
+    mode_t mode;
+
+    mode = 0;
+    if (flags & O_CREAT) {
+        va_list arg;
+        va_start (arg, flags);
+
+        mode = va_arg (arg, mode_t);
+
+        va_end (arg);
+    }
+    int mask;
+    mask = O_RDONLY | O_NOCTTY | O_NONBLOCK;
+    if ((flags & ~mask) == 0) {
+        int st_result;
+        struct stat st_buf;
+        st_result = vms_stat(file_spec, &st_buf);
+        if ((st_result == 0) &&  S_ISDIR(st_buf.st_mode)) {
+            int fd_result;
+            fd_result = open("/dev/null", 0, 0);
+            if (fd_result >= 0) {
+                struct vms_info_st * info;
+                info = vms_lookup_fd(fd_result);
+                /* Need to store cwd in VMS format for deep filenames */
+                info->vmscwd = decc_getcwd(NULL, 4097, 1);
+                info->path = strdup(file_spec);
+                info->st_buf = malloc(sizeof (struct stat));
+                if (info->st_buf != NULL) {
+                    memcpy(info->st_buf, &st_buf, sizeof(struct stat));
+                }
+            }
+            return fd_result;
+        }
+    }
+    return open(file_spec, flags, mode);
+}
+
+
+
+/* Need a wrapper for fstat() */
+int vms_fstat(int fd, struct stat * st_buf) {
+    struct vms_info_st * info;
+    info = vms_lookup_fd(fd);
+    if (info->path != NULL) {
+        if (info->st_buf != NULL) {
+            memcpy(st_buf, info->st_buf, sizeof(struct stat));
+            return 0;
+        }
+    }
+    return fstat(fd, st_buf);
+}
+
+DIR * decc$opendir(const char * name);
+
+DIR * vms_opendir(const char * name) {
+    int pathlen;
+    char * newpath;
+    DIR * dirptr;
+
+    /* First check for ".dir" bug */
+    pathlen = strlen(name);
+    if (pathlen > 4) {
+        int i, cmp;
+        i = pathlen - 4;
+        cmp = strcasecmp(".dir", &name[i]);
+        if (cmp == 0) {
+        newpath = malloc(pathlen + 3);
+            strcpy(newpath, name);
+            strcat(newpath, "/.");
+            dirptr = decc$opendir(newpath);
+            free(newpath);
+            return dirptr;
+        }
+   }
+   dirptr = decc$opendir(name);
+   return dirptr;
+}
+
+
+/* Fake an opendir */
+DIR * vms_fdopendir(int fd) {
+    struct vms_info_st * info;
+    info = vms_lookup_fd(fd);
+    char dir_path[4097];
+    dir_path[0] = 0;
+    if (info->path != NULL) {
+        if (info->path[0] != '/') {
+            if (info->vmscwd != NULL) {
+                int len;
+                char * unix_path;
+                unix_path = vms_to_unix(info->vmscwd);
+                strcpy(dir_path, unix_path);
+                free(unix_path);
+                len = strlen(dir_path);
+                if (dir_path[len -1] != '/')
+                    strcat(dir_path, "/");
+            }
+        }
+        if (!((info->path[0] == '.') && info->path[1] == 0)) {
+            strcat(dir_path, info->path);
+        }
+        info->dirptr = vms_opendir(dir_path);
+        return info->dirptr;
+    }
+    errno = ENOTDIR;
+    return NULL;
+}
+
+int vmsmode_chdir(const char * newdir) {
+    int result;
+    int file_ux_only_mode;
+#if (__CRTL_VER >= 80300000)
+    int pcp_mode;
+    /* Save the PCP mode */
+    pcp_mode = decc$feature_get("DECC$POSIX_COMPLIANT_PATHNAMES",
+                                __FEATURE_MODE_CURVAL);
+    if (pcp_mode > 0) {
+        decc$feature_set("DECC$POSIX_COMPLIANT_PATHNAMES",
+                         __FEATURE_MODE_CURVAL, 0);
+    }
+#endif
+    file_ux_only_mode = decc$feature_get("DECC$FILENAME_UNIX_ONLY",
+                                         __FEATURE_MODE_CURVAL);
+    if (file_ux_only_mode > 0) {
+        decc$feature_set("DECC$FILENAME_UNIX_ONLY",
+                         __FEATURE_MODE_CURVAL, 0);
+    }
+    result = chdir(newdir);
+    if (file_ux_only_mode > 0) {
+        decc$feature_set("DECC$FILENAME_UNIX_ONLY",
+                         __FEATURE_MODE_CURVAL, file_ux_only_mode);
+    }
+#if (__CRTL_VER >= 80300000)
+    if (pcp_mode > 0) {
+        decc$feature_set("DECC$POSIX_COMPLIANT_PATHNAMES",
+                         __FEATURE_MODE_CURVAL, pcp_mode);
+    }
+#endif
+    return result;
+}
+
+/* Need a fchdir */
+int vms_fchdir(int fd) {
+    struct vms_info_st * info;
+    info = vms_lookup_fd(fd);
+    /* First need to go to saved wd */
+    if (info->vmscwd != NULL) {
+        int err;
+        err = vmsmode_chdir(info->vmscwd);
+    }
+    /* Then to the desired directory */
+    if (info->path != NULL) {
+        if (!((info->path[0] == '.') && info->path[1] == 0)) {
+            int err;
+            err = chdir(info->path);
+            if (err == 0) {
+                /* Need to replace the saved path */
+                free(info->vmscwd);
+                info->vmscwd = decc_getcwd(NULL, 4097, 1);
+                free(info->path);
+                info->path = strdup(".");
+            }
+         return err;
+        } else {
+            return 0;
+        }
+    }
+    errno = ENOTDIR;
+    return -1;
+}
+
+
+/* Close up the file descriptor info on close */
+
+int vms_close(int fd) {
+    int result;
+    struct vms_info_st * info;
+    info = vms_lookup_fd(fd);
+    if (info->vmscwd != NULL) {
+        free(info->vmscwd);
+        info->vmscwd = NULL;
+    }
+    if (info->path != NULL) {
+        free(info->path);
+        info->path = NULL;
+    }
+    if (info->st_buf != NULL) {
+        free(info->st_buf);
+        info->st_buf = NULL;
+    }
+    result = close(fd);
+    if (info->dirptr != NULL) {
+        result = closedir(info->dirptr);
+        info->dirptr = NULL;
+    }
+    return result;
+}
+
+/* have to handle dup */
+int vms_dup(int fd1) {
+    int fd2;
+    struct vms_info_st * info1;
+    struct vms_info_st * info2;
+    fd2 = dup(fd1);
+    if (fd2 < 0) {
+        return fd2;
+    }
+    info1 = vms_lookup_fd(fd1);
+    info2 = vms_lookup_fd(fd2);
+    if (info1->vmscwd != NULL) {
+        info2->vmscwd = strdup(info1->vmscwd);
+    }
+    if (info1->path != NULL) {
+        info2->path = strdup(info1->path);
+    }
+    if (info1->st_buf != NULL) {
+        info2->st_buf = malloc(sizeof (struct stat));
+        memcpy(info2->st_buf, info1->st_buf, sizeof(struct stat));
+    }
+    return fd2;
+}
+
+/* and handle dup2 */
+int vms_dup2(int fd1, int fd2) {
+    int fd;
+    struct vms_info_st * info1;
+    struct vms_info_st * info2;
+    info1 = vms_lookup_fd(fd1);
+    info2 = vms_lookup_fd(fd2);
+    if (info2->path != NULL) {
+        vms_close(fd2);
+    }
+    fd = dup2(fd1, fd2);
+    if (fd2 < 0) {
+        return fd2;
+    }
+    if (info1->vmscwd != NULL) {
+        info2->vmscwd = strdup(info1->vmscwd);
+    }
+    if (info1->path != NULL) {
+        info2->path = strdup(info1->path);
+    }
+    if (info1->st_buf != NULL) {
+        info2->st_buf = malloc(sizeof (struct stat));
+        memcpy(info2->st_buf, info1->st_buf, sizeof(struct stat));
+    }
+    return fd2;
+}
+
+/* Need a dirfd */
+int vms_dirfd(DIR * dirp) {
+    int i;
+
+    /* No interceptions - Trivial */
+    if (vms_info == NULL) {
+        errno = ENOTDIR;
+        return -1;
+    }
+
+    /* Hard way, look it up */
+    for (i = 0; i < vms_info_size; i++) {
+        if (vms_info[i].dirptr == dirp) {
+            return i;
+        }
+    }
+
+    /* We may end up having to allocate a fd and return it */
+    errno = ENOTDIR;
+    return -1;
+}
+
+/* Cleanup a file descriptor on closedir */
+int vms_closedir(DIR * dirp) {
+    int fd;
+
+    fd = vms_dirfd(dirp);
+    if (fd >= 0) {
+        return vms_close(fd);
+    }
+
+    /* Still not found? */
+    return closedir(dirp);
+}
 
 /* When we encounter a terminal device, we need to see if it is one
  * that we already know about.
@@ -277,6 +598,7 @@ char * retname;
 struct dsc$descriptor_s dev_desc;
 int call_stat;
 unsigned short chan;
+struct vms_info_st * info;
 
     status = -1;
 
@@ -298,13 +620,14 @@ unsigned short chan;
     }
 
     /* Do we know about this one? */
-    if (vms_info[fd].ref_cnt > 0) {
+    info = vms_lookup_fd(fd);
+    if (info->ref_cnt > 0) {
 	/* We found it */
-	*channel = vms_info[fd].channel;
+	*channel = info->channel;
 
 	/* Do not increment the ref count for STDIN/STDOUT/STDERR */
 	if (fd > 2) {
-	    vms_info[fd].ref_cnt++;
+	    info->ref_cnt++;
 	}
 	return 0;
     }
@@ -315,7 +638,7 @@ unsigned short chan;
     if (retname != NULL) {
 
 	/* Store the name */
-	vms_info[fd].device_name = strdup(device_name);
+	info->device_name = strdup(device_name);
 
 	 /* Assign the channel */
 	/*--------------------*/
@@ -326,14 +649,13 @@ unsigned short chan;
 	call_stat = SYS$ASSIGN(&dev_desc, &chan, 0, 0, 0);
 	if ($VMS_STATUS_SUCCESS(call_stat)) {
 	    *channel = chan;
-	    vms_info[fd].channel = chan;
-	    vms_info[fd].ref_cnt = 1;
+	    info->channel = chan;
+	    info->ref_cnt = 1;
 	    status = 0;
 	}
 
 	/* Initialize the rest of the structure */
-	vms_info[fd].term_attr = NULL;
-
+	info->term_attr = NULL;
     }
 
     return status;

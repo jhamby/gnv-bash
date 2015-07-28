@@ -451,6 +451,7 @@ bash_objs = alias.obj,\
             y_tab.obj,\
 	    xmalloc.obj,\
 	    vms_fakefork.obj,\
+            vms_fname_to_unix.obj,\
 	    vms_mailstat.obj,\
 	    vms_terminal_io.obj,\
 	    vms_term.obj,\

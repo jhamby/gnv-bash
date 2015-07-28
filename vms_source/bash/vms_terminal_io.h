@@ -1,7 +1,5 @@
 /* File: vms_terminal_io.h
  *
- * $Id: vms_terminal_io.h,v 1.2 2013/06/09 17:07:00 wb8tyw Exp $
- *
  * Wrappers to intercept IO to terminals to better emulate what Unix programs
  * expect.
  *
@@ -61,6 +59,10 @@ int vms_terminal_tcgetattr(int fd, struct termios * buf);
 int vms_terminal_tcsetattr(int fd, int action, const struct termios * buf);
 int vms_terminal_tcflush(int fd, int queue_selector);
 
+#define cfsetispeed(buf, speed) (buf->__ispeed = speed)
+#define cfsetospeed(buf, speed) (buf->__ospeed = speed)
+#define cfgetispeed(buf) (buf->__ispeed)
+#define cfgetospeed(buf) (buf->__ospeed)
 
   /*******************************/
  /* stropts replacement routine */
@@ -118,6 +120,17 @@ int poll (struct pollfd fd_array[], nfds_t nfds, int timeout);
 #include <unixio.h>
 #include <unistd.h>
 #endif /* VMS_NEED_READ_WRITE */
+
+#include <dirent.h>
+
+int vms_open(const char *file_spec, int flags, ...);
+DIR * vms_fdopendir(int fd);
+int vms_close(int fd);
+int vms_dirfd(DIR * dirp);
+int vms_dup(int fd1);
+int vms_dup2(int fd1, int fd2);
+int vms_closedir(DIR * dirp);
+int vms_fstat(int fd, struct stat * st_buf);
 
 
 #define read(fd, buf, nbytes) vms_terminal_read(fd, buf, nbytes)

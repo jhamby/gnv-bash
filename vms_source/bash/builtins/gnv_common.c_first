@@ -19,40 +19,4 @@
  */
 
 
-#define getcwd decc$getcwd
-#include <vms_sys_library/unistd.h>
-#undef getcwd
-
-#define decc_getcwd decc$getcwd
-
-#ifndef __VAX
-#define VMS_MAX_PATH 4097
-#pragma extern_prefix NOCRTL (getcwd)
-#else
-#define VMS_MAX_PATH 255
-#endif
-
-
-/* GNU open source code expects that the getcwd() with a NULL buffer and
- * and a buffer size of 0 will allocate a buffer of the size needed
- * for the result.
- *
- * VMS does not do this, so this wrapper fixes it.
- */
-
-static char *
-getcwd(char * buffer, unsigned int size, ...)
-{
-  int real_size;
-  char * result;
-
-    real_size = 0;
-    if ((buffer == NULL) && (size == 0))
-      {
-	real_size = VMS_MAX_PATH;
-      }
-
-    result = decc_getcwd(buffer, real_size, 0);
-
-    return result;
-}
+#include "vms_getcwd_hack.h"

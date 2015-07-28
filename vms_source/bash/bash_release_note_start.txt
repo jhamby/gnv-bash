@@ -2,9 +2,9 @@ From file: BASH_RELEASE_NOTE_START.TXT
 
 $Id: bash_release_note_start.txt,v 1.10 2013/07/28 12:45:08 robertsonericw Exp $
 
-This is a fresh port of Bash 4.2.x with input from the many VMS OpenSource
-developers.  Much of this is from lessons learned from the previous
-bash 1.14.8. port.
+This is a fresh port starting with Bash 4.2.x with input from the many
+VMS OpenSource developers.  Much of this is from lessons learned from the
+previous bash 1.14.8. port.
 
 Note: I am a hobbyist and am not providing any support or any commitment
 to supply bug fixes or future releases.  This code is as-is with no
@@ -13,7 +13,7 @@ warrantees.
 The testing of this Bash involved some manual verification of the
 terminal line editing functions, the test built-in, and running the
 curl 7.20.0 configure script on Alpha.  At this time, the VAX build is
-considered experimental and untested.
+limited to the 4.2.x versions and is experimental.
 
 Due to the way that PCSI identifies packages, if you install a package from
 one producer and then want to upgrade it from another producer, you will
