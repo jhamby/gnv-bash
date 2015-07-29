@@ -347,6 +347,133 @@ people that were named in the GNV Bash 1.14.8 source:  John Malmberg,
 Martin Vorlander, Steve Pitcher, Hartmut Becker, Karl Puder, John Reagan.
 The first port of bash to VMS is the result of work by Douglas B Rupp.
 
+
+Bash 4.3.39(0)
+--------------
+The following bug is now fixed in this release:
+
+Bug
+Ticket #	Title
+--------	------------------------------------------------------------------
+94		Bash Still Has Problems with *.dir files
+
+This version of Bash for OpenVMS also incorporates changes which partially address
+problems with long/deep directory paths. However, there are still some outstanding
+issues with long/deep directory paths that remain in this release. These problems
+are expected to be better resolved in a future release of Bash for OpenVMS.
+
+Bash 4.3.30(0)
+--------------
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.30(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+Bash 4.3.29(0)
+--------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.29(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+
+Bash 4.3.28(0)
+--------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.28(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+
+Bash 4.3.27(0)
+---------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.27(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+
+Bash 4.3.26(0)
+---------------
+
+This release contains a change in the OpenVMS-specific vms_crtl_init.c module
+that is used to initialize UNIX compatibility of the OpenVMS CRTL functions
+prior to execution of the main() function. This release enables the following
+OpenVMS CRTL features: DECC$STREAM_PIPE and DECC$POPEN_NO_CRLF_REC_ATTR.
+
+
+Bash 4.3.25(0)
+---------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.25(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+
+Bash 4.3.24(0)
+---------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.24(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+
+Bash 4.3.18(1)
+---------------
+
+There was an inadvertent source code regression in the vms_main_wrapper.c
+file which reintroduced an earlier bug that produced extraneous
+"sys$getdviw failed with status 2312" messages to standard output. These
+extraneous messages would be produced when the program path specified for
+a disk command did not start with a slash. The fix for this bug was re-
+applied in this updated OpenVMS build for Bash 4.3.18.
+
+
+Bash 4.3.18(0)
+---------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.18(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+However, the OpenVMS build by default now enables the Bash Script Debugging
+capability by defining the macro DEBUGGER to have the value 1 in the OpenVMS
+specific file config_vms.h_in. Note that including this capability does not
+degrade Bash execution except when the Bash Script Debugger is invoked. Use
+of the Bash Script Debugger has not been tested.
+
+
+Bash 4.3.11(0)
+---------------
+
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.11(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+
+Bash 4.3.0.(1)
+---------------
+
+Bugs fixed in this  release:
+
+Bug
+Ticket #	Title
+--------	------------------------------------------------------------------
+72		Simple Unpathed Disk Commands are not Found
+73		Shebang Scripts Don't Execute Properly
+74		Bash Command Name Hash Table is Always Empty
+75		Execution of Functions with an exit Command from within a
+		Process Substitution Construct Terminates Bash
+76		Special Cases of Environment Variable Assignment Execute
+		Incorrectly
+77		Bash Process Substitution Construct Executes Incorrectly
+78		Nested Process Substitution Fails Using Bash 4.2.45(4)
+79		Bash Executes <command name>.COM commands instead of
+		<command name>.
+
+
+Bash 4.2.45(4)
+---------------
+
+Bugs fixed in this release:
+
+Bug
+Ticket #	Title
+--------	------------------------------------------------------------------
+66		Bash 4.2.45(3) does not preserve process umask across subshells
+
+
 Bash 4.2.45(3)
 ---------------
 There have been several, significant bug fixes since the initial Bash 4.2.39(1)
@@ -546,114 +673,3 @@ the OpenVMS port of Bash 4.2.45(3) and that of typical UNIX/Linux environments.
         cat $TMPFILE
         rm -f $TMPFILE
 
-Bash 4.2.45(4)
----------------
-
-Bugs fixed in this release:
-
-Bug
-Ticket #	Title
---------	------------------------------------------------------------------
-66		Bash 4.2.45(3) does not preserve process umask across subshells
-
-
-Bash 4.3.0.(1)
----------------
-
-Bugs fixed in this  release:
-
-Bug
-Ticket #	Title
---------	------------------------------------------------------------------
-72		Simple Unpathed Disk Commands are not Found
-73		Shebang Scripts Don't Execute Properly
-74		Bash Command Name Hash Table is Always Empty
-75		Execution of Functions with an exit Command from within a
-		Process Substitution Construct Terminates Bash
-76		Special Cases of Environment Variable Assignment Execute
-		Incorrectly
-77		Bash Process Substitution Construct Executes Incorrectly
-78		Nested Process Substitution Fails Using Bash 4.2.45(4)
-79		Bash Executes <command name>.COM commands instead of
-		<command name>.
-
-
-Bash 4.3.11(0)
----------------
-
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.11(0) is
-simply the OpenVMS build based on the GNU Bash sources for that same version.
-
-
-Bash 4.3.18(0)
----------------
-
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.18(0) is
-simply the OpenVMS build based on the GNU Bash sources for that same version.
-
-However, the OpenVMS build by default now enables the Bash Script Debugging
-capability by defining the macro DEBUGGER to have the value 1 in the OpenVMS
-specific file config_vms.h_in. Note that including this capability does not
-degrade Bash execution except when the Bash Script Debugger is invoked. Use
-of the Bash Script Debugger has not been tested.
-
-
-Bash 4.3.18(1)
----------------
-
-There was an inadvertent source code regression in the vms_main_wrapper.c
-file which reintroduced an earlier bug that produced extraneous
-"sys$getdviw failed with status 2312" messages to standard output. These
-extraneous messages would be produced when the program path specified for
-a disk command did not start with a slash. The fix for this bug was re-
-applied in this updated OpenVMS build for Bash 4.3.18.
-
-
-Bash 4.3.24(0)
----------------
-
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.24(0) is
-simply the OpenVMS build based on the GNU Bash sources for that same version.
-
-
-Bash 4.3.25(0)
----------------
-
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.25(0) is
-simply the OpenVMS build based on the GNU Bash sources for that same version.
-
-
-Bash 4.3.26(0)
----------------
-
-This release contains a change in the OpenVMS-specific vms_crtl_init.c module
-that is used to initialize UNIX compatibility of the OpenVMS CRTL functions
-prior to execution of the main() function. This release enables the following
-OpenVMS CRTL features: DECC$STREAM_PIPE and DECC$POPEN_NO_CRLF_REC_ATTR.
-
-
-Bash 4.3.27(0)
----------------
-
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.27(0) is
-simply the OpenVMS build based on the GNU Bash sources for that same version.
-
-
-Bash 4.3.28(0)
---------------
-
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.28(0) is
-simply the OpenVMS build based on the GNU Bash sources for that same version.
-
-
-Bash 4.3.29(0)
---------------
-
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.29(0) is
-simply the OpenVMS build based on the GNU Bash sources for that same version.
-
-
-Bash 4.3.30(0)
---------------
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.30(0) is
-simply the OpenVMS build based on the GNU Bash sources for that same version.
