@@ -1,7 +1,5 @@
 From file: BASH_RELEASE_NOTE_START.TXT
 
-$Id: bash_release_note_start.txt,v 1.10 2013/07/28 12:45:08 robertsonericw Exp $
-
 This is a fresh port starting with Bash 4.2.x with input from the many
 VMS OpenSource developers.  Much of this is from lessons learned from the
 previous bash 1.14.8. port.
@@ -12,8 +10,8 @@ warrantees.
 
 The testing of this Bash involved some manual verification of the
 terminal line editing functions, the test built-in, and running the
-curl 7.20.0 configure script on Alpha.  At this time, the VAX build is
-limited to the 4.2.x versions and is experimental.
+curl 7.20.0 and other configure scripts on Alpha.  At this time, the VAX
+build is limited to the 4.2.x versions and is experimental.
 
 Due to the way that PCSI identifies packages, if you install a package from
 one producer and then want to upgrade it from another producer, you will
@@ -57,10 +55,37 @@ shell would translate to sys$login.  When there is new mail, it will report
 the path that it was given to check even though it actually will use the
 path that the user set in their mail profile.
 
-One of the advantages of Bash 4.2 that should eventually help VMS porting
-efforts is that it supports dynamically loadable builtins.  As running a
-built in avoids a process creation, this can be a big win on VMS.  At this
+One of the advantages of Bash 4.2 and later that should eventually help VMS
+porting efforts is that it supports dynamically loadable builtins.  As running
+a built in avoids a process creation, this can be a big win on VMS.  At this
 time, this feature has not been tested on VMS.
+
+
+Interoperability with non GNV Posix compatible utilities:
+
+There are several ways that you can get Bash and other GNV utilities to
+be able to run non-GNV utilities such as Perl, Python, etc.
+
+The best way is to use the "alias" command to make command visbile.  This
+usually requires setting up a script to load those aliases when Bash starts.
+
+Example:
+
+      bash-4.3$ alias perl=/perl_root/perl
+      bash-4.3$ perl -e 'require 5.006;'
+
+Another way is to modify the PATH environment variable to contain the
+directory for that utility.  This can have drawbacks with applications
+that the VMS port uses command files instead of images.  Each level of
+command files or scripts strip quotation marks from the command which
+may be significant.
+
+Another method is to provide a script in the GNV directory to run the
+application.  This has the same drawback that quotation marks are stripped.
+
+
+For simple utilities, you can set up script in a directory that is in PATH
+
 
 VMS specific port information:
 
@@ -182,90 +207,18 @@ as such is dependent on them.  It is a known issue that directories with
 a Unix name "file.dir/" are not handled correctly.  This is a combination
 or problems with RMS and CRTL.  The RMS portion is fixed with the
 VMS84?_RMS-V0300 ECO kit.  I am not aware of a CRTL kit that fixes the
-issue.
-
-Previous releases fixes and enhancements:
-
-GNV-*-bash-v0402-39-1 kit:
-
-* The 'source' command will loop forever on some VMS text files.
-
-* The exit status for some commands, subprocesses and subshells is being
-  lost.
-
-JEM/MWV-*-bash-v0114-8e1-1 kit:
-
-* No logical names required for proper Bash operations other than GNV$GNU
-  for locating the simulated "/".
-
-  The older GNV programs may still need the logical names until they get
-  the same fixes.  Those additional logical names should be set in
-  GNV$GNU:[lib]gnv_setup.com instead of in the system startup.
-
-* GNV$GNU is used to find the posix root and locally sets SYS$POSIX_ROOT
-  for child processes if needed.  This is to comply with VMS logical
-  name conventions.  The logical name BIN is also set locally to be
-  GNV$GNU:[BIN] if it is not already set.
-
-* Bash now sets the logical name GNV$SHELL so that child programs can
-  detect if they are running under a UNIX shell instead of under DCL.
-  This requires that the child programs check this logical name.
-  Partial support for this is in Perl 5.10 and full support for this
-  is in Curl 7.19.5 and later.
-
-* VM pipes have been improved.
-
-* Bash no longer sets DECC$POSIX_STYLE_UID option, which should only be
-  set globaly by the system manager.
-
-* Now uses the terminal type width and size from VMS, so command line
-  editing works with any terminal size.
-
-* SYS$LOGIN:SH??????. temp files are no longer being left behind.
-
-* Bash 4.2.39 has been built on Alpha VMS 8.3 and 8.4 and Itanium VMS 8.4
-  Bash 1.14.8 builds on both VAX and Alpha, and IA64.
-
-* VMS C has a built in ALLOCA function, so stop replacing it with less
-  efficient code.
-
-* Default path was in the wrong order.
-   old: /bin:/gnu/bin:/usr/local/bin/usr/
-   new: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:.
-
-* On non-VAX, internal filename buffers fixed to handle long filenames.
-
-* New MMK based build procedure that uses a search list.  MMS does not
-  appear to work.
-
-* Fixed to use the same repository file for all the files compiled.
-
-* Config.h now generated at part of the build from a template.
-
-* The --version startup option reports the build date and time to make
-  it possible to identify this and successor variations of this port.
-
-* Fixed History.c from always including memalloc.h which breaks the __ALLOCA
-  built-in definitions.
-
-* Bash image now installed as a shared image to speed up launch times.
-
-Fixes supplied in the GNV 2.1.3 kit and this kit:
-
-* VM Pipes.  The DECC$ Option to set the pipe size should no longer be
-  needed, and using it may just waste bufferer I/O quota.
-
-* A Bash bug was fixed that was slowing down the parser on all platforms.
-
+issue.  Bash 4.3.39 and later attempts to work around this issue.
 
 The supplied GNV$BASH_STARTUP.COM procedure that can be installed in
 [VMS$COMMON.SYS$STARTUP] can be put in your VMS startup procedure to install
 the GNV$BASH program as a shared image.
 
-It is recommended that all images normally used by GNV be installed as
-open and shared, especially if you are running configure scripts.  This
-both lowers the amount of physical memory used and speeds up the launching
-of new images and processes.
+While it has been recommended that all images normally used by GNV be
+installed as open and shared to speed up activation and reduced physical
+memory usage, currently Bash will not take advantage of that because it
+launches a link to the actual image, instead of the installed image.
+Possibly a future update to Bash and other GNV utilities will address this
+issue better.
 
 The name of the bash image has been changed to GNV$BASH to prevent possible
 naming conflicts with other programs that are on the system.  The GNV$
@@ -336,6 +289,179 @@ bash readme file below.
 The source kits contains files for building BASH using MMK.
 MMK 3.9-9 was used for this build on Alpha.  MMK 4.0.0 was used on Itanium.
 
+Currently, the focus of the OpenVMS Bash porting team is to address bugs in
+the OpenVMS port of Bash that pose immediate barriers to running configure and
+make scripts for Open Source Software packages targeting OpenVMS environments.
+
+Although this release of Bash noticeably furthers progress toward supporting
+that focused objective, the work is by no means complete with this release.
+But, this release of Bash has been tested using current examples of Open Source
+configure and make scripts and has been found to correctly execute the scripts
+themselves. However, because of bugs and limitations in other GNV utilities as
+well as OpenVMS run-time libraries outside of Bash itself, any selected Open
+Source Software package will likely still require intervention to configure and
+make using GNV on OpenVMS at this time.
+
+The GNV development team is involved in an ongoing effort to identify and
+document the underlying technical causes for these current limitations and (if
+available) workarounds as well as developing code fixes to eliminate them. The
+VMS-Ports Source Forge project at https://sourceforge.net/p/vms-ports/tickets/
+currently documents OpenVMS CRTL bugs and limitations with respect to porting
+Open Source Software using OpenVMS. The VMS-Ports Source Forge Project also
+contains examples of ported packages provided by volunteer contributors as well
+as documentation with recommendations on how to setup, modify and use the
+OpenVMS GNV environment for the purpose of porting Open Source software
+packages to OpenVMS. Browse to https://sourceforge.net/p/vms-ports/wiki/Home/
+for more information.
+
+
+With the above statements in mind, there are a few known limitations of the
+Bash 4.2.45(3) release. Though Bash successfully executes its own configure
+script, Bash cannot currently build itself from the Bash prompt. For the
+present, Bash can only be built from DCL using MMK and the supplied Bash.mms
+description file.  The assumption is that if you are building a core GNV
+component, that you do not already have a working GNV environment.
+
+The OpenVMS port of Bash currently only supports being built without job
+control support.  This has a couple of non-obvious implications for certain
+features of Bash noted below.
+
+What follows is the list of known behavioral differences/limitations between
+the OpenVMS port of Bash 4.2.45(3) and later and that of typical UNIX/Linux
+environments.
+
+1.) Job Control features of Bash are unsupported.
+2.) POSIX regular expression support is not currently available because the
+    POSIX regular expression run-time has not yet been ported to OpenVMS.
+    Lack of this support implies that the [[...]] conditional commands cannot
+    support extended regular expression matching and the =~ binary operator.
+3.) The set UID and set GID file mode bits and features of commands associated
+    with them are not currently supported.
+4.) The PIPESTATUS shell array variable does not function. (Bash must be built
+    with job control for this shell array variable to be populated properly).
+5.) Generally speaking, creation of, and reference to, device character special
+    files are not supported. However, /dev/null is intrinsically mostly
+    supported by the OpenVMS CRTL.
+6.) The kill command of the form "kill -l <num>" produces output with the
+    signal name prefixed with "SIG" instead of without the "SIG" prefix.
+    (This is a side effect of Bash built without job control.)
+7.) The Bash coprocess feature is not supported. (Not of much use without job
+    control)
+8.) The command "shopt -lastpipe" is accepted but does not function as a result
+    of Bash being built without job control support.
+9.) The "mapfile -u <fd>" command can give different results than UNIX/linux
+    when the file associated with the specified file descriptor does not end
+    with a new-line character (0x0A).  The mapfile operation will probably
+    only work on STREAM and binary image files on VMS.  The mapfile operation
+    bypasses the OpenVMS CRTL conversion of VMS record file formats to appear
+    to be STREAM-LF type.
+10.) Timed read commmands (read -t <num> ...) do not work; Returned status is
+     always 1.
+11.) You may need to increase the size defined by the DECC RTL logical name
+     DECC$PIPE_BUFFER_SIZE for scripts which produce output directed to a pipe
+     attached to one of the GNV utilities (other than Bash) where any
+     individual, generated output request can exceed the default value of 512
+     bytes. Scripts will produce a "mailbox is too small for request" message
+     when any individual output request is attempted with a size exceeding the
+     value defined for the logical name DECC$PIPE_BUFFER_SIZE under these
+     circumstances.
+12.) As a result of missing support for certain C99 features in the OpenVMS
+     CRTL, the following elements of format specifications for the Bash
+     printf builtin are not supported:
+
+	The format specifier flag: I (alternative locale digits for decimal
+                                      integer conversions [i,d,u,f,g,G])
+	The length modifiers: hh (signed/unsigned char), j (intmax_t/uintmax_t),
+                              q (quadword), z (size_t/ssize_t), t (ptrdiff_t)
+
+	%F (C99 uppercase IEEE NaN and infinity value strings for floating
+        point double)
+
+	The following date/time format specifications:
+
+		%g (ISO 8601 week-based year expressed as two-digit year)
+		%G (ISO 8601 week-based year expressed as four-digit century)
+		%k (The blank padded two-digit hour [24-hour clock] as a
+		    decimal number [range 0 to 23] similar to %H)
+		%l (The blank padded two-digit hour [12-hour clock] as a
+		    decimal number [range 1 to 12] similar to %I)
+		%P (Lower case am/pm designator similar to %p)
+		%s (The number of seconds since the Epoch,
+		    1970-01-01 00:00:00 +0000 [UTC])
+		%z (The +hhmm or -hhmm numeric timezone [that is, the hour
+		    and minute offset from UTC])
+		%+ (The date and time in date(1) format
+		    [e.g. Sun Jul  7 17:56:05 EDT 2013])
+
+13.) Input redirection executed when stdin is originally a terminal, register
+     dumps.  Input redirection executed when stdin is NOT originally a
+     terminal operates as expected. The work around for this limitation is to
+     perform input redirections from within script files instead of on the
+     Bash terminal command line.
+14.) Script output redirected to a file may have additional new line characters
+     in comparison to the UNIX/Linux generated output file depending on how
+     output is distributed amongst commands in the script. Output directly to
+     a terminal, however, is identical with UNIX/Linux. The following script
+     illustrates this limitation. On UNIX/Linux, two identical lines are
+     produced. OpenVMS produces the redirected output with an extra new-line
+     character in the output redirected file.
+
+        echo "printf \"no new line \" ; printf \"now newline\n\"" > \
+           /tmp/newlinetest
+        chmod u+x /tmp/newlinetest
+        /tmp/newlinetest
+        /tmp/newlinetest > /tmp/newlinetest.out
+        cat /tmp/newlinetest.out
+        rm /tmp/newlinetest.out
+        rm /tmp/newlinetest
+
+15.) I/O within a script that depends on shared access to file data between
+     the shell executing the script and disk commands executed by the shell
+     may not give the same results on OpenVMS as on UNIX/Linux. For instance,
+     using UNIX/Linux the following script produces the output shown; on
+     OpenVMS this same script produces no output:
+
+     script:
+
+        TMPFILE=/tmp/foo
+        exec 20>$TMPFILE
+        echo foo 1 >&20
+        echo foo 2 >&20
+        echo foo 3 >&20
+        cat $TMPFILE
+        rm -f $TMPFILE
+
+     UNIX/Linux expected output:
+
+        foo 1
+        foo 2
+        foo 3
+
+     Modifying the above script slightly as shown below will produce the
+     expected output on both UNIX/Linux and OpenVMS:
+
+     script:
+
+        TMPFILE=/tmp/foo
+        exec 20>$TMPFILE
+        echo foo 1 >&20
+        echo foo 2 >&20
+        echo foo 3 >&20
+        #
+        # Explicitly close file descriptor 20 before
+        # executing the cat command.
+        #
+        exec 20>&-
+        cat $TMPFILE
+        rm -f $TMPFILE
+
+16.) File protection is different for Posix and VMS.  Currently the VMS
+    CRTL sets the delete bit of a file if the write bit is set through
+    the mode mask.  To properly emulate Posix behavior, the delete bit
+    of the file should be set based on if the user has write access to
+    the parent directory of the file.
+    https://sourceforge.net/p/gnv/bugs/96/
+
 Acknowledgements:
 
 This port was done by John Malmberg using information from the GNV 2.1.3
@@ -354,18 +480,34 @@ The following bug is now fixed in this release:
 
 Bug
 Ticket #	Title
---------	------------------------------------------------------------------
+--------	-------------------------------------------------------------
 94		Bash Still Has Problems with *.dir files
 
-This version of Bash for OpenVMS also incorporates changes which partially address
-problems with long/deep directory paths. However, there are still some outstanding
-issues with long/deep directory paths that remain in this release. These problems
-are expected to be better resolved in a future release of Bash for OpenVMS.
+This version of Bash for OpenVMS also incorporates changes which partially
+address problems with long/deep directory paths. However, there are still
+some outstanding issues with long/deep directory paths that remain in this
+release.  https://sourceforge.net/p/gnv/bugs/95/
+
+When the working directroy is deep enough to be in FID format, it will be
+displayed using the physical device name as the root instead of the logical
+name.  This is because for a FID format directory, it is not trivial to find
+the correct logical name to display and this is expected to be a rare case.
+
+If the directory is deep enough though, Bash may not be able to handle it
+and can crash with various errors.
+
+As some of the problems appear to be in the VMS CRTL, it may be difficult
+completely work around it.
+
+The PCSI kit should now install on VMS Software Inc. releases of OpenVMS.
+
 
 Bash 4.3.30(0)
 --------------
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.30(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+This is the bash release the contains the Shell Shock Fix.
 
 Bash 4.3.29(0)
 --------------
@@ -500,176 +642,82 @@ Ticket #	Title
 62		bash - SOURCE command fails
 63		is_vms_mail_file crashes with accvio
 
+Bash 4.2.39 ECO 1
+-----------------
 
-There may have also been other bugs in Bash 4.2.39(1) for OpenVMS that were not
-officially recorded but have now been fixed as a result of resolving the above
-listed bug reports. So, you are encouraged to try out this release and report
-anomolies on the GNV Bug Reporting page:
+* The 'source' command will loop forever on some VMS text files.
 
-https://sourceforge.net/p/gnv/bugs/?source=navbar
+* The exit status for some commands, subprocesses and subshells is being
+  lost.
 
-Currently, the focus of the OpenVMS Bash porting team is to address bugs in
-the OpenVMS port of Bash that pose immediate barriers to running configure and
-make scripts for Open Source Software packages targeting OpenVMS environments.
-
-Although this release of Bash noticeably furthers progress toward supporting
-that focused objective, the work is by no means complete with this release.
-But, this release of Bash has been tested using current examples of Open Source
-configure and make scripts and has been found to correctly execute the scripts
-themselves. However, because of bugs and limitations in other GNV utilities as
-well as OpenVMS run-time libraries outside of Bash itself, any selected Open
-Source Software package will likely still require intervention to configure and
-make using GNV on OpenVMS at this time.
-
-The GNV development team is involved in an ongoing effort to identify and
-document the underlying technical causes for these current limitations and (if
-available) workarounds as well as developing code fixes to eliminate them. The
-VMS-Ports Source Forge project at https://sourceforge.net/p/vms-ports/tickets/
-currently documents OpenVMS CRTL bugs and limitations with respect to porting
-Open Source Software using OpenVMS. The VMS-Ports Source Forge Project also
-contains examples of ported packages provided by volunteer contributors as well
-as documentation with recommendations on how to setup, modify and use the
-OpenVMS GNV environment for the purpose of porting Open Source software
-packages to OpenVMS. Browse to https://sourceforge.net/p/vms-ports/wiki/Home/
-for more information.
+* There may have also been other bugs in Bash 4.2.39(1) for OpenVMS that were
+  not officially recorded but have now been fixed as a result of resolving the
+  above listed bug reports. So, you are encouraged to try out this release and
+  report anomolies on the GNV Bug Reporting page:
+  https://sourceforge.net/p/gnv/bugs/?source=navbar
 
 
-With the above statements in mind, there are a few known limitations of the
-Bash 4.2.45(3) release. Though Bash successfully executes its own configure
-script, Bash cannot currently build itself from the Bash prompt. For the
-present, Bash can only be built from DCL using MMK and the supplied Bash.mms
-description file.  The assumption is that if you are building a core GNV
-component, that you do not already have a working GNV environment.
+JEM/MWV-*-bash-v0114-8e1-1
+--------------------------
 
-The OpenVMS port of Bash currently only supports being built without job
-control support.  This has a couple of non-obvious implications for certain
-features of Bash noted below.
+* No logical names required for proper Bash operations other than GNV$GNU
+  for locating the simulated "/".
 
-What follows is the list of known behavioral differences/limitations between
-the OpenVMS port of Bash 4.2.45(3) and that of typical UNIX/Linux environments.
+  The older GNV programs may still need the logical names until they get
+  the same fixes.  Those additional logical names should be set in
+  GNV$GNU:[lib]gnv_setup.com instead of in the system startup.
 
-1.) Job Control features of Bash are unsupported.
-2.) POSIX regular expression support is not currently available because the
-    POSIX regular expression run-time has not yet been ported to OpenVMS.
-    Lack of this support implies that the [[...]] conditional commands cannot
-    support extended regular expression matching and the =~ binary operator.
-3.) The set UID and set GID file mode bits and features of commands associated
-    with them are not currently supported.
-4.) The PIPESTATUS shell array variable does not function. (Bash must be built
-    with job control for this shell array variable to be populated properly).
-5.) Generally speaking, creation of, and reference to, device character special
-    files are not supported. However, /dev/null is intrinsically mostly
-    supported by the OpenVMS CRTL.
-6.) The kill command of the form "kill -l <num>" produces output with the
-    signal name prefixed with "SIG" instead of without the "SIG" prefix.
-    (This is a side effect of Bash built without job control.)
-7.) The Bash coprocess feature is not supported. (Not of much use without job
-    control)
-8.) The command "shopt -lastpipe" is accepted but does not function as a result
-    of Bash being built without job control support.
-9.) The "mapfile -u <fd>" command can give different results than UNIX/linux
-    when the file associated with the specified file descriptor does not end
-    with a new-line character (0x0A).  The mapfile operation will probably
-    only work on STREAM and binary image files on VMS.  The mapfile operation
-    bypasses the OpenVMS CRTL conversion of VMS record file formats to appear
-    to be STREAM-LF type.
-10.) Timed read commmands (read -t <num> ...) do not work; Returned status is
-     always 1.
-11.) You may need to increase the size defined by the DECC RTL logical name
-     DECC$PIPE_BUFFER_SIZE for scripts which produce output directed to a pipe
-     attached to one of the GNV utilities (other than Bash) where any
-     individual, generated output request can exceed the default value of 512
-     bytes. Scripts will produce a "mailbox is too small for request" message
-     when any individual output request is attempted with a size exceeding the
-     value defined for the logical name DECC$PIPE_BUFFER_SIZE under these
-     circumstances.
-12.) As a result of missing support for certain C99 features in the OpenVMS
-     CRTL, the following elements of format specifications for the Bash
-     printf builtin are not supported:
+* GNV$GNU is used to find the posix root and locally sets SYS$POSIX_ROOT
+  for child processes if needed.  This is to comply with VMS logical
+  name conventions.  The logical name BIN is also set locally to be
+  GNV$GNU:[BIN] if it is not already set.
 
-	The format specifier flag: I (alternative locale digits for decimal
-                                      integer conversions [i,d,u,f,g,G])
-	The length modifiers: hh (signed/unsigned char), j (intmax_t/uintmax_t),
-                              q (quadword), z (size_t/ssize_t), t (ptrdiff_t)
+* Bash now sets the logical name GNV$SHELL so that child programs can
+  detect if they are running under a UNIX shell instead of under DCL.
+  This requires that the child programs check this logical name.
+  Partial support for this is in Perl 5.10 and full support for this
+  is in Curl 7.19.5 and later.
 
-	%F (C99 uppercase IEEE NaN and infinity value strings for floating
-        point double)
+* VM pipes have been improved.
 
-	The following date/time format specifications:
+* Bash no longer sets DECC$POSIX_STYLE_UID option, which should only be
+  set globaly by the system manager.
 
-		%g (ISO 8601 week-based year expressed as two-digit year)
-		%G (ISO 8601 week-based year expressed as four-digit century)
-		%k (The blank padded two-digit hour [24-hour clock] as a
-		    decimal number [range 0 to 23] similar to %H)
-		%l (The blank padded two-digit hour [12-hour clock] as a
-		    decimal number [range 1 to 12] similar to %I)
-		%P (Lower case am/pm designator similar to %p)
-		%s (The number of seconds since the Epoch,
-		    1970-01-01 00:00:00 +0000 [UTC])
-		%z (The +hhmm or -hhmm numeric timezone [that is, the hour
-		    and minute offset from UTC])
-		%+ (The date and time in date(1) format
-		    [e.g. Sun Jul  7 17:56:05 EDT 2013])
+* Now uses the terminal type width and size from VMS, so command line
+  editing works with any terminal size.
 
-13.) Input redirection executed when stdin is originally a terminal, register
-     dumps.  Input redirection executed when stdin is NOT originally a
-     terminal operates as expected. The work around for this limitation is to
-     perform input redirections from within script files instead of on the
-     Bash terminal command line.
-14.) Script output redirected to a file may have additional new line characters
-     in comparison to the UNIX/Linux generated output file depending on how
-     output is distributed amongst commands in the script. Output directly to
-     a terminal, however, is identical with UNIX/Linux. The following script
-     illustrates this limitation. On UNIX/Linux, two identical lines are
-     produced. OpenVMS produces the redirected output with an extra new-line
-     character in the output redirected file.
+* SYS$LOGIN:SH??????. temp files are no longer being left behind.
 
-        echo "printf \"no new line \" ; printf \"now newline\n\"" > \
-           /tmp/newlinetest
-        chmod u+x /tmp/newlinetest
-        /tmp/newlinetest
-        /tmp/newlinetest > /tmp/newlinetest.out
-        cat /tmp/newlinetest.out
-        rm /tmp/newlinetest.out
-        rm /tmp/newlinetest
+* Bash 4.2.39 has been built on Alpha VMS 8.3 and 8.4 and Itanium VMS 8.4
+  Bash 1.14.8 builds on both VAX and Alpha, and IA64.
 
-15.) I/O within a script that depends on shared access to file data between
-     the shell executing the script and disk commands executed by the shell
-     may not give the same results on OpenVMS as on UNIX/Linux. For instance,
-     using UNIX/Linux the following script produces the output shown; on
-     OpenVMS this same script produces no output:
+* VMS C has a built in ALLOCA function, so stop replacing it with less
+  efficient code.
 
-     script:
+* Default path was in the wrong order.
+   old: /bin:/gnu/bin:/usr/local/bin/usr/
+   new: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:.
 
-        TMPFILE=/tmp/foo
-        exec 20>$TMPFILE
-        echo foo 1 >&20
-        echo foo 2 >&20
-        echo foo 3 >&20
-        cat $TMPFILE
-        rm -f $TMPFILE
+* On non-VAX, internal filename buffers fixed to handle long filenames.
 
-     UNIX/Linux expected output:
+* New MMK based build procedure that uses a search list.  MMS does not
+  appear to work.
 
-        foo 1
-        foo 2
-        foo 3
+* Fixed to use the same repository file for all the files compiled.
 
-     Modifying the above script slightly as shown below will produce the
-     expected output on both UNIX/Linux and OpenVMS:
+* Config.h now generated at part of the build from a template.
 
-     script:
+* The --version startup option reports the build date and time to make
+  it possible to identify this and successor variations of this port.
 
-        TMPFILE=/tmp/foo
-        exec 20>$TMPFILE
-        echo foo 1 >&20
-        echo foo 2 >&20
-        echo foo 3 >&20
-        #
-        # Explicitly close file descriptor 20 before
-        # executing the cat command.
-        #
-        exec 20>&-
-        cat $TMPFILE
-        rm -f $TMPFILE
+* Fixed History.c from always including memalloc.h which breaks the __ALLOCA
+  built-in definitions.
 
+* Bash image now installed as a shared image to speed up launch times.
+
+Fixes supplied in the GNV 2.1.3 kit and this kit:
+
+* VM Pipes.  The DECC$ Option to set the pipe size should no longer be
+  needed, and using it may just waste bufferer I/O quota.
+
+* A Bash bug was fixed that was slowing down the parser on all platforms.
