@@ -79,7 +79,31 @@ void DeallocMainWrapperMemory()
    for (int i=0; (i < sizeof(MemoryAllocations)/sizeof(void *)); i++)
       if (MemoryAllocations[i] != NULL) free(MemoryAllocations[i]);
    }
+/*
+When the DECC$POSIX_COMPLIANT_PATHNAMES feature is enabled, the HOME environment
+variable can be initialized by the CRTL with an OpenVMS formatted path instead
+of the expected UNIX formatted path. This routine forces the value for the HOME
+environment variable to be UNIX formatted if it is not already.
+*/
+void force_env_home_to_unix_format(char **env)
+   {
+   unsigned int FoundHome=0;
+   char *HomeEntry;
+   char * HomeVal;
 
+   for (unsigned int Index = 0; ((env[Index] != NULL) && !FoundHome); Index++)
+      {
+      if ((HomeEntry = strstr(env[Index], "HOME=")) != NULL)
+         {
+         FoundHome = 1;
+         HomeVal = HomeEntry + 5;
+         if (strchr(HomeVal,':') != NULL)
+            {
+            strcpy(HomeVal,decc$translate_vms(HomeVal));
+            }
+         }
+      }
+   }
 int original_main(int argc, char ** argv, char **env);
 
 int main(int argc, char ** argv, char **env) {
@@ -89,6 +113,7 @@ char arg_nam[256];
 char **new_argv;
 char *cpos;
 char *one_cmd_arg=NULL;
+char * dotexe;
 int in_opts;
 int do_one_cmd=0;
 int arg_len;
@@ -317,10 +342,23 @@ int exit_value;
 	}
     }
 
+    /* Check if argv[0] ends in . or .exe on the name (case insenstive) and truncate */
+    /* it if it does. */
+    dotexe = strrchr(argv[0], '.');
+    if (dotexe != NULL)
+       {
+       if ((dotexe[1] == '\0') || ((dotexe[1] == 'e' || dotexe[1] == 'E') &&
+           (dotexe[2] == 'x' || dotexe[2] == 'X') &&
+           (dotexe[3] == 'e' || dotexe[3] == 'E') &&
+           (dotexe[4] == '\0')))
+          {
+          *dotexe = '\0';
+          }
+       }
+
     if (result) {
 	char * lastslash;
 	char * dollar;
-	char * dotexe;
 	char * lastdot;
 	char * extension;
 
@@ -360,24 +398,6 @@ int exit_value;
 		}
 		if (lastdot[i] == 0) {
 		    *lastdot = 0;
-		}
-	    }
-
-	    /* Find the .exe on the name (case insenstive) and toss it */
-	    dotexe = strrchr(arg_nam, '.');
-	    if (dotexe != NULL) {
-		if ((dotexe[1] == 'e' || dotexe[1] == 'E') &&
-		    (dotexe[2] == 'x' || dotexe[2] == 'X') &&
-		    (dotexe[3] == 'e' || dotexe[3] == 'E') &&
-		    (dotexe[4] == 0)) {
-
-		    *dotexe = 0;
-		} else {
-		    /* Also need to handle a null extension because of a */
-		    /* CRTL bug. */
-		    if (dotexe[1] == 0) {
-			*dotexe = 0;
-		    }
 		}
 	    }
 
@@ -446,7 +466,7 @@ int exit_value;
           printf("WARNING: Unable to register function to deallocate "
                  "memory for main() wrapper arguments array!\r\n");
        }
-
+    force_env_home_to_unix_format(env);
     exit(original_main(argc, new_argv, env));
     return 1; /* Needed to silence compiler diagnostic */
 }

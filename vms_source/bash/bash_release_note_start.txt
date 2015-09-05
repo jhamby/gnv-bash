@@ -474,6 +474,18 @@ Martin Vorlander, Steve Pitcher, Hartmut Becker, Karl Puder, John Reagan.
 The first port of bash to VMS is the result of work by Douglas B Rupp.
 
 
+Bash 4.3.40(0)
+--------------
+The following bug is now fixed in this release:
+
+Bug
+Ticket #	Title
+--------	-------------------------------------------------------------
+97		Bash Incorrectly Initializes argv[0] and the HOME
+		Environment Variable When DECC$POSIX_COMPLIANT_PATHNAMES
+		is defined
+
+
 Bash 4.3.39(0)
 --------------
 The following bug is now fixed in this release:
