@@ -1996,6 +1996,7 @@ const char * select_ignores_invalid_fd = "DECC$SELECT_IGNORES_INVALID_FD";
 	    /* Now separate out the pipes and terminals */
 	    if (isapipe(i) == 1) {
 		pipe_array[pi].fd_desc_ptr = &poll_array[i];
+		pipe_array[pi].fd = i;
 		if (readfds != NULL) {
 		    if (FD_ISSET(i, readfds))
 			poll_array[i].events |= POLL_IN;
@@ -2014,6 +2015,7 @@ const char * select_ignores_invalid_fd = "DECC$SELECT_IGNORES_INVALID_FD";
 	    /* Not a pipe, see if a terminal */
 	    else if (isatty(i) == 1) {
 		term_array[ti].fd_desc_ptr = &poll_array[i];
+		term_array[ti].fd = i;
 		if (readfds != NULL) {
 		    if (FD_ISSET(i, readfds))
 			poll_array[i].events |= POLL_IN;
