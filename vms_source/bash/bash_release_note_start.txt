@@ -477,9 +477,8 @@ The first port of bash to VMS is the result of work by Douglas B Rupp.
 Bash 4.3.42(0)
 --------------
 
-No OpenVMS-specific bugs are addressed in this release. Bash 4.3.42(0) is
-simply the OpenVMS build based on the GNU Bash sources for that same version.
-
+A VMS specific fix for an access violation when attempted to edit a recalled
+command.
 
 Bash 4.3.41(0)
 --------------
