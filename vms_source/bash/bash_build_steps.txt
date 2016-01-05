@@ -242,7 +242,36 @@ branding the PCSI kit based on who is making the kit.
       step, the PCSI kit built by these steps does a rename to the correct
       case.
 
-   7. Build the PCSI kit with @pcsi_product_gnv_bash.com
+   7. Prepare to backup the files for building the kit.
+
+      Note that if src_root: or vms_root: are NFS mounted disks, the
+      step of backing up the source files will probably hang or fail.
+
+      You need to copy the source files to VMS mounted disks and create
+      logical names SRC_ROOT1 and VMS_ROOT1 to work around this to to
+      reference local disks.  Make sure src_root1:[000000] and
+      vms_root1:[000000] exist and can be written to.
+
+      The command procedure compare_bash_source can be used to check
+      those directories and keep them up to date.
+
+         @compare_bash_source.com SRCBCK UPDATE
+
+         This compares the reference GNU source with the backup
+         staging directory for it and updates with any changes.
+
+         @compare_bash_source.com VMSBCK UPDATE
+
+         This compares the VMS specific soruce with the backup
+         staging directory for it and updates with any changes.
+
+         Leave off "UPDATE" to just check without doing any changes.
+
+      If you are not using NFS mounted disks and do not want to have a
+      separate directory for staging the sources for backup make sure
+      that src_root1: and vms_root1: do not exist.
+
+   8. Build the PCSI kit with @pcsi_product_gnv_bash.com
 
       On VAX, the product command always prompts to the terminal for a
       confirmation.
