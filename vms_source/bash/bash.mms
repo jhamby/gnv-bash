@@ -80,10 +80,19 @@ cinc2 = /nested=none
 cinc = $(cinc2)
 #cdefs = /define=(_USE_STD_STAT=1,_POSIX_EXIT=1,\
 #	HAVE_STRING_H=1,HAVE_STDLIB_H=1,HAVE_CONFIG_H=1,SHELL=1)
+#
+# Force the status of the HAVE_REGEX_H, HAVE_REGCOMP, and HAVE_REGEXEC macros on
+# VMS so that HAVE_POSIX_REGEXP is indirectly forced which will in turn set the
+# macro COND_REGEXP. This will enable conditional regular expressions in Bash
+# via [.lib.sh]shmatch.c. Note that this cannot be done via config_h.com because
+# configure does not have tests for these macros; So they must be manually set.
+#
 .ifdef __VAX__
-cdefs = /def=(_POSIX_EXIT=1,HAVE_CONFIG_H=1)
+cdefs = /def=(_POSIX_EXIT=1,HAVE_CONFIG_H=1,HAVE_REGEX_H=1,\
+HAVE_REGCOMP=1,HAVE_REGEXEC=1)
 .else
-cdefs = /define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1)
+cdefs = /define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,HAVE_REGEX_H=1,\
+HAVE_REGCOMP=1,HAVE_REGEXEC=1)
 .endif
 cflags = $(cnames)/debu$(clist)$(cprefix)$(cwarn)$(cinc)$(cdefs)
 cflagsx = $(cnames)/debu$(clist)$(cwarn)$(cinc2)
@@ -770,6 +779,16 @@ version.obj : version.c version.h gnv$version.c_first vms_eco_level.h
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
    /first_include=gnv$version.c_first $(MMS$SOURCE)
 .endif
+
+# GNU Regular Expression Support
+lcl_root:[.lib]regex.DIR :
+	$create/directory/prot=o:rwed lcl_root:[.lib.regex]
+
+[.lib.regex]regex.obj : vms_root:[.lib.regex]regex.c, lcl_root:[.lib]regex.DIR,\
+                        $(config_h)
+   $define/user decc$system_include prj_root:[.lib.regex], prj_root:[bash]
+   $define/user decc$user_include prj_root:[.lib.regex]
+   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
 
 # libsh
 lcl_root:[.lib]sh.DIR :
@@ -2440,7 +2459,7 @@ error.obj : error.c $(config_h) bashtypes.h $(bashansi_h) $(bashintl_h) \
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/define=\
-	(_USE_STD_STAT=1,_POSIX_EXIT=1, HAVE_VFPRINTF)\
+	(DEBUG,_USE_STD_STAT=1,_POSIX_EXIT=1, HAVE_VFPRINTF)\
 	/obj=$(MMS$TARGET) $(MMS$SOURCE)
 
 eval.obj : eval.c $(config_h) $(bashansi_h) $(bashintl_h) $(shell_h) flags.h \
@@ -2473,8 +2492,9 @@ execute_cmd.obj : lcl_root:execute_cmd.c $(config_h) \
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/OBJ=$(MMS$TARGET) $(MMS$SOURCE) \
-	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,\
-	MODULE_EXECUTE_CMD=1,HAVE_STRING_H=1,HAVE_STDLIB_H=1)
+	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_REGEX_H=1,\
+HAVE_REGCOMP=1,HAVE_REGEXEC=1, MODULE_EXECUTE_CMD=1,HAVE_STRING_H=1,\
+HAVE_STDLIB_H=1)
 
 expr.obj : expr.c $(config_h) $(bashansi_h) [.include]chartypes.h \
 		$(bashintl_h)  $(shell_h)
@@ -2822,6 +2842,7 @@ gnv$bash.exe : $(bash_objs) \
            libreadline.olb \
            libglob.olb \
 	   libintl.olb \
+	   [.lib.regex]regex.obj \
 	   libsh.olb temp_stub.obj
 .ifdef __VAX__
    $(LINK)$(LFLAGS)/exec=$(MMS$TARGET) bash_vax.opt/opt
@@ -2836,7 +2857,8 @@ gnv$bash.exe : $(bash_objs) \
 	[]libintl.olb/lib, \
         []libreadline.olb/lib, \
 	[]libbuiltins.olb/lib,\
-	[]libsh.olb/lib
+	[]libsh.olb/lib,\
+	[.lib.regex]regex.obj
 .endif
 
 bashdebug.exe : $(bash_objs), \
@@ -2861,7 +2883,8 @@ bashdebug.exe : $(bash_objs), \
 	[]libintl.olb/lib, \
         []libreadline.olb/lib, \
 	[]libbuiltins.olb/lib,\
-	[]libsh.olb/lib
+	[]libsh.olb/lib,\
+	[.lib.regex]regex.obj
 .endif
 
 # Always provide these two cleanup targets.

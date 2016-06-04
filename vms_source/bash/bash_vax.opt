@@ -78,3 +78,4 @@ temp_stub.obj
 []libreadline.olb/lib
 []libbuiltins.olb/lib
 []libsh.olb/lib
+[.lib.regex]regex.obj
