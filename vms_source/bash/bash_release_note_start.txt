@@ -316,7 +316,7 @@ for more information.
 
 
 With the above statements in mind, there are a few known limitations of the
-Bash 4.2.45(3) release. Though Bash successfully executes its own configure
+current OpenVMS Bash release. Though Bash successfully executes its own configure
 script, Bash cannot currently build itself from the Bash prompt. For the
 present, Bash can only be built from DCL using MMK and the supplied Bash.mms
 description file.  The assumption is that if you are building a core GNV
@@ -327,37 +327,32 @@ control support.  This has a couple of non-obvious implications for certain
 features of Bash noted below.
 
 What follows is the list of known behavioral differences/limitations between
-the OpenVMS port of Bash 4.2.45(3) and later and that of typical UNIX/Linux
-environments.
+the current OpenVMS port of Bash and that of typical UNIX/Linux environments.
 
 1.) Job Control features of Bash are unsupported.
-2.) POSIX regular expression support is not currently available because the
-    POSIX regular expression run-time has not yet been ported to OpenVMS.
-    Lack of this support implies that the [[...]] conditional commands cannot
-    support extended regular expression matching and the =~ binary operator.
-3.) The set UID and set GID file mode bits and features of commands associated
+2.) The set UID and set GID file mode bits and features of commands associated
     with them are not currently supported.
-4.) The PIPESTATUS shell array variable does not function. (Bash must be built
+3.) The PIPESTATUS shell array variable does not function. (Bash must be built
     with job control for this shell array variable to be populated properly).
-5.) Generally speaking, creation of, and reference to, device character special
+4.) Generally speaking, creation of, and reference to, device character special
     files are not supported. However, /dev/null is intrinsically mostly
     supported by the OpenVMS CRTL.
-6.) The kill command of the form "kill -l <num>" produces output with the
+5.) The kill command of the form "kill -l <num>" produces output with the
     signal name prefixed with "SIG" instead of without the "SIG" prefix.
     (This is a side effect of Bash built without job control.)
-7.) The Bash coprocess feature is not supported. (Not of much use without job
+6.) The Bash coprocess feature is not supported. (Not of much use without job
     control)
-8.) The command "shopt -lastpipe" is accepted but does not function as a result
+7.) The command "shopt -lastpipe" is accepted but does not function as a result
     of Bash being built without job control support.
-9.) The "mapfile -u <fd>" command can give different results than UNIX/linux
+8.) The "mapfile -u <fd>" command can give different results than UNIX/linux
     when the file associated with the specified file descriptor does not end
     with a new-line character (0x0A).  The mapfile operation will probably
     only work on STREAM and binary image files on VMS.  The mapfile operation
     bypasses the OpenVMS CRTL conversion of VMS record file formats to appear
     to be STREAM-LF type.
-10.) Timed read commmands (read -t <num> ...) do not work; Returned status is
+9.) Timed read commmands (read -t <num> ...) do not work; Returned status is
      always 1.
-11.) You may need to increase the size defined by the DECC RTL logical name
+10.) You may need to increase the size defined by the DECC RTL logical name
      DECC$PIPE_BUFFER_SIZE for scripts which produce output directed to a pipe
      attached to one of the GNV utilities (other than Bash) where any
      individual, generated output request can exceed the default value of 512
@@ -365,7 +360,7 @@ environments.
      when any individual output request is attempted with a size exceeding the
      value defined for the logical name DECC$PIPE_BUFFER_SIZE under these
      circumstances.
-12.) As a result of missing support for certain C99 features in the OpenVMS
+11.) As a result of missing support for certain C99 features in the OpenVMS
      CRTL, the following elements of format specifications for the Bash
      printf builtin are not supported:
 
@@ -393,12 +388,12 @@ environments.
 		%+ (The date and time in date(1) format
 		    [e.g. Sun Jul  7 17:56:05 EDT 2013])
 
-13.) Input redirection executed when stdin is originally a terminal, register
+12.) Input redirection executed when stdin is originally a terminal, register
      dumps.  Input redirection executed when stdin is NOT originally a
      terminal operates as expected. The work around for this limitation is to
      perform input redirections from within script files instead of on the
      Bash terminal command line.
-14.) Script output redirected to a file may have additional new line characters
+13.) Script output redirected to a file may have additional new line characters
      in comparison to the UNIX/Linux generated output file depending on how
      output is distributed amongst commands in the script. Output directly to
      a terminal, however, is identical with UNIX/Linux. The following script
@@ -415,7 +410,7 @@ environments.
         rm /tmp/newlinetest.out
         rm /tmp/newlinetest
 
-15.) I/O within a script that depends on shared access to file data between
+14.) I/O within a script that depends on shared access to file data between
      the shell executing the script and disk commands executed by the shell
      may not give the same results on OpenVMS as on UNIX/Linux. For instance,
      using UNIX/Linux the following script produces the output shown; on
@@ -455,7 +450,7 @@ environments.
         cat $TMPFILE
         rm -f $TMPFILE
 
-16.) File protection is different for Posix and VMS.  Currently the VMS
+15.) File protection is different for Posix and VMS.  Currently the VMS
     CRTL sets the delete bit of a file if the write bit is set through
     the mode mask.  To properly emulate Posix behavior, the delete bit
     of the file should be set based on if the user has write access to
@@ -472,6 +467,16 @@ The Bash 1.14.8 port was done by an number of unknown people and the following
 people that were named in the GNV Bash 1.14.8 source:  John Malmberg,
 Martin Vorlander, Steve Pitcher, Hartmut Becker, Karl Puder, John Reagan.
 The first port of bash to VMS is the result of work by Douglas B Rupp.
+
+Bash 4.3.42(2)
+--------------
+Conditional regular expressions are now supported. As of Bash 4.3.42(2) and
+later, the source modules from Gnulib for POSIX regular expression support
+have been added to the Bash build tree. These Gnulib regular expression modules
+are now compiled as part of the OpenVMS Bash build and the appropriate macros
+(HAVE_REGEX_H, HAVE_REGCOMP, and HAVE_REGEXEC) are set to enable conditional
+regular expression support for the resulting build of OpenVMS Bash.
+
 
 Bash 4.3.42(1)
 --------------
