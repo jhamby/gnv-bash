@@ -468,6 +468,12 @@ people that were named in the GNV Bash 1.14.8 source:  John Malmberg,
 Martin Vorlander, Steve Pitcher, Hartmut Becker, Karl Puder, John Reagan.
 The first port of bash to VMS is the result of work by Douglas B Rupp.
 
+Bash 4.3.43(0)
+--------------
+No OpenVMS-specific bugs are addressed in this release. Bash 4.3.43(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+
 Bash 4.3.42(2)
 --------------
 Conditional regular expressions are now supported. As of Bash 4.3.42(2) and
@@ -490,14 +496,12 @@ Ticket #	Title
 
 Bash 4.3.42(0)
 --------------
-
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.42(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
 
 
 Bash 4.3.41(0)
 --------------
-
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.41(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
 
@@ -551,28 +555,24 @@ This is the bash release the contains the Shell Shock Fix.
 
 Bash 4.3.29(0)
 --------------
-
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.29(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
 
 
 Bash 4.3.28(0)
 --------------
-
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.28(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
 
 
 Bash 4.3.27(0)
 ---------------
-
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.27(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
 
 
 Bash 4.3.26(0)
 ---------------
-
 This release contains a change in the OpenVMS-specific vms_crtl_init.c module
 that is used to initialize UNIX compatibility of the OpenVMS CRTL functions
 prior to execution of the main() function. This release enables the following
@@ -581,21 +581,18 @@ OpenVMS CRTL features: DECC$STREAM_PIPE and DECC$POPEN_NO_CRLF_REC_ATTR.
 
 Bash 4.3.25(0)
 ---------------
-
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.25(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
 
 
 Bash 4.3.24(0)
 ---------------
-
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.24(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
 
 
 Bash 4.3.18(1)
 ---------------
-
 There was an inadvertent source code regression in the vms_main_wrapper.c
 file which reintroduced an earlier bug that produced extraneous
 "sys$getdviw failed with status 2312" messages to standard output. These
@@ -606,7 +603,6 @@ applied in this updated OpenVMS build for Bash 4.3.18.
 
 Bash 4.3.18(0)
 ---------------
-
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.18(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
 
@@ -619,14 +615,12 @@ of the Bash Script Debugger has not been tested.
 
 Bash 4.3.11(0)
 ---------------
-
 No OpenVMS-specific bugs are addressed in this release. Bash 4.3.11(0) is
 simply the OpenVMS build based on the GNU Bash sources for that same version.
 
 
 Bash 4.3.0.(1)
 ---------------
-
 Bugs fixed in this  release:
 
 Bug
@@ -647,7 +641,6 @@ Ticket #	Title
 
 Bash 4.2.45(4)
 ---------------
-
 Bugs fixed in this release:
 
 Bug
@@ -684,7 +677,6 @@ Ticket #	Title
 
 Bash 4.2.39 ECO 1
 -----------------
-
 * The 'source' command will loop forever on some VMS text files.
 
 * The exit status for some commands, subprocesses and subshells is being
