@@ -51,26 +51,37 @@ static int vms_lstat(const char * name, struct stat * st) {
     int presult;
     int pcp_mode;
     int pathlen;
-    char * newpath;
+    char * slash;
+    int cmp;
 
-    /* First check for ".dir" bug */
+    /* check for bare filename bug */
+    slash = strchr(name, '/');
     pathlen = strlen(name);
-    if (pathlen > 4) {
-        int i, cmp;
+
+    cmp = 1;
+    if (slash == NULL) {
+        cmp = 0;
+    } else if (pathlen > 4) {
+        /* also check for ".dir" bug */
+        int i;
         i = pathlen - 4;
         cmp = strcasecmp(".dir", &name[i]);
-        if (cmp == 0) {
-            newpath = malloc(pathlen + 3);
-            strcpy(newpath, name);
-            strcat(newpath, "/.");
-            result = lstat(newpath, st);
-            free(newpath);
-            if (result == 0) {
-                return result;
-            }
-        }
     }
 
+    if (cmp == 0) {
+        char * newpath;
+        newpath = malloc(pathlen + 3);
+        if (newpath == NULL) {
+            return -1;
+        }
+        strcpy(newpath, name);
+        strcat(newpath, "/.");
+        result = lstat(newpath, st);
+        free(newpath);
+        if (result == 0) {
+            return result;
+        }
+    }
 
     result = lstat(name, st);
 
@@ -101,7 +112,7 @@ static int vms_lstat(const char * name, struct stat * st) {
         decc$feature_set("DECC$POSIX_COMPLIANT_PATHNAMES",
                          __FEATURE_MODE_CURVAL,
                          pcp_mode);
-	if (result1 == 0) {
+        if (result1 == 0) {
             memcpy(st, &psx_st, sizeof(struct stat));
             result = result1;
         }
@@ -122,7 +133,6 @@ static int do_exe_stat(const char *path, struct stat *buf) {
       free(exepath);
    } else {
       retvalue = -1;
-      errno = ENOMEM;
    }
    return retvalue;
 }
@@ -130,28 +140,42 @@ static int do_exe_stat(const char *path, struct stat *buf) {
 static int vms_stat(const char * name, struct stat * st) {
     int result;
     int pathlen;
+    char * slash;
+    int cmp;
 
-    /* First check for ".dir" bug */
+    /* check for bare filename bug */
+    slash = strchr(name, '/');
     pathlen = strlen(name);
-    if (pathlen > 4) {
-        int i, cmp;
-        char * newpath;
 
+    cmp = 1;
+    if (slash == NULL) {
+        cmp = 0;
+    } else if (pathlen > 4) {
+        /* also check for ".dir" bug */
+        int i;
         i = pathlen - 4;
         cmp = strcasecmp(".dir", &name[i]);
-        if (cmp == 0) {
-            newpath = malloc(pathlen + 3);
-            strcpy(newpath, name);
-            strcat(newpath, "/.");
-            result = stat(newpath, st);
-            free(newpath);
-            if (result == 0) {
-                return result;
-            }
+    }
+
+    /* Either special case */
+    if (cmp == 0) {
+        char * newpath;
+        newpath = malloc(pathlen + 3);
+        if (newpath == NULL) {
+            return -1;
+        }
+        strcpy(newpath, name);
+        strcat(newpath, "/.");
+        result = stat(newpath, st);
+        free(newpath);
+        if (result == 0) {
+            return result;
         }
     }
 
     result = stat(name, st);
+
+    /* Retry to see if an executable is present */
     if (result == -1) {
         char *slashptr = NULL;
         char *dotptr = NULL;
@@ -186,6 +210,9 @@ static int vms_unlink(const char * name) {
         cmp = strcasecmp(".dir", &name[i]);
         if (cmp == 0) {
             newpath = malloc(pathlen + 3);
+            if (newpath == NULL) {
+                return -1;
+            }
             strcpy(newpath, name);
             strcat(newpath, "/.");
             result = unlink(newpath);
@@ -274,18 +301,18 @@ gid_t maxsysgroup;
 
     result = decc$access(file_spec, mode);
     if (result == 0) {
-	return result;
+        return result;
     }
 
     /* The access() routine fails for the root directories */
     stat_result = stat(file_spec, &st);
     if (stat_result < 0) {
-	/* If stat fails, return original access status */
-	return result;
+        /* If stat fails, return original access status */
+        return result;
     }
     if (!S_ISDIR(st.st_mode)) {
-	/* If this is not a directory, return original access status */
-	return result;
+        /* If this is not a directory, return original access status */
+        return result;
     }
 
     my_gid = getgid();
@@ -295,14 +322,14 @@ gid_t maxsysgroup;
     w_mask = S_IWOTH;
     r_mask = S_IROTH;
     if (my_gid == st.st_gid) {
-	x_mask |= S_IXGRP;
-	w_mask |= S_IWGRP;
-	r_mask |= S_IRGRP;
+        x_mask |= S_IXGRP;
+        w_mask |= S_IWGRP;
+        r_mask |= S_IRGRP;
     }
     if (my_uid == st.st_uid) {
-	x_mask |= S_IXUSR;
-	w_mask |= S_IWUSR;
-	r_mask |= S_IRUSR;
+        x_mask |= S_IXUSR;
+        w_mask |= S_IWUSR;
+        r_mask |= S_IRUSR;
     }
 
     /* To be complete, should check if READALL, SYSPRV, or in the */
@@ -310,19 +337,19 @@ gid_t maxsysgroup;
 
     /* Check for each request */
     if (mode & X_OK) {
-	if ((x_mask & st.st_mode) == 0) {
-	    return -1;
-	}
+        if ((x_mask & st.st_mode) == 0) {
+            return -1;
+        }
     }
     if (mode & W_OK) {
-	if ((w_mask & st.st_mode) == 0) {
-	    return -1;
-	}
+        if ((w_mask & st.st_mode) == 0) {
+            return -1;
+        }
     }
     if (mode & R_OK) {
-	if ((r_mask & st.st_mode) == 0) {
-	    return -1;
-	}
+        if ((r_mask & st.st_mode) == 0) {
+            return -1;
+        }
     }
 
 return result;
@@ -332,25 +359,39 @@ static int vms_access(const char * file, int mode) {
     int result;
     int pathlen;
 
-    pathlen = strlen(file);
-    if (pathlen > 4) {
-        int i, cmp;
-        char * newpath;
+    char * slash;
+    int cmp;
 
+    /* check for bare filename bug */
+    slash = strchr(file, '/');
+    pathlen = strlen(file);
+
+    cmp = 1;
+    if (slash == NULL) {
+        cmp = 0;
+    } else if (pathlen > 4) {
+        /* also check for ".dir" bug */
+        int i;
         i = pathlen - 4;
         cmp = strcasecmp(".dir", &file[i]);
-        if (cmp == 0) {
-            newpath = malloc(pathlen + 3);
-            strcpy(newpath, file);
-            strcat(newpath, "/.");
-            result = vms_access_root(newpath, mode);
-            free(newpath);
-            if (result == 0) {
-                return result;
-            }
-            if ((result == -1) && (errno != ENOENT)) {
-                return result;
-            }
+    }
+
+    pathlen = strlen(file);
+    if (cmp ==  0) {
+        char * newpath;
+        newpath = malloc(pathlen + 3);
+        if (newpath == NULL) {
+            return -1;
+        }
+        strcpy(newpath, file);
+        strcat(newpath, "/.");
+        result = vms_access_root(newpath, mode);
+        free(newpath);
+        if (result == 0) {
+            return result;
+        }
+        if ((result == -1) && (errno != ENOENT)) {
+            return result;
         }
     }
 
@@ -393,6 +434,9 @@ static int vms_chdir(const char * file) {
         cmp = strcasecmp(".dir", &file[i]);
         if (cmp == 0) {
             newpath = malloc(pathlen + 3);
+            if (newpath == NULL) {
+                return -1;
+            }
             strcpy(newpath, file);
             strcat(newpath, "/.");
             result = decc$chdir(newpath);
@@ -418,6 +462,9 @@ static int vms_mkdir(const char * file, mode_t mode) {
         cmp = strcasecmp(".dir", &file[i]);
         if (cmp == 0) {
             newpath = malloc(pathlen + 3);
+            if (newpath == NULL) {
+                return -1;
+            }
             strcpy(newpath, file);
             strcat(newpath, "/.");
             result = mkdir(newpath, mode);
@@ -430,7 +477,7 @@ static int vms_mkdir(const char * file, mode_t mode) {
     return result;
 }
 
-/* TODO: backporting to VMS is mostly not compiling these hacks
+/* TODO: backporting to older VMS is mostly not compiling these hacks
    since the long directory paths and DID format paths do not exist */
 
 static int tovms_rmdir(const char * unix_dir) {
@@ -524,6 +571,9 @@ static int vms_rmdir(const char * file) {
         cmp = strcasecmp(".dir", &file[i]);
         if (cmp == 0) {
             newpath = malloc(pathlen + 3);
+            if (newpath == NULL) {
+                return -1;
+            }
             strcpy(newpath, file);
             strcat(newpath, "/.");
             result = rmdir(newpath);
