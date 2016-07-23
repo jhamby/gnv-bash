@@ -142,14 +142,9 @@ $product package 'product_name' -
  /material=('gnu_src','source') -
  /format=sequential 'pcsi_option'
 $!
-$! VAX can not do a compressed kit.
-$!----------------------------------
-$if arch_code .nes. "V"
+$if f$type(zip) .eqs. "STRING"
 $then
-$   PRODUCT COPY /OPTION=(NOVALIDATE,noconfirm) /FORMAT=COMPRESSED -
-   'product_name' -
-    /SOURCE=STAGE_ROOT:[KIT]/DEST=STAGE_ROOT:[KIT] -
-    /version='version'
+$   zip "-9Vj" stage_root:[kit]'kit_name'.zip stage_root:[kit]'kit_name'.pcsi
 $endif
 $!
 $all_exit:
