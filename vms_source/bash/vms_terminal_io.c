@@ -353,6 +353,10 @@ char * cwd;
 
 static struct vms_info_st * vms_lookup_fd(int fd) {
 
+    if (fd < 0) {
+        return NULL;
+    }
+
     /* Make sure memory of file descriptors is set up. */
     if (vms_info == NULL) {
 
@@ -515,7 +519,12 @@ DIR * vms_fdopendir(int fd) {
         errno = EIO;
         return NULL;
     }
-    char dir_path[MAX_UNIX_DIR_PATH + 1];
+    /* char dir_path[MAX_UNIX_DIR_PATH + 1]; */
+    char * dir_path;
+    dir_path = malloc(MAX_UNIX_DIR_PATH + 1);
+    if (dir_path == NULL) {
+        return NULL;
+    }
     dir_path[0] = 0;
     if (info->path != NULL) {
         if (info->path[0] != '/') {
@@ -538,16 +547,25 @@ DIR * vms_fdopendir(int fd) {
             int len1,len2;
             len1 = strlen(dir_path);
             len2 = strlen(info->path);
-            if (len1 + len2 < MAX_DIR_PATH) {
-                strcat(dir_path, info->path);
-            } else {
-                errno = ENOTDIR;
-                return NULL;
+            if (len1 + len2 > MAX_UNIX_DIR_PATH) {
+                char * dir_path2;
+                dir_path2 = malloc(len1 + len2 + 1);
+                if (dir_path2 == NULL) {
+                    free(dir_path);
+                    errno = ENOMEM;
+                    return NULL;
+                }
+                strcpy(dir_path2, dir_path);
+                free(dir_path);
+                dir_path = dir_path2;
             }
+            strcat(dir_path, info->path);
         }
         info->dirptr = vms_opendir(dir_path);
+        free(dir_path);
         return info->dirptr;
     }
+    free(dir_path);
     errno = ENOTDIR;
     return NULL;
 }
@@ -1102,6 +1120,11 @@ struct vms_info_st * info;
 
     status = -1;
 
+    if (fd < 0) {
+        errno = EIO;
+        return -1;
+    }
+
     /* Make sure memory of file descriptors is set up. */
     if (vms_info == NULL) {
 
@@ -1173,6 +1196,11 @@ struct vms_info_st * info;
 
 static int vms_channel_close(int fd) {
     int status = 0;
+
+    if (fd < 0) {
+	errno = EIO;
+	status = -1;
+    }
 
     if (vms_info[fd].ref_cnt) {
 	if (fd > 2) {

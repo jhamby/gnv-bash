@@ -23,24 +23,24 @@
 #define chdir hide_chdir
 #define delete hide_delete  /* delete() not used but conflicts with tr.c */
 
-#include <stat.h>
-#include <stdlib.h>
-#include <unixlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <errno.h>
-#include <unixio.h>
+#include <vms_fake_path/stat.h>
+#include <vms_fake_path/stdlib.h>
+#include <vms_fake_path/unixlib.h>
+#include <vms_fake_path/unistd.h>
+#include <vms_fake_path/string.h>
+#include <vms_fake_path/errno.h>
+#include <vms_fake_path/unixio.h>
 #undef lstat
 #undef unlink
 #undef readlink
 #undef chdir
 #undef delete
-#include <stdio.h>
+#include <vms_fake_path/stdio.h>
 #include <descrip.h>
 #include <libfildef.h>
 #include <dscdef.h>
 #include <stsdef.h>
-#include <errno.h>
+#include <vms_fake_path/errno.h>
 
 int decc$chdir(const char *__dir_spec, ...);
 
@@ -61,11 +61,16 @@ static int vms_lstat(const char * name, struct stat * st) {
     cmp = 1;
     if (slash == NULL) {
         cmp = 0;
-    } else if (pathlen > 4) {
-        /* also check for ".dir" bug */
-        int i;
-        i = pathlen - 4;
-        cmp = strcasecmp(".dir", &name[i]);
+    } else {
+       if (pathlen > 4) {
+            /* also check for ".dir" bug */
+            int i;
+            i = pathlen - 4;
+            cmp = strcasecmp(".dir", &name[i]);
+            if (cmp == 1) {
+                slash = NULL;
+            }
+       }
     }
 
     if (cmp == 0) {
@@ -74,8 +79,13 @@ static int vms_lstat(const char * name, struct stat * st) {
         if (newpath == NULL) {
             return -1;
         }
-        strcpy(newpath, name);
-        strcat(newpath, "/.");
+        if (slash == NULL) {
+            strcpy(newpath, "./");
+            strcat(newpath, name);
+        } else {
+            strcpy(newpath, name);
+            strcat(newpath, "/.");
+        }
         result = lstat(newpath, st);
         free(newpath);
         if (result == 0) {
@@ -150,11 +160,16 @@ static int vms_stat(const char * name, struct stat * st) {
     cmp = 1;
     if (slash == NULL) {
         cmp = 0;
-    } else if (pathlen > 4) {
-        /* also check for ".dir" bug */
-        int i;
-        i = pathlen - 4;
-        cmp = strcasecmp(".dir", &name[i]);
+    } else {
+        if (pathlen > 4) {
+            /* also check for ".dir" bug */
+            int i;
+            i = pathlen - 4;
+            cmp = strcasecmp(".dir", &name[i]);
+            if (cmp == 1) {
+                slash = NULL;
+            }
+        }
     }
 
     /* Either special case */
@@ -164,8 +179,13 @@ static int vms_stat(const char * name, struct stat * st) {
         if (newpath == NULL) {
             return -1;
         }
-        strcpy(newpath, name);
-        strcat(newpath, "/.");
+        if (slash == NULL) {
+            strcpy(newpath, "./");
+            strcat(newpath, name);
+        } else {
+            strcpy(newpath, name);
+            strcat(newpath, "/.");
+        }
         result = stat(newpath, st);
         free(newpath);
         if (result == 0) {
@@ -369,11 +389,16 @@ static int vms_access(const char * file, int mode) {
     cmp = 1;
     if (slash == NULL) {
         cmp = 0;
-    } else if (pathlen > 4) {
-        /* also check for ".dir" bug */
-        int i;
-        i = pathlen - 4;
-        cmp = strcasecmp(".dir", &file[i]);
+    } else {
+        if (pathlen > 4) {
+            /* also check for ".dir" bug */
+            int i;
+            i = pathlen - 4;
+            cmp = strcasecmp(".dir", &file[i]);
+            if (cmp == 1) {
+                slash = NULL;
+            }
+        }
     }
 
     pathlen = strlen(file);
@@ -383,8 +408,13 @@ static int vms_access(const char * file, int mode) {
         if (newpath == NULL) {
             return -1;
         }
-        strcpy(newpath, file);
-        strcat(newpath, "/.");
+        if (slash == NULL) {
+            strcpy(newpath, "./");
+            strcat(newpath, file);
+        } else {
+            strcpy(newpath, file);
+            strcat(newpath, "/.");
+        }
         result = vms_access_root(newpath, mode);
         free(newpath);
         if (result == 0) {
