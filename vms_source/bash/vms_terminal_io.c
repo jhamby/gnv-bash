@@ -1536,15 +1536,15 @@ static int unix_speed_to_vms_speed(unsigned char speed) {
  * Does the actual work of getting those VMS terminal characteristics
  * that can be mapped to Unix terminal characteristics.
  *
- * vms_info - on input, the VMS device channel, and other information.
- *            on output, updated to reflect the current status.
+ * info - on input, the VMS device channel, and other information.
+ *        on output, updated to reflect the current status.
  *
  * my_attr  - Structure containing the equivalent Unix characteristics.
  *
  * Returns 0 for success, -1 for an error and sets errno on failure.
  *
  */
-int vms_term_qio_tcgetattr(struct vms_info_st * vms_info,
+int vms_term_qio_tcgetattr(struct vms_info_st * info,
 			   struct termios *my_attr) {
 int status;
 struct term_mode_iosb_st * mode_iosb;
@@ -1556,41 +1556,41 @@ unsigned int cflag_active = 0;
 int ret_stat = 0;
 
     /* Get the old control character mask */
-    status = LIB$ENABLE_CTRL(&newmask, &vms_info->oldctrlmask);
+    status = LIB$ENABLE_CTRL(&newmask, &info->oldctrlmask);
     if (!$VMS_STATUS_SUCCESS(status)) {
 	errno = EIO;
 	return -1;
     }
 
     /* Set up the structures to hold the information if not already there */
-    if (vms_info->vms_char == NULL) {
-	vms_info->vms_char = malloc(sizeof(struct term_char_st));
-	if (vms_info->vms_char == NULL) {
+    if (info->vms_char == NULL) {
+	info->vms_char = malloc(sizeof(struct term_char_st));
+	if (info->vms_char == NULL) {
 	    return -1;
 	}
     }
-    termchar = vms_info->vms_char;
+    termchar = info->vms_char;
 
-    if (vms_info->vms_iosb == NULL) {
-	vms_info->vms_iosb = malloc(sizeof(struct term_mode_iosb_st));
-	if (vms_info->vms_iosb == NULL) {
+    if (info->vms_iosb == NULL) {
+	info->vms_iosb = malloc(sizeof(struct term_mode_iosb_st));
+	if (info->vms_iosb == NULL) {
 	    return -1;
 	}
     }
-    mode_iosb = vms_info->vms_iosb;
+    mode_iosb = info->vms_iosb;
 
-    if (vms_info->term_attr == NULL) {
-	vms_info->term_attr = malloc(sizeof(struct termios));
-	if (vms_info->term_attr == NULL) {
+    if (info->term_attr == NULL) {
+	info->term_attr = malloc(sizeof(struct termios));
+	if (info->term_attr == NULL) {
 	    return -1;
 	}
     }
 
     status = SYS$QIOW
        (EFN$C_ENF,
-	vms_info->channel,
+	info->channel,
 	IO$_SENSEMODE,
-	vms_info->vms_iosb,
+	info->vms_iosb,
 	NULL,
 	NULL,
 	termchar, sizeof(struct term_char_st), 0, 0, 0, 0);
@@ -1810,7 +1810,7 @@ int ret_stat = 0;
 /*			TOSTOP		VMS does not have SIGTTOU */
 #ifdef __USE_BSD
 /*			FLUSHO		VMS and Linux do not do this. */
-    if ((vms_info->oldctrlmask & LIB$M_CLI_CTRLT) == 0) {
+    if ((info->oldctrlmask & LIB$M_CLI_CTRLT) == 0) {
 	my_attr->c_lflag |= NOKERNINFO; /* VMS Control-T Disabled */
     }
 /*			PENDIN		Not sure how to do on VMS */
@@ -1860,7 +1860,7 @@ int ret_stat = 0;
 	my_attr->__ispeed = vms_speed_to_unix_speed(mode_iosb->rxspeed);
     }
 
-    memcpy(vms_info->term_attr, my_attr, sizeof(struct termios));
+    memcpy(info->term_attr, my_attr, sizeof(struct termios));
 
     return ret_stat;
 }
@@ -1869,12 +1869,12 @@ int ret_stat = 0;
 /* vms_term_qio_tcsetattr
  * Does the actual work of setting those VMS terminal characteristics
  * that can be set, ignoring the rest.
- * The vms_term_qio_tcgetattr routine needs to initially populate the vms_info
+ * The vms_term_qio_tcgetattr routine needs to initially populate the info
  * structure that is passed by reference before this call.
- * The vms_info structure will be updated to reflect the changes.
+ * The info structure will be updated to reflect the changes.
  *
- * vms_info - on input, the VMS device channel, and other information.
- *            on output, updated to reflect any change requested.
+ * info - on input, the VMS device channel, and other information.
+ *        on output, updated to reflect any change requested.
  *
  * my_attr  - Readonly structure containing the desired Unix characteristics.
  *
@@ -1885,7 +1885,7 @@ int ret_stat = 0;
  * Returns 0 for success, -1 for an error and sets errno on failure.
  *
  */
-int vms_term_qio_tcsetattr(struct vms_info_st * vms_info,
+int vms_term_qio_tcsetattr(struct vms_info_st * info,
 			   const struct termios *my_attr) {
 int status;
 struct term_mode_iosb_st * mode_iosb;
@@ -1897,17 +1897,19 @@ int is_scope;
 int ret_stat;
 struct term_mode_iosb_st set_mode_iosb;
 
+    ret_stat = 0;
+
     /* Set up the structures to hold the information if not already there */
-    if (vms_info->vms_char == NULL) {
+    if (info->vms_char == NULL) {
 	struct termios old_attr;
-	ret_stat = vms_term_qio_tcgetattr(vms_info, &old_attr);
+	ret_stat = vms_term_qio_tcgetattr(info, &old_attr);
 	if (ret_stat < 0) {
 	    return ret_stat;
 	}
     }
 
-    termchar = vms_info->vms_char;
-    mode_iosb = vms_info->vms_iosb;
+    termchar = info->vms_char;
+    mode_iosb = info->vms_iosb;
 
     is_modem = termchar->ttdef.tt$v_modem;
     is_scope = termchar->ttdef.tt$v_scope;
@@ -2111,11 +2113,11 @@ struct term_mode_iosb_st set_mode_iosb;
 #ifdef __USE_BSD
 /*			FLUSHO		VMS and Linux do not do this. */
     if ((my_attr->c_lflag & NOKERNINFO) != 0) {  /* VMS Control-T handling */
-	if ((vms_info->oldctrlmask & LIB$M_CLI_CTRLT) != 0) {
+	if ((info->oldctrlmask & LIB$M_CLI_CTRLT) != 0) {
 	    status = LIB$DISABLE_CTRL(&newmask, &oldmask);
 	}
     } else {
-	if ((vms_info->oldctrlmask & LIB$M_CLI_CTRLT) == 0) {
+	if ((info->oldctrlmask & LIB$M_CLI_CTRLT) == 0) {
 	    status = LIB$ENABLE_CTRL(&newmask, &oldmask);
 	}
     }
@@ -2168,7 +2170,7 @@ struct term_mode_iosb_st set_mode_iosb;
 
     status = SYS$QIOW
        (EFN$C_ENF,
-	vms_info->channel,
+	info->channel,
 	IO$_SETMODE,
 	&set_mode_iosb,
 	NULL,
@@ -2179,20 +2181,20 @@ struct term_mode_iosb_st set_mode_iosb;
 	$VMS_STATUS_SUCCESS(set_mode_iosb.sts)) {
 
 	    /* We set the data, cache it */
-	    vms_info->term_attr->c_iflag = my_attr->c_iflag;
-	    vms_info->term_attr->c_oflag = my_attr->c_oflag;
-	    vms_info->term_attr->c_lflag = my_attr->c_lflag;
+	    info->term_attr->c_iflag = my_attr->c_iflag;
+	    info->term_attr->c_oflag = my_attr->c_oflag;
+	    info->term_attr->c_lflag = my_attr->c_lflag;
 	    if (termchar->tt2def.tt2$v_pasthru) {
-	        vms_info->term_attr->c_lflag &= ~(ISIG|ICANON|IEXTEN);
+	        info->term_attr->c_lflag &= ~(ISIG|ICANON|IEXTEN);
 	    }
 
 	    /* Except if CIGNORE set for changes */
 	    if ((my_attr->c_cflag & CIGNORE) == 0) {
-		vms_info->term_attr->c_cflag = my_attr->c_cflag;
+		info->term_attr->c_cflag = my_attr->c_cflag;
 	    }
 
 	    /* VMS 8.2 can set BS, so this could have changed */
-	    vms_info->term_attr->c_cc[VERASE] = my_attr->c_cc[VERASE];
+	    info->term_attr->c_cc[VERASE] = my_attr->c_cc[VERASE];
 
     } else {
 	/* Something really wrong */
@@ -2206,7 +2208,7 @@ struct term_mode_iosb_st set_mode_iosb;
 /* Routine to do raw/cooked reads on a terminal */
 
 size_t
-vms_terminal_qio_read(struct vms_info_st * vms_info,
+vms_terminal_qio_read(struct vms_info_st * info,
 		      void * buf,
 		      size_t nbytes) {
 int status;
@@ -2215,15 +2217,15 @@ struct term_read_iosb_st read_iosb;
 int command;
 
     command = IO$_READVBLK;
-    if (vms_info->term_attr != NULL) {
- 	if ((vms_info->term_attr->c_lflag & ICANON) == 0) {
+    if (info->term_attr != NULL) {
+ 	if ((info->term_attr->c_lflag & ICANON) == 0) {
 	    command |= IO$M_NOFILTR;
 	}
     }
 
     status = SYS$QIOW
        (EFN$C_ENF,
-	vms_info->channel,
+	info->channel,
 	command,
 	&read_iosb,
 	NULL,
@@ -2244,7 +2246,7 @@ int command;
 }
 
 size_t
-vms_terminal_qio_write(struct vms_info_st * vms_info,
+vms_terminal_qio_write(struct vms_info_st * info,
 		       const void * buf,
 		       size_t nbytes) {
 int status;
@@ -2253,7 +2255,7 @@ struct term_write_iosb_st write_iosb;
 
     status = SYS$QIOW
        (EFN$C_ENF,
-	vms_info->channel,
+	info->channel,
 	IO$_WRITEVBLK,
 	&write_iosb,
 	NULL,
@@ -2267,7 +2269,6 @@ struct term_write_iosb_st write_iosb;
 	/* Something really wrong */
 	ret_stat = -1;
 	errno = EIO;
-	return ret_stat;
     }
     return ret_stat;
 }
@@ -2986,8 +2987,9 @@ struct vms_pollfd_st *xefn_array;
 /*******************************/
 ssize_t vms_terminal_read(int fd, void * buf, size_t nbytes) {
 
-    size_t result;
+    ssize_t result;
 
+    result = -1;
     if (fd >= 0) {
 	if (isatty(fd)) {
 	    int status;
@@ -2997,11 +2999,11 @@ ssize_t vms_terminal_read(int fd, void * buf, size_t nbytes) {
 	    status = vms_channel_lookup(fd, &chan);
 	    if (status == 0) {
 		result = vms_terminal_qio_read(&vms_info[fd], buf, nbytes);
-		return result;
-	    }
 
-	    /* close the channel if we opened it */
-	    vms_channel_close(fd);
+	        /* close the channel if we opened it */
+	        vms_channel_close(fd);
+	        return result;
+           }
 	}
     }
 
@@ -3011,8 +3013,9 @@ ssize_t vms_terminal_read(int fd, void * buf, size_t nbytes) {
 }
 
 ssize_t vms_terminal_write(int fd, const void * buf, size_t nbytes) {
-    size_t result;
+    ssize_t result;
 
+    result = -1;
     if (fd >= 0) {
 	if (isatty(fd)) {
 	    int status;
@@ -3022,11 +3025,11 @@ ssize_t vms_terminal_write(int fd, const void * buf, size_t nbytes) {
 	    status = vms_channel_lookup(fd, &chan);
 	    if (status == 0) {
 	        result = vms_terminal_qio_write(&vms_info[fd], buf, nbytes);
-		return result;
-	    }
 
-	    /* close the channel if we opened it */
-	    vms_channel_close(fd);
+	        /* close the channel if we opened it */
+	        vms_channel_close(fd);
+                return result;
+            }
 	}
     }
 

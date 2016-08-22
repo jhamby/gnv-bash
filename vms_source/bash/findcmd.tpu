@@ -1,0 +1,58 @@
+! File findcmd.tpu
+!
+! Copyright 2016, John Malmberg
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+!
+! VMS specific patches needed.
+!
+VMS_INSERT_AFTER('#include "findcmd.h"', '#ifdef __VMS');
+SPLIT_LINE;
+COPY_TEXT('char * vms_get_foreign_cmd(const char * exec_name);');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+!
+! If command not found, optionally try a foreign command
+!-------------------------------------------------------
+VMS_INSERT_BEFORE('return (file_to_lose_on)', '#ifdef __VMS');
+COPY_TEXT('if (file_to_lose_on == NULL)');
+SPLIT_LINE;
+COPY_TEXT('  {');
+SPLIT_LINE;
+COPY_TEXT('    char * vms_foreign;');
+SPLIT_LINE;
+COPY_TEXT('    vms_foreign = getenv("GNV_VMS_FOREIGN");');
+SPLIT_LINE;
+COPY_TEXT("    if ((vms_foreign != NULL) && (vms_foreign[0] == '1'))");
+SPLIT_LINE;
+COPY_TEXT('      {');
+SPLIT_LINE;
+COPY_TEXT('        char * foreign_cmd;');
+SPLIT_LINE;
+COPY_TEXT('        foreign_cmd = vms_get_foreign_cmd(name);');
+SPLIT_LINE;
+COPY_TEXT('        if (foreign_cmd != NULL)');
+SPLIT_LINE;
+COPY_TEXT('            file_to_lose_on = strdup(foreign_cmd);');
+SPLIT_LINE;
+COPY_TEXT('      }');
+SPLIT_LINE;
+COPY_TEXT('  }');
+SPLIT_LINE;
+COPY_TEXT('#endif');
+SPLIT_LINE;
+SPLIT_LINE;

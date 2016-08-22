@@ -460,6 +460,7 @@ bash_objs = alias.obj,\
             y_tab.obj,\
 	    xmalloc.obj,\
 	    vms_fakefork.obj,\
+            vms_get_foreign_cmd.obj,\
             vms_fname_to_unix.obj,\
 	    vms_mailstat.obj,\
 	    vms_terminal_io.obj,\
@@ -2503,7 +2504,11 @@ expr.obj : expr.c $(config_h) $(bashansi_h) [.include]chartypes.h \
 #gnv$findcmd.c_first : gnv_findcmd.c_first
 #    $type $(MMS$SOURCE)/output=$(MMS$TARGET)
 
-findcmd.obj : findcmd.c $(config_h) \
+lcl_root:findcmd.c : src_root:findcmd.c findcmd.tpu
+    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
+	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
+
+findcmd.obj : lcl_root:findcmd.c $(config_h) \
 		[.include]chartypes.h bashtypes.h \
 		[.include]filecntl.h [.include]posixstat.h $(bashansi_h) \
 		[.include]memalloc.h $(shell_h) flags.h hashlib.h \
@@ -2806,6 +2811,8 @@ y_tab.obj : lcl_root:y_tab.c $(config_h) bashtypes.h $(bashansi.h)\
 		[.include]shmbutil.h bashline.h $(readline_readline_h) \
 		bashhist.h $(readline_history_h) jobs.h alias.h \
 		[.include]maxpath.h
+
+vms_get_foreign_cmd.obj : vms_get_foreign_cmd.c
 
 vms_fakefork.obj : vms_fakefork.c vms_fakefork.h $(config_h) $(xmalloc_h) \
 		command.h hashlib.h $(general_h) $(variables_h) error.h \

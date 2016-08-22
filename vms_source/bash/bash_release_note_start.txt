@@ -471,6 +471,14 @@ The first port of bash to VMS is the result of work by Douglas B Rupp.
 
 Bash 4.3.46(0)
 --------------
+If the GNV_VMS_FOREIGN environment variable is set to 1, Bash will
+look for VMS foreign commands if the image is not found in the PATH
+environment variable.
+When looking up the foreign command symbol, any characters that are
+not alphanumeric will be replaced with a underscore.
+Example for "python3.5", the DCL symbol "python3_5" will be used.
+The foreign command must specify the complete path for the filename.
+
 
 The VMS CRTL lstat() function is having issues with symbolic links
 and non-existant files.  This appears to show up as internal corruption
