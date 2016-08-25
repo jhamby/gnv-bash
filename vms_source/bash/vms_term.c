@@ -1,7 +1,5 @@
 /* File: vms_term.c
  *
- * $Id: vms_term.c,v 1.1.1.1 2012/12/02 19:25:23 wb8tyw Exp $
- *
  * Terminal capabilities based on the Open Group Single Unix Specification,
  * Version 2.
  *
@@ -362,6 +360,9 @@ int vms_tgetent(char * bp, const char * name) {
     term_width = -1;
     term_sl_width = -1;
 
+    if (name == NULL) {
+        return ERR; /* Failure code for this routine */
+    }
     term_dsc.dsc$a_pointer = (char *) name;
     term_dsc.dsc$w_length = strlen(name);
     term_dsc.dsc$b_dtype = DSC$K_DTYPE_T;
@@ -423,12 +424,12 @@ int vms_tgetent(char * bp, const char * name) {
 	    term_dsc.dsc$w_length = strlen(smg_name);
 	    status = SMG$INIT_TERM_TABLE(&term_dsc, &_vms_termtable_entry);
 	    if ($VMS_STATUS_SUCCESS(status)) {
-		ret_stat = 1;
+		ret_stat = OK;
 	    }
 	}
 	break;
     default:
-	ret_stat = 0; /* Something is wrong */
+	ret_stat = ERR; /* Something is wrong */
     }
 
     return ret_stat;
@@ -1307,7 +1308,7 @@ char * vms_tgoto(char * id, int col, int row) {
     const long buffer_len = VMS_TERM_BUFFER_LEN;
     enum smg_actions smg_action;
 
-    if (_vms_termtable_entry == 0) {
+    if ((_vms_termtable_entry == 0) || (id == NULL)) {
 	return NULL;
     }
 
@@ -1440,7 +1441,7 @@ int vms_tgetnum(char * id) {
     int ret_val;
     unsigned short term_chan;
 
-    if (_vms_termtable_entry == 0) {
+    if ((_vms_termtable_entry == 0) || (id == NULL)) {
 	return -1;
     }
 
@@ -1547,7 +1548,7 @@ char *vms_tgetstr(char * id, char **area) {
     enum smg_actions smg_action;
     char * return_buffer = *area;
 
-    if (_vms_termtable_entry == 0) {
+    if ((_vms_termtable_entry == 0) || (id == NULL)) {
 	return NULL;
     }
 
@@ -1643,7 +1644,7 @@ int vms_tgetflag(char * id) {
     enum smg_actions smg_action;
     unsigned short id_code;
 
-    if (_vms_termtable_entry == 0) {
+    if ((_vms_termtable_entry == 0) || (id == NULL)) {
 	return -1;
     }
 
