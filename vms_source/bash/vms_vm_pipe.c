@@ -1,7 +1,5 @@
 /* File: VMS_VM_PIPE.C */
 
-/* $Id: vms_vm_pipe.c,v 1.1.1.1 2012/12/02 19:25:23 wb8tyw Exp $ */
-
 /*************************************************************************
  *                                                                       *
  * © Copyright 2005 Hewlett-Packard Development Company, L.P.		 *
@@ -283,9 +281,8 @@ int status;
 	     /* Cancel the AST reading from the child */
 	    /*---------------------------------------*/
 	    context->child_watch_ast_status = -1;
-	    status = SYS$DASSGN(context->read_chan);
 
-	     /* This AST is done */
+	    /* This AST is done */
 	    return;
 	}
 
@@ -313,6 +310,9 @@ int status;
     }
 
 }
+
+static void vms_write_mbx_ast(struct vms_mbx * context);
+
 
  /* This routine is used to check to see if a child is still alive. */
 /*-----------------------------------------------------------------*/
@@ -346,9 +346,15 @@ int status1;
 	    context,
 	    0);
 
-         /* Pull the plug on the READER */
-	/*-----------------------------*/
+         /* Check if child has already exited */
+	/*----------------------------------*/
 	if (!$VMS_STATUS_SUCCESS(status)) {
+
+            /* Child has exited, mark for future EOF to be added
+             * to the end of the read buffer.
+             */
+
+            struct mbx_buffer_hdr * rbuf;
 
 	     /* Cancel the AST reading from the child */
 	    /*---------------------------------------*/
@@ -416,8 +422,8 @@ const unsigned long write_it = IO$_WRITEVBLK | IO$M_READERCHECK;
 const unsigned long write_eof = IO$_WRITEOF | IO$M_READERCHECK;
 int status;
 
-     /* if parent_iosb.status is 0, then we are starting or restarting */
-    /*------------------------------------------------------------*/
+     /* if write_iosb.status is 0, then we are starting or restarting */
+    /*----------------------------------------------------------------*/
     if (context->write_iosb.status == 0) {
     }
     else {
@@ -769,29 +775,54 @@ int status;
 	    /*-------------------------------------------*/
 	    INSQUEL((void *)context->rbuf_blink, rbuf);
 
+            if (context->child_watch_ast_status == -1) {
+                /* Child has already exited */
+	        /* Add an EOF rbuf */
+                rbuf = malloc(sizeof(struct mbx_buffer_hdr));
+                if (rbuf == NULL) {
+                    context->read_ast_status = -2; /* AST in fatal state */
+                    LIB$STOP(SS$_INSFMEM);
+                }
+
+                rbuf->flink = NULL;
+                rbuf->blink = NULL;
+                rbuf->flags = 1; /* EOF flag */
+                rbuf->size = 0;
+                rbuf->buffer = ((char *)rbuf + sizeof(struct mbx_buffer_hdr));
+
+	         /* Put it on the end of the queue for a FIFO */
+	        /*-------------------------------------------*/
+	        INSQUEL((void *)context->rbuf_blink, rbuf);
+
+                /* Disable reading from child */
+	        status = SYS$DASSGN(context->read_chan);
+            }
+
 	     /* Write out the buffer data */
 	    /*---------------------------*/
 	    if (context->write_ast_status == 0) {
 		context->write_iosb.status = 0;
 	        vms_write_mbx_ast(context);
 	    }
-
 	}
     }
 
      /* Set up the next read */
     /*----------------------*/
     if (context->read_ast_status >= 0) {
-	status = SYS$QIO
-	       (EFN$C_ENF,
-		context->read_chan,
-		read_it,
-		&context->read_iosb,
-		vms_read_mbx_ast,
-		context,
-		context->read_buffer,
-		context->read_devbufsiz,
-		0,0,0,0);
+        status = SS$_IVCHAN;
+        if (context->child_watch_ast_status >= 0) {
+ 	    status = SYS$QIO
+	           (EFN$C_ENF,
+		    context->read_chan,
+		    read_it,
+		    &context->read_iosb,
+		    vms_read_mbx_ast,
+		    context,
+		    context->read_buffer,
+		    context->read_devbufsiz,
+		    0,0,0,0);
+        }
 	if (!$VMS_STATUS_SUCCESS(status)) {
 
 	     /* Cleanup and exit time */

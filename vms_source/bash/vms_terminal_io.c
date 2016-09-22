@@ -273,6 +273,9 @@ struct vms_info_st {
 	char * vmscwd;			/* VMS format Current Working Dir */
 	char * path;			/* Path dirfd simulation */
 	DIR * dirptr;			/* Pointer for dirfd simulation */
+	FILE * fptr;			/* Pointer for popen */
+        pid_t pid;			/* Pid for popen */
+        int parent_pipe;                /* Parent pipe from pair */
 	unsigned long vms_crtl;		/* VMS CRTL stuff */
 					/* Add info for signals here */
 	struct stat *st_buf;		/* Stat buffer for directories */
@@ -902,6 +905,57 @@ int vms_fchdir(int fd) {
     }
     errno = ENOTDIR;
     return -1;
+}
+
+/* Helper for a replacement popen function
+ * Need to track pipe direction and pipe numbers
+ */
+FILE * vms_popen_helper(int *pipeno, pid_t pid, const char * mode) {
+    struct vms_info_st * info;
+    int parent_pipe;
+
+    if (mode[0] == 'r') {
+        parent_pipe = 0;
+    } else {
+        parent_pipe = 1;
+    }
+    info = vms_lookup_fd(pipeno[parent_pipe]);
+    if (info == NULL) {
+        return NULL;
+    }
+    info->parent_pipe = parent_pipe;
+    info->pid = pid;
+    info->fptr = fdopen(pipeno[parent_pipe], mode);
+    return info->fptr;
+}
+
+/* Special handling for a pclose */
+int vms_pclose(FILE * stream) {
+    int result;
+    int status;
+    int wstatus;
+    int fno;
+    struct vms_info_st * info;
+
+    fno = fileno(stream);
+    if (fno < 0) {
+        return fno;
+    }
+    info = vms_lookup_fd(fno);
+    if ((info != NULL)  && (info->fptr == stream)) {
+        pid_t wpid;
+
+        if (info->parent_pipe == 1) {
+            /* If we are a child process, be nice and write an EOF */
+            status = decc$write_eof_to_mbx(fno);
+        }
+        status = fclose(stream);
+        wpid = waitpid(info->pid, &wstatus, 0);
+        info->fptr = NULL;
+        return wstatus;
+    } else {
+        return pclose(stream);
+    }
 }
 
 

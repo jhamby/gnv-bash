@@ -132,6 +132,8 @@ int vms_dup2(int fd1, int fd2);
 int vms_closedir(DIR * dirp);
 int vms_fstat(int fd, struct stat * st_buf);
 
+FILE * vms_popen_helper(int *pipeno, pid_t pid, const char *mode);
+int vms_pclose(FILE * stream);
 
 #define read(fd, buf, nbytes) vms_terminal_read(fd, buf, nbytes)
 #define write(fd, buf, nbytes) vms_terminal_write(fd, buf, nbytes)
