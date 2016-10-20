@@ -1,0 +1,25 @@
+!
+! VMS specific patches needed.
+!
+! On OpenVMS, the function confstr() does not return a meaningful string
+! (in the context of bash) for the system configuration string ID represented
+! by the macro _CS_PATH. So, for Bash, we make it look like OpenVMS does not
+! provide this macro. By undefining the _CS_PATH macro, the function
+! conf_standard_path() will return the value of the macro STANDARD_UTILS_PATH
+! instead of the OpenVMS system configuration string for string ID _CS_PATH.
+!
+srch_pattern := 'char *' + LINE_END + LINE_BEGIN +
+                'conf_standard_path ()' + LINE_END + LINE_BEGIN +
+                '{';
+find_range := SEARCH_QUIETLY(srch_pattern, FORWARD, EXACT);
+IF find_range <> 0
+THEN
+   VMS_INSERT_AFTER(srch_pattern, '#ifdef __VMS');
+   SPLIT_LINE;
+   COPY_TEXT('#undef _CS_PATH');
+   SPLIT_LINE;
+   COPY_TEXT('#undef CS_PATH');
+   SPLIT_LINE;
+   COPY_TEXT('#endif /* __VMS */');
+   SPLIT_LINE;
+ENDIF;

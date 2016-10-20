@@ -76,7 +76,7 @@ Example:
 
 Another way is to modify the PATH environment variable to contain the
 directory for that utility.  This can have drawbacks with applications
-that the VMS port uses command files instead of images.  Each level of
+where the VMS port uses command files instead of images.  Each level of
 command files or scripts strip quotation marks from the command which
 may be significant.
 
@@ -140,7 +140,7 @@ DECC$STRTOL_ERANGE enabled.
 DECC$UNIX_PATH_BEFORE_LOGNAME enabled.
 
 While more strict UNIX compatibility feature settings can be applied by users
-by setting feature logical names, these settings are all the Bash and most
+by setting feature logical names, these settings are all that Bash and most
 ported programs need.
 
 The COE specific environment variables: (DATA_DIR, LD_LIBRARY_PATH,
@@ -205,7 +205,7 @@ not appear to work under Bash.
 This port of Bash uses the VMS CRTL to handle the Unix format pathnames and
 as such is dependent on them.  It is a known issue that directories with
 a Unix name "file.dir/" are not handled correctly.  This is a combination
-or problems with RMS and CRTL.  The RMS portion is fixed with the
+of problems with RMS and CRTL.  The RMS portion is fixed with the
 VMS84?_RMS-V0300 ECO kit.  I am not aware of a CRTL kit that fixes the
 issue.  Bash 4.3.39 and later attempts to work around this issue.
 
@@ -467,6 +467,66 @@ The Bash 1.14.8 port was done by an number of unknown people and the following
 people that were named in the GNV Bash 1.14.8 source:  John Malmberg,
 Martin Vorlander, Steve Pitcher, Hartmut Becker, Karl Puder, John Reagan.
 The first port of bash to VMS is the result of work by Douglas B Rupp.
+
+
+Bash 4.4.0(0)
+--------------
+No OpenVMS-specific bugs are addressed in this release. Bash 4.4.0(0) is simply
+the OpenVMS build based on the GNU Bash sources for that same version. However,
+the combination of the new Bash 4.4 command parser and word expansion code can
+produce different output relative to the Bash 4.3 and earlier releases on OpenVMS
+when using the C/POSIX locale (which is a typical user's default locale). This
+difference in output manifests on OpenVMS when expanding strings for output which
+have character codes outside of the Portable Character Set (PCS) when using the
+C/POSIX locale. This difference in output arises because of the following, combined
+facts:
+
+	1.) The new parser used in Bash 4.4 releases now encodes
+	    character codes within a command structure directly
+	    as their binary values even when the originating
+	    command input uses ANSI C quoting to express them.
+	2.) The ISO/POSIX standards explicitly permit platform
+	    implementors to freely choose what character codes
+	    and associated locale attributes to define (or not
+	    to define) outside of the PCS.
+	3.) With the exception of the non-graphical, terminal
+	    control characters (alert, backspace, form feed, new
+	    line, carriage return, horizontal tab and vertical tab),
+	    the word expansion code for Bash uses the printable
+	    locale attribute to determine if a character code will
+	    be ANSI C quoted or not when processing characters
+	    outside of the PCS.
+	    
+Most Linux/UNIX platform implementations do not define any characters outside
+of the PCS for the C/POSIX locale while OpenVMS does define such characters in
+its implementation of the C/POSIX locale. As a result of the above, most Linux/
+UNIX platforms will display expanded character codes outside of the PCS in ANSI
+C quoted form when the user's active locale is C/POSIX. But, OpenVMS will instead
+display such characters as the corresponding character glyph associated with the
+character code in its implementation of the C/POSIX locale. An example of Bash
+statements which illustrate this difference in expanded string output is:
+
+unset array
+declare -A array
+array=( [$'x\001y\177z']=$'a\242b\002c' )
+echo ${array[@]@A}
+
+When executing the above, most Linux/UNIX platforms will display:
+
+declare -A array=([$'x\001y\177z']=$'a\242b\002c' )
+
+OpenVMS Bash instead displays
+
+declare -A array=([$'x\001y\177z']=$'a¢b\002c' )
+
+Since this difference in output does not change the semantics of any character
+in question, this difference should not materially affect the logical execution
+of Bash acripts executed on OpenVMS despite the difference in how the characters
+of expanded strings are displayed. For additional information, refer to the folowing
+links in the Source Forge gnv-develop mailing list archives:
+
+https://sourceforge.net/p/gnv/mailman/message/35414636/
+https://sourceforge.net/p/gnv/mailman/message/35423883/
 
 
 Bash 4.3.46(1)

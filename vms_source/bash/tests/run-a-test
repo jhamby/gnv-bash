@@ -1,5 +1,14 @@
 #! /bin/sh
 
+: ${TMPDIR:=/tmp}
+export TMPDIR
+
+# basic /bin/sh syntax
+SUFFIX=`${THIS_SH} -c 'echo $(( $RANDOM + $BASHPID ))'`
+
+BASH_TSTOUT=${TMPDIR}/bashtst-$SUFFIX	# for now
+export BASH_TSTOUT
+
 PATH=.:$PATH	# just to get recho/zecho/printenv if not run via `make tests'
 export PATH
 
@@ -13,10 +22,10 @@ export THIS_SH
 
 ${THIS_SH} ./version
 
-rm -f /tmp/xx
+rm -f ${BASH_TSTOUT}
 
 echo Any output from any test, unless otherwise noted, indicates a possible anomaly
 
-echo run-$1 ; sh run-$1 ;
+sh run-$1
 
 exit 0

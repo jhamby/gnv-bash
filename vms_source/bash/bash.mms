@@ -317,7 +317,7 @@ DEFSRC =  $(srcdir)/alias.def $(srcdir)/bind.def $(srcdir)/break.def \
 # This macro defines the .def files for builtins which require changes for
 # OpenVMS.
 #
-VMSDEFSRC = lcl_root:[.builtins]exec.def lcl_root:[.builtins]command.def
+VMSDEFSRC = lcl_root:[.builtins]exec.def
 
 
 #		  "common"=[.builtins]common.obj,\
@@ -1571,11 +1571,6 @@ lcl_root:[.builtins]exec.def : src_root:[.builtins]exec.def \
     $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
 	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
 
-lcl_root:[.builtins]command.def : src_root:[.builtins]command.def \
-	[.builtins]command.tpu lcl_root:[]builtins.DIR
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
 libbuiltins.olb : libbuiltins($(libbuiltins_objs))
     @ write sys$output "libbuiltins is up to date"
 
@@ -2539,7 +2534,11 @@ findcmd.obj : lcl_root:findcmd.c $(config_h) \
 
 flags.obj : flags.c $(config_h) $(shell_h) flags.h bashhist.h
 
-general.obj : general.c $(config_h) bashtypes.h [.include]posixstat.h \
+lcl_root:general.c : src_root:general.c []general.tpu
+    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
+	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
+
+general.obj : lcl_root:general.c $(config_h) bashtypes.h [.include]posixstat.h \
 		[.include]filecntl.h $(bashansi_h) [.include]chartypes.h \
 		$(bashintl_h) $(shell_h) test.h [.lib.tilde]tilde.h
 

@@ -1366,7 +1366,18 @@ VMS_INSERT_BEFORE('else', '      }');
 ! Bash tries to avoid an additional fork by doing a longjump.
 ! Because VMS is doing a fake fork, here we actually have to spawn
 ! a new child.
-VMS_INSERT_BEFORE('initialize_subshell', '#ifndef __VMS');
+! Bash 4.4 introduced a new call to reset_parser() at the beginning
+! of this excluded block of code. We first look for it and if we don't
+! find it, we look for the call to initialize_subshell() as the marker
+! (i.e. pre-Bash 4.4).
+! 
+find_range := SEARCH_QUIETLY('reset_parser', FORWARD, EXACT);
+IF find_range <> 0
+THEN
+   VMS_INSERT_BEFORE('reset_parser', '#ifndef __VMS');
+ELSE
+   VMS_INSERT_BEFORE('initialize_subshell', '#ifndef __VMS');
+ENDIF;
 VMS_INSERT_AFTER('set_sigint_handler', '#endif /* __VMS */');
 
 VMS_INSERT_BEFORE('if (subshell_argv)', '#ifdef __VMS');

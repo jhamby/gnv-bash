@@ -191,6 +191,10 @@
    characters, even if the OS supports them. */
 /* #undef NO_MULTIBYTE_SUPPORT */
 
+/* Define DEBUGGER if you want to compile in some features used only by the
+   bash debugger. */
+#define DEBUGGER 1
+
 /* Define STRICT_POSIX if you want bash to be strictly posix.2 conformant by
    default (except for echo; that is controlled separately). */
 /* #undef STRICT_POSIX */
@@ -199,15 +203,24 @@
    memory contents on malloc() and free(). */
 #define MEMSCRAMBLE 1
 
-/* Define AFS if you are using Transarc's AFS. */
-/* #undef AFS */
-
 /* Define for case-modifying variable attributes; variables modified on
    assignment */
 #define CASEMOD_ATTRS 1
 
 /* Define for case-modifying word expansions */
 #define CASEMOD_EXPANSIONS 1
+
+/* Define to make the `direxpand' shopt option enabled by default. */
+/* #undef DIRCOMPLETE_EXPAND_DEFAULT */
+
+/* Define to make the `globasciiranges' shopt option enabled by default. */
+#define GLOBASCII_DEFAULT 0
+
+/* Define to allow functions to be imported from the environment. */
+#define FUNCTION_IMPORT 1
+
+/* Define AFS if you are using Transarc's AFS. */
+/* #undef AFS */
 
 /* Define to use GNU libc extensions */
 #define _GNU_SOURCE 1
@@ -336,5 +349,3 @@ static void setpwent(void) {}
 
 /* Get rid of a implicit function diagnostic. */
 void v_set_pid_list_vms_pid (pid_t, pid_t);
-
-#define DEBUGGER 1

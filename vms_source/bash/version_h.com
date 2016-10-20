@@ -38,8 +38,8 @@ $ plvl_loop_end:
 $ close plvl
 $!
 $ maj_ver = "4"
-$ min_ver = "3"
-$ bv = "1"
+$ min_ver = "4"
+$ bv = "0"
 $ rel = "unknown"
 $ if f$search("configure.") .nes. ""
 $ then
