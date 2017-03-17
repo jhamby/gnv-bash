@@ -469,6 +469,12 @@ Martin Vorlander, Steve Pitcher, Hartmut Becker, Karl Puder, John Reagan.
 The first port of bash to VMS is the result of work by Douglas B Rupp.
 
 
+Bash 4.4.10(0)
+--------------
+No OpenVMS-specific bugs are addressed in this release. Bash 4.4.10(0) is
+simply the OpenVMS build based on the GNU Bash sources for that same version.
+
+
 Bash 4.4.9(0)
 --------------
 No OpenVMS-specific bugs are addressed in this release. Bash 4.4.9(0) is
