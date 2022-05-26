@@ -379,38 +379,6 @@ $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
 $!
-$	if key2 .eqs. "intmax_t"
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#ifdef __VAX"
-$	    write tf "#define ''key2' long"
-$	    write tf "#else"
-$	    write tf "#define ''key2' long long"
-$	    write tf "#endif"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$	if key2 .eqs. "uintmax_t"
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#ifdef __VAX"
-$	    write tf "#define ''key2' unsigned long"
-$	    write tf "#else"
-$	    write tf "#define ''key2' unsigned long long"
-$	    write tf "#endif"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$	if key2 .eqs. "socklen_t"
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' int"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
 $	if key2 .eqs. "GETGROUPS_T"
 $	then
 $	    write tf "#ifndef ''key2'"
@@ -599,7 +567,7 @@ $!
 $	if key2a .eqs. "HAVE_DECL_STRTOLD"
 $	then
 $	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' 0"
+$	    write tf "#define ''key2' 1"
 $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
@@ -607,7 +575,7 @@ $!
 $	if key2 .eqs. "HAVE_DECL_STRTOIMAX"
 $	then
 $	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' 0"
+$	    write tf "#define ''key2' 1"
 $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
@@ -647,7 +615,7 @@ $!
 $	if key2 .eqs. "HAVE_DECL_STRTOUMAX"
 $	then
 $	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' 0"
+$	    write tf "#define ''key2' 1"
 $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif

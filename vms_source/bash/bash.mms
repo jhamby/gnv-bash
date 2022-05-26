@@ -35,9 +35,7 @@
 #
 # Symbol names in base are case sensitive, bash will build wrong otherwise.
 #
-# For later debug, put information in the listing files including the
-# machine code, expanded macros, and the included header files.
-# current CC compiler does not allow a value added to /machine_code
+# For later debug, put only basic information in the listing files.
 #
 # Warnings should generaly be enabled globally and only suppressed if there
 # is a specific issue that can not be addressed in the code.
@@ -64,13 +62,8 @@
 # Watch out long lines on VAX, so need to shorten
 crepository = /repo=lcl_root:[bash.cxx_repository]
 cnames = /name=(as_i,shor)$(crepository)
-cshow = /show=(EXPA,INC)
-clist = /list/mach$(cshow)
-.ifdef __VAX__
+clist = /list
 cprefix = /pref=all
-.else
-cprefix = /prefix=(all,exce=(strtoimax,strtoumax))
-.endif
 #cnowarn1 = noparmlist,questcompare2,unusedtop,unknownmacro
 #cnowarn2 = intconcastsgn,controlassign,exprnotused,unreachcode
 #cnowarn = $(cnowarn1),$(cnowarn2)
@@ -87,13 +80,8 @@ cinc = $(cinc2)
 # via [.lib.sh]shmatch.c. Note that this cannot be done via config_h.com because
 # configure does not have tests for these macros; So they must be manually set.
 #
-.ifdef __VAX__
-cdefs = /def=(_POSIX_EXIT=1,HAVE_CONFIG_H=1,HAVE_REGEX_H=1,\
-HAVE_REGCOMP=1,HAVE_REGEXEC=1)
-.else
 cdefs = /define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,HAVE_REGEX_H=1,\
-HAVE_REGCOMP=1,HAVE_REGEXEC=1)
-.endif
+HAVE_REGCOMP=1,HAVE_REGEXEC=1)/fl=ieee/ieee=denorm
 cflags = $(cnames)/debu$(clist)$(cprefix)$(cwarn)$(cinc)$(cdefs)
 cflagsx = $(cnames)/debu$(clist)$(cwarn)$(cinc2)
 
@@ -185,8 +173,6 @@ libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
                 "fmtullong"=[.lib.sh]fmtullong.obj,\
 		"strtoull"=[.lib.sh]strtoll.obj,\
                 "strtoull"=[.lib.sh]strtoull.obj,\
-		"strtoimax"=[.lib.sh]strtoimax.obj,\
-                "strtoumax"=[.lib.sh]strtoumax.obj,\
 		"fmtumax"=[.lib.sh]fmtumax.obj,\
                 "netconn"=[.lib.sh]netconn.obj,\
 		"mktime"=[.lib.sh]mktime.obj,\
@@ -968,8 +954,6 @@ libsh.olb : libsh($(libsh_objs))
 [.lib.sh]strtod.obj : [.lib.sh]strtod.c lcl_root:[.lib]sh.DIR $(config_h) \
 		$(bashansi_h) [.include]chartypes.h
 
-[.lib.sh]strtoimax.obj : [.lib.sh]strtoimax.c lcl_root:[.lib]sh.DIR $(config_h)
-
 strtol_c = [.lib.sh]strtol.c, $(config_h), $(bashansi_h) [.include]chartypes.h
 
 [.lib.sh]strtol.obj : $(strtol_c) lcl_root:[.lib]sh.DIR
@@ -979,8 +963,6 @@ strtol_c = [.lib.sh]strtol.c, $(config_h), $(bashansi_h) [.include]chartypes.h
 [.lib.sh]strtoul.obj : [.lib.sh]strtoul.c $(strtol_c) lcl_root:[.lib]sh.DIR
 
 [.lib.sh]strtoull.obj : [.lib.sh]strtolull.c $(strtol_c) lcl_root:[.lib]sh.DIR
-
-[.lib.sh]strtoumax.obj : [.lib.sh]strtoumax.c $(config_h) lcl_root:[.lib]sh.DIR
 
 [.lib.sh]strtrans.obj : [.lib.sh]strtrans.c lcl_root:[.lib]sh.DIR $(config_h) \
 		$(bashansi_h) $(shell_h)

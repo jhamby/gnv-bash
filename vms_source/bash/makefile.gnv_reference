@@ -218,7 +218,6 @@ SHLIB_SOURCE =	${SH_LIBSRC}/clktck.c ${SH_LIBSRC}/getcwd.c \
 		${SH_LIBSRC}/snprintf.c ${SH_LIBSRC}/mailstat.c \
 		${SH_LIBSRC}/fmtulong.c ${SH_LIBSRC}/fmtullong.c \
 		${SH_LIBSRC}/strtoll.c ${SH_LIBSRC}/strtoull.c \
-		${SH_LIBSRC}/strtoimax.c ${SH_LIBSRC}/strtoumax.c \
 		${SH_LIBSRC}/fmtumax.c ${SH_LIBSRC}/netconn.c \
 		${SH_LIBSRC}/mktime.c ${SH_LIBSRC}/strftime.c \
 		${SH_LIBSRC}/memset.c ${SH_LIBSRC}/mbschr.c \

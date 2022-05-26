@@ -768,6 +768,8 @@ $   file = "LIBBUILTINS"
 $   if f$search("''file'.OLB") .nes. "" then delete 'file'.OLB;*
 $   file = "lcl_root:[.builtins]GNV$COMMON.C_FIRST"
 $   if f$search("''file'") .nes. "" then delete 'file';*
+$   file = "lcl_root:[.builtins]GNV$PRINTF.C_FIRST"
+$   if f$search("''file'") .nes. "" then delete 'file';*
 $   file = "[.BUILTINS]ALIAS"
 $   if f$search("''file'.C") .nes. "" then delete 'file'.C;*
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
@@ -1133,6 +1135,9 @@ $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "[.LIB.READLINE]CALLBACK"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
+$   file = "[.LIB.READLINE]COLORS"
+$   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
+$   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "[.LIB.READLINE]COMPAT"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
@@ -1188,6 +1193,9 @@ $   file = "[.LIB.READLINE]NLS"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "[.LIB.READLINE]PARENS"
+$   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
+$   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
+$   file = "[.LIB.READLINE]PARSE-COLORS"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "[.LIB.READLINE]READLINE"
@@ -1255,6 +1263,11 @@ $   if f$search("''file'") .nes. "" then delete 'file';*
 $   file = "lcl_root:[.LIB.READLINE]CXX_REPOSITORY.DIR"
 $   if f$search("''file'") .nes. "" then set file/prot=o:rwed 'file';*
 $   if f$search("''file'") .nes. "" then delete 'file';*
+$!
+$   ![LIB.REGEX]
+$   file = "[.LIB.REGEX]REGEX"
+$   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
+$   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $!
 $   ![LIB.TILDE]
 $   file = "[.LIB.TILDE]TILDE"
@@ -1460,6 +1473,9 @@ $   file = "[.LIB.SH]VPRINT"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "[.LIB.SH]WCSDUP"
+$   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
+$   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
+$   file = "[.LIB.SH]WCSNWIDTH"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "[.LIB.SH]WCSWIDTH"

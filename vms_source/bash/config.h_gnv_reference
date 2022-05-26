@@ -316,10 +316,10 @@
 /* #undef ssize_t */
 
 /* Define to `long' if <stdint.h> doesn't define. */
-#define intmax_t long long
+/* #undef intmax_t */
 
 /* Define to `unsigned long' if <stdint.h> doesn't define. */
-#define uintmax_t unsigned long long
+/* #undef uintmax_t */
 
 /* Define to `int' if <sys/types.h> doesn't define.  */
 /* #undef uid_t */
@@ -334,7 +334,7 @@
 /* #undef gid_t */
 
 /* Define to `unsigned int' if <sys/socket.h> doesn't define. */
-#define socklen_t int
+/* #undef socklen_t */
 
 /* Define to `int' if <signal.h> doesn't define. */
 /* #undef sig_atomic_t */
@@ -617,7 +617,7 @@
 /* #undef HAVE_GETRLIMIT */
 
 /* Define if you have the getrusage function.  */
-/* #undef HAVE_GETRUSAGE */
+#define HAVE_GETRUSAGE 1
 
 /* Define if you have the getservbyname function.  */
 #define HAVE_GETSERVBYNAME 1
@@ -641,7 +641,7 @@
 #define HAVE_ISASCII 1
 
 /* Define if you have the isblank function.  */
-/* #undef HAVE_ISBLANK */
+#define HAVE_ISBLANK 1
 
 /* Define if you have the isgraph function.  */
 #define HAVE_ISGRAPH 1
@@ -758,7 +758,7 @@
 /* #undef HAVE_SETOSTYPE */
 
 /* Define if you have the setregid function.  */
-/* #undef HAVE_SETREGID */
+#define HAVE_SETREGID 1
 #define HAVE_DECL_SETREGID 1
 
 /* Define if you have the setvbuf function.  */
@@ -807,7 +807,7 @@
 #define HAVE_STRTOD 1
 
 /* Define if you have the strtoimax function. */
-/* #undef HAVE_STRTOIMAX */
+#define HAVE_STRTOIMAX 1
 
 /* Define if you have the strtol function. */
 #define HAVE_STRTOL 1
@@ -822,7 +822,7 @@
 #define HAVE_STRTOULL 1
 
 /* Define if you have the strtoumax function. */
-/* #undef HAVE_STRTOUMAX */
+#define HAVE_STRTOUMAX 1
 
 /* Define if you have the strsignal function or macro. */
 /* #undef HAVE_STRSIGNAL */
@@ -911,7 +911,7 @@
 #define HAVE_GRP_H 1
 
 /* Define if you have the <inttypes.h> header file. */
-#define HAVE_INTTYPES_H 1
+/* #undef HAVE_INTTYPES_H */
 
 /* Define if you have the <langinfo.h> header file.  */
 #define HAVE_LANGINFO_H 1
@@ -959,7 +959,7 @@
 #define HAVE_STDDEF_H 1
 
 /* Define if you have the <stdint.h> header file. */
-/* #undef HAVE_STDINT_H */
+#define HAVE_STDINT_H 1
 
 /* Define if you have the <syslog.h> header file. */
 /* #undef HAVE_SYSLOG_H */
@@ -1115,7 +1115,7 @@
 /* #undef HAVE_NL_LANGINFO */
 
 /* Define if you have the `stpcpy' function. */
-/* #undef HAVE_STPCPY */
+#define HAVE_STPCPY 1
 
 /* Define if you have the `strcspn' function. */
 #define HAVE_STRCSPN 1
