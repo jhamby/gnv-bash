@@ -115,9 +115,6 @@ extern int vms_fake_exit_seen;
 #endif /* __VAX */
 
 
-/* When we really want to exit, we want to use the posix exit only */
-#define vms_posix_exit(__p1) __posix_exit(__p1)
-
 extern int interactive;
 extern int interactive_shell;
 extern int login_shell;
@@ -132,7 +129,7 @@ extern char **export_env;
 
 typedef struct vms_bash_environ {
     int sanity_count;
-    int subshell_save;
+    unsigned int subshell_save;
 
     VAR_CONTEXT * shell_variables;
     VAR_CONTEXT * global_variables;
@@ -272,7 +269,7 @@ vms_restore_std_fds (int fds[3]) {
 #define VMS_SAVE_SANITY_DEALLOCATE (0xfeed)
 
 VMS_BASH_ENVIRON *
-vms_save_bash_environ(int subshell_save);
+vms_save_bash_environ(unsigned int subshell_save);
 
 void
 vms_restore_bash_environ(VMS_BASH_ENVIRON * buf);

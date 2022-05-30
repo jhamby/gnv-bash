@@ -180,7 +180,7 @@ COPY_TEXT('      /* Simulate a PID in the range 0x10000 to 0x1FFFF */');
 SPLIT_LINE;
 COPY_TEXT('      /* We should never have to worry about an overlap */');
 SPLIT_LINE;
-COPY_TEXT('      static vms_pid_count = 0x10000;');
+COPY_TEXT('      static int vms_pid_count = 0x10000;');
 SPLIT_LINE;
 COPY_TEXT('      vms_pid_count+= 0x1;');
 SPLIT_LINE;

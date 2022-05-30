@@ -30,9 +30,9 @@
 #ifndef __VAX
 #include <iosbdef.h>
 #endif
-#include <ssdef.h>
 #include <stdio.h>
 #include <stsdef.h>
+#include <starlet.h>
 #ifdef TEST_DECW_SHOWDISPLAY
 #include <stdlib.h>
 #endif
@@ -46,42 +46,6 @@
 #endif
 #define NODE_LEN 255
 #define TRANSPORT_LEN 64
-
-int SYS$ASSIGN
-       (const struct dsc$descriptor_s * devnam,
-	unsigned short * chan,
-	unsigned long acmode,
-	const struct dsc$descriptor_s * mbxnam,
-	unsigned long flags);
-
-int SYS$DASSGN(unsigned short chan);
-
-#pragma message save
-#pragma message disable noparmlist
-#ifdef __VAX
-struct qio_iosb {
-    unsigned short iosb$w_status;
-    unsigned short iosb_w_something;
-    unsigned long iosb$l_dev_depend;
-};
-typedef struct qio_iosb IOSB;
-#endif
-
-int SYS$QIOW
-       (unsigned long efn,
-	unsigned short chan,
-	unsigned long func,
-	IOSB * iosb,
-	void (* astadr)(__unknown_params),
-	void *,
-	void * p1,
-	int p2,
-	int p3,
-	int p4,
-	int p5,
-	int p6);
-
-#pragma message restore
 
 
 /* Need space for hostname, two colons, 5 digit server, period, 5 digit screen

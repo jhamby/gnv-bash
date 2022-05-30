@@ -39,9 +39,12 @@
 #include <stdlib.h>
 #undef passwd
 #include <string.h>
+#define __NEW_STARLET 1
 #include <descrip.h>
 #include <stsdef.h>
+#include <iledef.h>
 #include <lnmdef.h>
+#include <starlet.h>
 #include <unixlib.h>
 
 #ifdef __VAX
@@ -71,22 +74,6 @@ typedef struct vms_passwd {
    char *pw_passwd;
 } VMS_PASSWD;
 
-#pragma nomember_alignment longword
-struct itmlst_3 {
-  unsigned short int buflen;
-  unsigned short int itmcode;
-  void *bufadr;
-  unsigned short int *retlen;
-};
-
-int   SYS$TRNLNM(
-	const unsigned long * attr,
-	const struct dsc$descriptor_s * table_dsc,
-	struct dsc$descriptor_s * name_dsc,
-	const unsigned char * acmode,
-	const struct itmlst_3 * item_list);
-
-
 /* The getpw*() routine return a pointer to static storage */
 static VMS_PASSWD vms__internal_passwd = {0};
 
@@ -112,20 +99,20 @@ static char vms__internal_passwd_dir[256] = {0};
 static int sys_trnlnm(const char * logname,
 		      char * value,
 		      int value_len) {
-    const $DESCRIPTOR(table_dsc, "LNM$FILE_DEV");
-    const unsigned long attr = LNM$M_CASE_BLIND;
+    $DESCRIPTOR(table_dsc, "LNM$FILE_DEV");
+    unsigned int attr = LNM$M_CASE_BLIND;
     struct dsc$descriptor_s name_dsc;
     int status;
     unsigned short result;
-    struct itmlst_3 itlst[2];
+    struct _ile3 itlst[2];
 
-    itlst[0].buflen = value_len;
-    itlst[0].itmcode = LNM$_STRING;
-    itlst[0].bufadr = value;
-    itlst[0].retlen = &result;
+    itlst[0].ile3$w_length = value_len;
+    itlst[0].ile3$w_code = LNM$_STRING;
+    itlst[0].ile3$ps_bufaddr = value;
+    itlst[0].ile3$ps_retlen_addr = &result;
 
-    itlst[1].buflen = 0;
-    itlst[1].itmcode = 0;
+    itlst[1].ile3$w_length = 0;
+    itlst[1].ile3$w_code = 0;
 
     name_dsc.dsc$w_length = strlen(logname);
     name_dsc.dsc$a_pointer = (char *)logname;

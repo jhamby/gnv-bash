@@ -588,6 +588,10 @@ static int tovms_rmdir(const char * unix_dir) {
     return result;
 }
 
+#ifdef __DECC
+# pragma message restore
+#endif
+
 static int vms_rmdir(const char * file) {
     int result;
     int pathlen;

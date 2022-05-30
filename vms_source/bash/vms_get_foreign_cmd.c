@@ -24,6 +24,8 @@
 #define _POSIX_EXIT=1
 #endif
 
+#define __NEW_STARLET 1
+
 #include <vms_fake_path/ctype.h>
 #include <vms_fake_path/errno.h>
 #include <vms_fake_path/stdlib.h>
@@ -33,26 +35,8 @@
 
 #include <descrip.h>
 #include <libclidef.h>
-#include <ssdef.h>
 #include <stsdef.h>
-
-#pragma member_alignment save
-#pragma nomember_alignment longword
-struct item_list_3
-{
-  unsigned short len;
-  unsigned short code;
-  void * bufadr;
-  unsigned short * retlen;
-};
-
-#pragma member_alignment
-
-int
-LIB$GET_SYMBOL (const struct dsc$descriptor_s * symbol,
-                struct dsc$descriptor_s * value,
-                unsigned short * value_len,
-                unsigned long * table);
+#include <lib$routines.h>
 
 #define MAX_DCL_SYMBOL_LEN (255)
 #if __CRTL_VER >= 70302000 && !defined(__VAX)
@@ -121,17 +105,17 @@ char * vms_get_foreign_cmd(const char * exec_name) {
 
     status = LIB$GET_SYMBOL (&name_desc, &value_desc,
                                &value_len, &symtbl);
-    if ($VMS_STATUS_SUCCESS(status) && (value_len > 0)) {
+    if ($VMS_STATUS_SUCCESS(status) && (value_len != 0)) {
         value[value_len] = 0;
 
         /* Look for leading $ character */
-        if (value[0] = '$') {
+        if (value[0] == '$') {
             int j;
             /* Look for end of word, discard parameters */
             j = 0;
             while (value[j] != 0) {
                 if (isspace(value[j])) {
-                    value[j] == 0;
+                    value[j] = 0;
                     break;
                 }
                 j++;

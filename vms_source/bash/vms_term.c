@@ -41,6 +41,8 @@
  *
  ***************************************************************************/
 
+#define __NEW_STARLET 1
+
 #include "vms_term.h"
 
 #include <stdlib.h>
@@ -49,15 +51,14 @@
 #ifdef __DECC
 #pragma message save
     /* Bugs in smg*.h routines */
-#pragma message disable dollarid
-    /* Bug in smgdef_upcase.h */
 #pragma message disable nestedcomment
     /* Bug in smgdef_upcase.h */
-#pragma message disable misalgndstrct
-    /* Bug in smgdef_upcase.h */
 #endif
+
 #include <smgdef.h>
 #include <smgtrmptr.h>
+#include <smg$routines.h>
+
 #ifdef __DECC
 #pragma message restore
 #endif
@@ -68,16 +69,13 @@
 #include <ssdef.h>
 #include <stsdef.h>
 #include <ttdef.h>
+#include <starlet.h>
 
 #ifdef __DECC
 /* We are using mulitcharacter constants for readability */
 #pragma message disable multichar
 /* We are using VMS constants with dollarid */
 #pragma message disable dollarid
-/* The following is just noise */
-#pragma message disable valuepres
-#pragma message disable pragma
-#pragma message disable hexoctunsign
 #endif
 
 #pragma member_alignment save
@@ -91,10 +89,10 @@ struct sense_st {
     unsigned char class;
     unsigned char type;
     unsigned short term_width;
-    unsigned long tt_def;     /* Page length and characteristics */
-    unsigned long tt2_def;    /* Extended terminal characteristics */
-#if defined (__VMS_VER) && __VMS_VER >=80300000
-    unsigned long tt3_def;	/* More extended terminal characteristics */
+    unsigned int tt_def;     /* Page length and characteristics */
+    unsigned int tt2_def;    /* Extended terminal characteristics */
+#if defined (__VMS_VER) && __VMS_VER >= 80300000
+    unsigned int tt3_def;	/* More extended terminal characteristics */
 #endif
 };
 
@@ -117,37 +115,6 @@ struct ttyread_iosb_st {
 
 #pragma member_alignment restore
 
-
-int SMG$INIT_TERM_TABLE(const struct dsc$descriptor_s * dev_name,
-			unsigned long * vms_termtable_entry);
-
-int SMG$GET_NUMERIC_DATA(const unsigned long * vms_termtable_entry,
-			 const unsigned long * request_code,
-			 const long * return_value);
-
-int SMG$GET_TERM_DATA(const unsigned long * vms_termtable_entry,
-		      const unsigned long * request_code,
-		      const long * max_buffer_length,
-		      long * return_length,
-		      const char * capability_data,
-		      const unsigned long *input_args);
-
-int SYS$ASSIGN(
-	const struct dsc$descriptor_s * devnam,
-	unsigned short * chan,
-	unsigned long acmode,
-	const struct dsc$descriptor_s * mbxnam,
-	unsigned long flags);
-
-int SYS$DASSGN(unsigned short chan);
-
-unsigned long SYS$QIOW(
-	unsigned long efn,
-	unsigned short chan,
-	unsigned long func,
-	void * iosb,
-	void (* astadr)(void *),
-	...);
 
 /* Simple wrapper for SYS$ASSIGN(SYS$OUTPUT, chan) */
 static int sys_assign_stdout(unsigned short *channel)
@@ -212,7 +179,7 @@ extern struct vms_kb_st vms_keyboard = {VMS_NOCRMODE, 0, 0};
  */
 int vms_getch(struct vms_kb_st *vms_kb) {
 
-    unsigned long iofunc;
+    unsigned int iofunc;
     int ret_char;
     struct ttyread_iosb_st read_iosb;
     int read_limit;
@@ -270,11 +237,11 @@ int vms_getch(struct vms_kb_st *vms_kb) {
 		EFN$C_ENF,
 		vms_kb->termchan,
 		iofunc,
-		&read_iosb,
+		(struct _iosb *)&read_iosb,
 		NULL,
-		NULL,
+		0,
 		rbuffer,
-                read_limit, 0, 0, 0, 0, 0);
+                read_limit, 0, 0, 0, 0);
 
     if (!$VMS_STATUS_SUCCESS(status)) {
 	return ERR;
@@ -329,7 +296,7 @@ int vms_getch(struct vms_kb_st *vms_kb) {
 }
 
 
-static unsigned long _vms_termtable_entry = 0;
+static unsigned int _vms_termtable_entry = 0;
 
 /* Check caching for getting terminal characteristics */
 static int term_lines = -1;
@@ -486,7 +453,7 @@ enum smg_actions {SMG_UNKNOWN,	 /* Not a known SMG string */
 /* Translate a termcap code to an SMG$K_ value */
 static int vms_get_smg_request_code(
     const char * id,
-    unsigned long * smg_code,
+    int * smg_code,
     enum smg_actions * smg_action) {
 
     int ret_stat = SS$_NORMAL;
@@ -1300,12 +1267,12 @@ static char _vms_tgoto_buffer[VMS_TERM_BUFFER_LEN + 1];
 /* Return the escape sequence to move to specific position */
 char * vms_tgoto(char * id, int col, int row) {
 
-    int status;
-    unsigned long request_code;
+    unsigned int status;
+    int request_code;
     int ret_stat;
-    unsigned long input[3];
-    long return_length;
-    const long buffer_len = VMS_TERM_BUFFER_LEN;
+    unsigned int input[3];
+    int return_length;
+    int buffer_len = VMS_TERM_BUFFER_LEN;
     enum smg_actions smg_action;
 
     if ((_vms_termtable_entry == 0) || (id == NULL)) {
@@ -1339,7 +1306,7 @@ char * vms_tgoto(char * id, int col, int row) {
 			       &request_code,
 			       &buffer_len,
 			       &return_length,
-			       _vms_tgoto_buffer,
+			       (unsigned int *)_vms_tgoto_buffer,
 			       input);
 
 
@@ -1408,11 +1375,11 @@ struct sense_st term_char;
 		EFN$C_ENF,
 		chan,
 		IO$_SENSEMODE,
-		&sense_iosb,
+		(struct _iosb *)&sense_iosb,
 		NULL,
-		NULL,
+		0,
 		&term_char,
-                sizeof term_char, 0, 0, 0, 0, 0);
+                sizeof term_char, 0, 0, 0, 0);
 
     if (!$VMS_STATUS_SUCCESS(status) ||
 	!$VMS_STATUS_SUCCESS(sense_iosb.status)) {
@@ -1430,13 +1397,14 @@ struct sense_st term_char;
 int vms_tgetnum(char * id) {
 
     int status;
-    unsigned long request_code;
-    long return_value;
+    int request_code;
+    unsigned int u_request_code;
+    int return_value;
     enum smg_actions smg_action;
-    long return_length;
-    const long buffer_len = VMS_TERM_BUFFER_LEN;
+    int return_length;
+    int buffer_len = VMS_TERM_BUFFER_LEN;
     char return_buffer[VMS_TERM_BUFFER_LEN + 1];
-    unsigned long input[1];
+    unsigned int input[1];
     unsigned short id_code;
     int ret_val;
     unsigned short term_chan;
@@ -1468,7 +1436,7 @@ int vms_tgetnum(char * id) {
 				       &request_code,
 				       &buffer_len,
 				       &return_length,
-				       return_buffer,
+				       (unsigned int *)return_buffer,
 				       input);
 	    if ($VMS_STATUS_SUCCESS(status) && (return_length > 0)) {
 		return 2;
@@ -1520,8 +1488,9 @@ int vms_tgetnum(char * id) {
     return_value = -1;
 
     /* Look it up with SMG */
+    u_request_code = (unsigned int)request_code;
     status = SMG$GET_NUMERIC_DATA(&_vms_termtable_entry,
-				  &request_code,
+				  &u_request_code,
 				  &return_value);
 
     /* We have a return value */
@@ -1540,11 +1509,11 @@ char *vms_tgetstr(char * id, char **area) {
  */
 
     int status;
-    unsigned long request_code;
+    int request_code;
     int ret_stat;
-    unsigned long input[3];
-    long return_length;
-    const long buffer_len = VMS_TERM_BUFFER_LEN;
+    unsigned int input[3];
+    int return_length;
+    int buffer_len = VMS_TERM_BUFFER_LEN;
     enum smg_actions smg_action;
     char * return_buffer = *area;
 
@@ -1605,7 +1574,7 @@ char *vms_tgetstr(char * id, char **area) {
 			       &request_code,
 			       &buffer_len,
 			       &return_length,
-			       return_buffer,
+			       (unsigned int *)return_buffer,
 			       input);
 
 
@@ -1634,13 +1603,14 @@ char *vms_tgetstr(char * id, char **area) {
 int vms_tgetflag(char * id) {
 
     int status;
-    unsigned long request_code;
+    int request_code;
+    unsigned int u_request_code;
     int ret_stat;
-    unsigned long input[3];
-    long return_length;
-    const long buffer_len = VMS_TERM_BUFFER_LEN;
+    unsigned int input[3];
+    int return_length;
+    int buffer_len = VMS_TERM_BUFFER_LEN;
     char return_buffer[VMS_TERM_BUFFER_LEN + 1];
-    long return_value;
+    int return_value;
     enum smg_actions smg_action;
     unsigned short id_code;
 
@@ -1676,7 +1646,7 @@ int vms_tgetflag(char * id) {
 				   &request_code,
 				   &buffer_len,
 				   &return_length,
-				   return_buffer,
+				   (unsigned int *)return_buffer,
 				   input);
 	if ($VMS_STATUS_SUCCESS(status) && (return_length > 0)) {
 	    if (smg_action == SMG_STRING_NEG) {
@@ -1706,9 +1676,10 @@ int vms_tgetflag(char * id) {
 
     /* SMG does not update if value not found */
     id_code = id[0] + (id[1] * 256);
+    u_request_code = (unsigned int)request_code;
     return_value = -1;
     status = SMG$GET_NUMERIC_DATA(&_vms_termtable_entry,
-				  &request_code,
+				  &u_request_code,
 				  &return_value);
 
     if ($VMS_STATUS_SUCCESS(status)) {
@@ -1726,10 +1697,10 @@ int vms_tgetflag(char * id) {
 		    /* So assume if not scope than overstrike is available */
 		    /* This hack will allow correct operation if the */
 		    /* SMGTERMS.TXT is fixed. */
-		    request_code = SMG$K_SCOPE;
+		    u_request_code = SMG$K_SCOPE;
 		    return_value = -1;
 		    status = SMG$GET_NUMERIC_DATA(&_vms_termtable_entry,
-						  &request_code,
+						  &u_request_code,
 						  &return_value);
 		    if ($VMS_STATUS_SUCCESS(status)) {
 			if (return_value == 0) {

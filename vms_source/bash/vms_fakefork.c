@@ -51,11 +51,15 @@
 /* For debugging routines */
 #include <unixio.h>
 
+#define __NEW_STARLET 1
 
 #include <jpidef.h>
 #include <stsdef.h>
 #include <efndef.h>
 #include <descrip.h>
+#include <iledef.h>
+#include <iosbdef.h>
+#include <starlet.h>
 
 /* These three are noise that the compiler generate for VMS specific code
  * in the more stricter modes
@@ -63,30 +67,6 @@
 #pragma message disable pragma
 #pragma message disable dollarid
 #pragma message disable valuepres
-
-#pragma member_alignment save
-#pragma nomember_alignment longword
-struct item_list_3 {
-	unsigned short len;
-	unsigned short code;
-	void * bufadr;
-	unsigned short * retlen;
-};
-
-#pragma member_alignment
-
-#pragma message save
-#pragma message disable noparmlist
-int SYS$GETJPIW
-       (unsigned long efn,
-	pid_t * pid,
-	const struct dsc$descriptor_s * prcnam,
-	const struct item_list_3 * itmlst,
-	void * iosb,
-	void (* astadr)(__unknown_params),
-	void * astprm,
-	void * nullarg);
-#pragma message restore
 
 /* Referenced routines from module NOJOBS.C */
 extern void set_pid_status (int, int);
@@ -168,10 +148,10 @@ static struct vms_pid_stack *stp_PidStack=NULL;
 char *
 vms_getjpi_imagename(void) {
 
-struct item_list_3 itemlist[2];
+struct _ile3 itemlist[2];
 int status;
 unsigned short length;
-unsigned short jpi_iosb[4];
+struct _iosb jpi_iosb;
 char my_imagename[256];
 
     if (vms_imagename[0] != 0) {
@@ -180,24 +160,23 @@ char my_imagename[256];
 
      /* Verify that the PID is valid */
     /*------------------------------*/
-    itemlist[0].len = 255;
-    itemlist[0].code = JPI$_IMAGNAME;
-    itemlist[0].bufadr = my_imagename;
-    itemlist[0].retlen = &length;
-    itemlist[1].len = 0;
-    itemlist[1].code = 0;
+    itemlist[0].ile3$w_length = 255;
+    itemlist[0].ile3$w_code = JPI$_IMAGNAME;
+    itemlist[0].ile3$ps_bufaddr = my_imagename;
+    itemlist[0].ile3$ps_retlen_addr = &length;
+    itemlist[1].ile3$w_length = 0;
+    itemlist[1].ile3$w_code = 0;
 
     status = SYS$GETJPIW
 	   (EFN$C_ENF,
 	    0,
 	    NULL,
 	    itemlist,
-	    jpi_iosb,
+	    &jpi_iosb,
 	    NULL,
-	    0,
 	    0);
 
-    if ($VMS_STATUS_SUCCESS(status) && $VMS_STATUS_SUCCESS(jpi_iosb[0])) {
+    if ($VMS_STATUS_SUCCESS(status) && $VMS_STATUS_SUCCESS(jpi_iosb.iosb$w_status)) {
     char * unix_name;
 	my_imagename[length] = 0;
 
@@ -938,7 +917,7 @@ char *vms_copy_path_data(char *cpdata)
    }
    
 VMS_BASH_ENVIRON *
-vms_save_bash_environ(int subshell_save) {
+vms_save_bash_environ(unsigned int subshell_save) {
     VMS_BASH_ENVIRON *buf;
     buf = malloc(sizeof (VMS_BASH_ENVIRON));
     buf->sanity_count = VMS_SAVE_SANITY_VALUE;
@@ -1059,7 +1038,7 @@ int vms_fake_fork_exit(int status) {
        }
     else
 #if !defined(__VAX)
-       __posix_exit(status);
+       exit(status);    /* this will turn into __posix_exit(status) */
 #else
        decc$exit(status);
 #endif

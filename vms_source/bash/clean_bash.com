@@ -79,6 +79,10 @@ $   file = "lcl_root:config.log"
 $   if f$search(file) .nes. "" then delete 'file';*
 $   file = "lcl_root:config.status"
 $   if f$search(file) .nes. "" then delete 'file';*
+$   file = "lcl_root:gnv$subst.c_first"
+$   if f$search(file) .nes. "" then delete 'file';*
+$   file = "lcl_root:gnv$test.c_first"
+$   if f$search(file) .nes. "" then delete 'file';*
 $   file = "lcl_root:[.sys]param.h"
 $   if f$search(file) .nes. "" then delete 'file';*
 $   file = "lcl_root:[.builtins.sys]param.h"
@@ -266,6 +270,7 @@ $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "FINDCMD"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
+$   if f$search("lcl_root:''file'.c") .nes. "" then delete lcl_root:'file'.c;*
 $   file = "FINDDOMAIN"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
@@ -293,6 +298,7 @@ $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "GENERAL"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
+$   if f$search("lcl_root:''file'.c") .nes. "" then delete lcl_root:'file'.c;*
 $   file = "GETCWD"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
@@ -693,7 +699,16 @@ $   file = "VMS_CRTL_INIT"
 $   if f$search("''file'_BASH.OBJ") .nes. "" then delete 'file'_BASH.OBJ;*
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
+$   file = "VMS_CRTL_VALUES"
+$   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
+$   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "VMS_FAKEFORK"
+$   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
+$   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
+$   file = "VMS_FNAME_TO_UNIX"
+$   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
+$   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
+$   file = "VMS_GET_FOREIGN_CMD"
 $   if f$search("''file'.OBJ") .nes. "" then delete 'file'.OBJ;*
 $   if f$search("''file'.LIS") .nes. "" then delete 'file'.LIS;*
 $   file = "VMS_MAILSTAT"

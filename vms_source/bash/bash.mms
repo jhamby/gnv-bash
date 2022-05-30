@@ -64,10 +64,11 @@ crepository = /repo=lcl_root:[bash.cxx_repository]
 cnames = /name=(as_i,shor)$(crepository)
 clist = /list
 cprefix = /pref=all
-#cnowarn1 = noparmlist,questcompare2,unusedtop,unknownmacro
-#cnowarn2 = intconcastsgn,controlassign,exprnotused,unreachcode
-#cnowarn = $(cnowarn1),$(cnowarn2)
-#cwarn = /warnings=(disable=($(cnowarn)))
+cnowarn1 = questcompare1,unknownmacro,intconstsign,falloffend
+cnowarn2 = boolexprconst,knrfunc,embedcomment,nestedcomment,uninit2
+cnowarn = $(cnowarn1),$(cnowarn2)
+cwarn1 = defunct,obsolescent,questcode,unusedtop
+cwarn = /warnings=(enable=($(cwarn1)),disable=($(cnowarn)))
 #cinc1 = prj_root:[],prj_root:[.include],prj_root:[.lib.intl],prj_root:[.lib.sh]
 cinc2 = /nested=none
 cinc = $(cinc2)
@@ -450,8 +451,7 @@ bash_objs = alias.obj,\
             vms_fname_to_unix.obj,\
 	    vms_mailstat.obj,\
 	    vms_terminal_io.obj,\
-	    vms_term.obj,\
-	    vms_vm_pipe.obj
+	    vms_term.obj
 
 # Nested header files
 #========================
@@ -640,21 +640,21 @@ lcl_root:[bash]support.DIR :
 
 [.support]zecho.obj : [.support]zecho.c $(config_h)
 
-[.support]printenv.exe : [.support]printenv.obj vms_crtl_init.obj
+[.support]printenv.exe : [.support]printenv.obj vms_crtl_init.obj vms_crtl_values.obj
    $(LINK)$(LFLAGS)/exec=$(MMS$TARGET)/DSF=$(MMS$TARGET_NAME) \
-	/MAP=$(MMS$TARGET_NAME) [.support]printenv.obj, []vms_crtl_init.obj
+	/MAP=$(MMS$TARGET_NAME) [.support]printenv.obj, []vms_crtl_init.obj, []vms_crtl_values.obj
 
-[.support]recho.exe : [.support]recho.obj vms_crtl_init.obj
+[.support]recho.exe : [.support]recho.obj vms_crtl_init.obj vms_crtl_values.obj
    $(LINK)$(LFLAGS)/exec=$(MMS$TARGET)/DSF=$(MMS$TARGET_NAME) \
-	/MAP=$(MMS$TARGET_NAME) [.support]recho.obj, []vms_crtl_init.obj
+	/MAP=$(MMS$TARGET_NAME) [.support]recho.obj, []vms_crtl_init.obj, []vms_crtl_values.obj
 
-[.support]xcase.exe : [.support]xcase.obj vms_crtl_init.obj
+[.support]xcase.exe : [.support]xcase.obj vms_crtl_init.obj vms_crtl_values.obj
    $(LINK)$(LFLAGS)/exec=$(MMS$TARGET)/DSF=$(MMS$TARGET_NAME) \
-	/MAP=$(MMS$TARGET_NAME) [.support]xcase.obj, []vms_crtl_init.obj
+	/MAP=$(MMS$TARGET_NAME) [.support]xcase.obj, []vms_crtl_init.obj, []vms_crtl_values.obj
 
-[.support]zecho.exe : [.support]zecho.obj vms_crtl_init.obj
+[.support]zecho.exe : [.support]zecho.obj vms_crtl_init.obj vms_crtl_values.obj
    $(LINK)$(LFLAGS)/exec=$(MMS$TARGET)/DSF=$(MMS$TARGET_NAME) \
-	/MAP=$(MMS$TARGET_NAME) [.support]zecho.obj, []vms_crtl_init.obj
+	/MAP=$(MMS$TARGET_NAME) [.support]zecho.obj, []vms_crtl_init.obj, []vms_crtl_values.obj
 
 lcl_root:[.lib]malloc.DIR :
    $ create/directory/prot=o:rwed lcl_root:[.lib.malloc]
@@ -2803,7 +2803,7 @@ vms_term.obj : vms_term.c vms_term.h
 
 vms_terminal_io.obj : vms_terminal_io.c vms_terminal_io.h
 
-vms_vm_pipe.obj : vms_vm_pipe.c
+#vms_vm_pipe.obj : vms_vm_pipe.c
 
 decw_showdisplay.obj : decw_showdisplay.c
 
@@ -2811,12 +2811,12 @@ decw_showdisplay.obj : decw_showdisplay.c
 #	input.h bashhist.h $(jobs_h) $(alias_h) [.include]maxpath.h \
 #	[.builtins]common.h [.builtins]builtext.h $(trap_h)
 
-vms_crtl_init_bash.obj : vms_crtl_init.c
-	$(CC)$(cflagsx)/define="GNV_UNIX_SHELL=""bash""" \
+vms_crtl_init.obj : vms_crtl_init.c
+	$(CC)$(cflagsx) \
 	/object=$(MMS$TARGET) $(MMS$SOURCE)
 
-vms_crtl_init.obj : vms_crtl_init.c
-	$(CC)$(cflagsx)/define="GNV_UNIX_TOOL=1" \
+vms_crtl_values.obj : vms_crtl_values.c
+	$(CC)$(cflagsx) \
 	/object=$(MMS$TARGET) $(MMS$SOURCE)
 
 temp_stub.obj : temp_stub.c $(config_h)
@@ -2825,7 +2825,8 @@ temp_stub.obj : temp_stub.c $(config_h)
 gnv$bash.exe : $(bash_objs) \
 	   [.builtins]builtins.obj,\
 	   [.builtins]common.obj,\
-           vms_crtl_init_bash.obj \
+           vms_crtl_init.obj,\
+           vms_crtl_values.obj \
            libbuiltins.olb \
            libreadline.olb \
            libglob.olb \
@@ -2837,7 +2838,7 @@ gnv$bash.exe : $(bash_objs) \
 .else
    $(LINK)$(LFLAGS)/exec=$(MMS$TARGET)/DSF=$(MMS$TARGET_NAME) \
 	/MAP=$(MMS$TARGET_NAME) \
-	 $(bash_objs),vms_crtl_init_bash.obj,\
+	 $(bash_objs),vms_crtl_init.obj,vms_crtl_values.obj,\
 	temp_stub.obj,\
 	[.builtins]builtins.obj,\
 	[.builtins]common.obj,\
@@ -2852,7 +2853,8 @@ gnv$bash.exe : $(bash_objs) \
 bashdebug.exe : $(bash_objs), \
 	   [.builtins]builtins.obj,\
 	   [.builtins]common.obj,\
-           vms_crtl_init_bash.obj,\
+           vms_crtl_init.obj,\
+           vms_crtl_values.obj,\
            libbuiltins.olb \
            libreadline.olb \
            libglob.olb \
@@ -2863,7 +2865,7 @@ bashdebug.exe : $(bash_objs), \
 .else
    $(LINK)$(LFLAGS)/debug/exec=$(MMS$TARGET)/DSF=$(MMS$TARGET_NAME) \
 	/MAP=$(MMS$TARGET_NAME) \
-	 $(bash_objs),vms_crtl_init_bash.obj,\
+	 $(bash_objs),vms_crtl_init.obj,vms_crtl_values.obj,\
 	temp_stub.obj,\
 	[.builtins]builtins.obj,\
 	[.builtins]common.obj,\

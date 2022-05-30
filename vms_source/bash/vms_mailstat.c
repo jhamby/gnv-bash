@@ -24,17 +24,22 @@
  *
  */
 
+#define __NEW_STARLET 1
+
 #include <stat.h>
 #include <pwd.h>
 #include <unistd.h>
 #include <string.h>
-#include <descrip.h>
 #include <efndef.h>
+#include <iledef.h>
+#include <iosbdef.h>
 #include <jpidef.h>
 #include <errno.h>
 #include <maildef.h>
+#include <mail$routines.h>
 #include <namdef.h>
 #include <stsdef.h>
+#include <starlet.h>
 #include <unixlib.h>
 #include <stdio.h>
 #define VMS_MAXRSS NAM$C_MAXRSS
@@ -49,55 +54,6 @@ int
 mailstat(const char *path, struct stat *st);
 #endif
 
-#pragma member_alignment save
-#pragma nomember_alignment longword
-struct item_list_3 {
-	unsigned short len;
-	unsigned short code;
-	void * bufadr;
-	unsigned short * retlen;
-};
-#pragma member_alignment restore
-
-#pragma message save
-#pragma message disable noparmlist
-int SYS$GETJPIW
-       (unsigned long efn,
-	pid_t * pid,
-	const struct dsc$descriptor_s * prcnam,
-	const struct item_list_3 * itmlst,
-	void * iosb,
-	void (* astadr)(__unknown_params),
-	void * astprm,
-	void * nullarg);
-#pragma message restore
-
-int MAIL$USER_BEGIN(unsigned long * context,
-			const struct item_list_3 * in_item_list,
-			const struct item_list_3 * out_item_list);
-
-int MAIL$USER_GET_INFO(unsigned long * context,
-			const struct item_list_3 * in_item_list,
-			const struct item_list_3 * out_item_list);
-
-int MAIL$USER_END(unsigned long * context,
-			const struct item_list_3 * in_item_list,
-			const struct item_list_3 * out_item_list);
-
-
-int MAIL$MAILFILE_BEGIN(unsigned long * context,
-			const struct item_list_3 * in_item_list,
-			const struct item_list_3 * out_item_list);
-
-int MAIL$MAILFILE_INFO_FILE(unsigned long * context,
-			const struct item_list_3 * in_item_list,
-			const struct item_list_3 * out_item_list);
-
-int MAIL$MAILFILE_END(unsigned long * context,
-			const struct item_list_3 * in_item_list,
-			const struct item_list_3 * out_item_list);
-
-
 int
 vms_mail_info(struct stat *st) {
 int status;
@@ -105,35 +61,37 @@ int end_status;
 char full_directory[VMS_MAXRSS + 1];
 char *full_directory_u;
 unsigned short full_directory_len;
-struct item_list_3 out_itemlist[2];
-const struct item_list_3 null_list[] = {{0,0,0,0}};
-unsigned long user_context = 0;
+struct _ile3 out_itemlist[3];
+unsigned int user_context = 0;
 unsigned short new_messages;
 unsigned short new_messages_len;
 
-    out_itemlist[0].code = MAIL$_USER_FULL_DIRECTORY;
-    out_itemlist[0].len = VMS_MAXRSS;
-    out_itemlist[0].bufadr = full_directory;
-    out_itemlist[0].retlen = &full_directory_len;
-    out_itemlist[1].code = MAIL$_USER_NEW_MESSAGES;
-    out_itemlist[1].len = sizeof new_messages;
-    out_itemlist[1].bufadr = &new_messages;
-    out_itemlist[1].retlen = &new_messages_len;
-    out_itemlist[2].code = 0;
-    out_itemlist[2].len = 0;
+    out_itemlist[0].ile3$w_code = MAIL$_USER_FULL_DIRECTORY;
+    out_itemlist[0].ile3$w_length = VMS_MAXRSS;
+    out_itemlist[0].ile3$ps_bufaddr = full_directory;
+    out_itemlist[0].ile3$ps_retlen_addr = &full_directory_len;
+    out_itemlist[1].ile3$w_code = MAIL$_USER_NEW_MESSAGES;
+    out_itemlist[1].ile3$w_length = sizeof new_messages;
+    out_itemlist[1].ile3$ps_bufaddr = &new_messages;
+    out_itemlist[1].ile3$ps_retlen_addr = &new_messages_len;
+    out_itemlist[2].ile3$w_code = 0;
+    out_itemlist[2].ile3$w_length = 0;
 
     /* Start the user context */
-    status = MAIL$USER_BEGIN(&user_context, null_list, null_list);
+    status = MAIL$USER_BEGIN(&user_context, (unsigned int *)&out_itemlist[2],
+			     (unsigned int *)&out_itemlist[2]);
     if (!$VMS_STATUS_SUCCESS(status)) {
 	errno = ENOENT;
 	return -1;
     }
 
     /* Get the mailbox file and new message count */
-    status = MAIL$USER_GET_INFO(&user_context, null_list, out_itemlist);
+    status = MAIL$USER_GET_INFO(&user_context, (unsigned int *)&out_itemlist[2],
+				(unsigned int *)out_itemlist);
 
     /* End the user context and check for errors */
-    end_status = MAIL$USER_END(&user_context, null_list, null_list);
+    end_status = MAIL$USER_END(&user_context, (unsigned int *)&out_itemlist[2],
+			       (unsigned int *)&out_itemlist[2]);
     if (!$VMS_STATUS_SUCCESS(end_status) || !$VMS_STATUS_SUCCESS(status)) {
 	errno = ENOENT;
 	return -1;
@@ -143,7 +101,7 @@ unsigned short new_messages_len;
     /* Which is really all Bash is looking at */
     full_directory[full_directory_len] = 0;
     strcat(full_directory, "mail.mai");
-    if (full_directory_len > 0) {
+    if (full_directory_len != 0) {
 	/* Bash had filename_unix_only active, so need to convert */
 	full_directory_u = decc$translate_vms(full_directory);
 	status = stat(full_directory_u, st);
@@ -190,27 +148,27 @@ int pw_name_len;
 
     /* Cache the username for future checks */
     if (vms_username[0] == 0) {
-	struct item_list_3 itemlist[2];
-	int status;
+	struct _ile3 itemlist[2];
+	unsigned int status;
 	unsigned short length;
-	unsigned short jpi_iosb[4];
+	struct _iosb jpi_iosb;
 
-	itemlist[0].len = VMS_USERNAME_LEN;
-	itemlist[0].code = JPI$_USERNAME;
-	itemlist[0].bufadr = vms_username;
-	itemlist[0].retlen = &length;
-	itemlist[1].len = 0;
-	itemlist[1].code = 0;
+	itemlist[0].ile3$w_length = VMS_USERNAME_LEN;
+	itemlist[0].ile3$w_code = JPI$_USERNAME;
+	itemlist[0].ile3$ps_bufaddr = vms_username;
+	itemlist[0].ile3$ps_retlen_addr = &length;
+	itemlist[1].ile3$w_length = 0;
+	itemlist[1].ile3$w_code = 0;
 
 	status = SYS$GETJPIW(
 		EFN$C_ENF,
 		0,
 		NULL,
 		itemlist,
-		jpi_iosb,
+		&jpi_iosb,
 		NULL,
-		0, 0);
-	if ($VMS_STATUS_SUCCESS(status) && $VMS_STATUS_SUCCESS(jpi_iosb[0])) {
+		0);
+	if ($VMS_STATUS_SUCCESS(status) && $VMS_STATUS_SUCCESS(jpi_iosb.iosb$w_status)) {
 	    int name_len = length;
 	    vms_username[name_len] = 0;
 	    do {

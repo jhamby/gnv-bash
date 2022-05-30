@@ -62,33 +62,28 @@
 #include "vms_getcwd_hack.h"
 char * vms_to_unix(const char * vms_spec);
 
-#include <errno.h>
+#define __NEW_STARLET 1
 #include <stropts.h>
 #include "vms_terminal_io.h"
-#include <stdlib.h>
-#include <stsdef.h>
-#include <descrip.h>
 #include <efndef.h>
-#include <string.h>
 #include <iodef.h>
-#include <unixlib.h>
 #include <ssdef.h>
 /* #include <inttypes.h> */
 /* #include <libdef.h> */
 #include <libclidef.h>
-#define __NEW_STARLET 1
 #include <ttdef.h>
 /* #include <tt2def.h> */
-#if (__CRTL_VER >= 080200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000) && !defined (__VAX)
 #include <tt3def.h>
 #endif
-#include <dirent.h>
-#include <stat.h>
 #include <stdarg.h>
 #include <fcntl.h>
 #include <fscndef.h>
+#include <iledef.h>
+#include <iosbdef.h>
 #include <lnmdef.h>
-
+#include <lib$routines.h>
+#include <starlet.h>
 
 /* Eventually this may need to be conditionally compiled for
  * versions of VMS that do not have it, and also set the size of
@@ -122,35 +117,10 @@ typedef union tt2def TT2DEF;
  * the port of glib.
  */
 
-#pragma message disable pragma
-#pragma message disable dollarid
-#pragma message disable valuepres
-#pragma message disable questcompare2
-
 #pragma member_alignment save
 #pragma nomember_alignment longword
 #pragma message save
 #pragma message disable misalgndmem
-
-/* Generic VMS item list structure */
-struct itmlst_3 {
-  unsigned short int buflen;
-  unsigned short int itmcode;
-  void *bufadr;
-  unsigned short int *retlen;
-};
-
-struct filescan_itmlst_2 {
-    unsigned short length;
-    unsigned short itmcode;
-    char * component;
-};
-
-/* Packed structure for passing terminal information to other processes */
-struct unix_term_log_st {
-  int	version;	/* Sanity check - sizeof struct termios */
-  struct termios unix_termios;
-};
 
 struct tt_framing_st {
     unsigned tt_v_framesize : 4;
@@ -167,7 +137,7 @@ struct tt_framing_st {
 
 
 struct term_mode_iosb_st {
-    unsigned short sts;
+    unsigned short status;
     unsigned char txspeed;
     unsigned char rxspeed;
     unsigned char cr_fill;
@@ -181,86 +151,20 @@ struct term_char_st {
     unsigned short page_width;
     TTDEF ttdef;
     TT2DEF tt2def;
-#if (__CRTL_VER >= 080200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000) && !defined (__VAX)
     TT3DEF tt3def;
 #endif
 };
 
-struct term_speed_st {
-    unsigned char txspeed;
-    unsigned char rxspeed;
-    unsigned short speed_fill_mbz;
-};
-
-struct term_fill_st {
-    unsigned short cr_fill;
-    unsigned short lf_fill;
-};
-
 struct term_read_iosb_st {
-    unsigned short sts;
+    unsigned short status;
     unsigned short count;
     unsigned short terminator;
     unsigned short terminator_count;
 };
 
-struct term_write_iosb_st {
-    unsigned short sts;
-    unsigned short count;
-    unsigned short unknown1;
-    unsigned short unknown2;
-};
-
 #pragma message restore
 #pragma member_alignment restore
-
-int LIB$DISABLE_CTRL(const unsigned long * new_mask,
-		     unsigned long * old_mask);
-
-int LIB$ENABLE_CTRL(const unsigned long * new_mask,
-		    unsigned long * old_mask);
-
-int LIB$SIGNAL(int);
-
-int SYS$ASSIGN(
-	const struct dsc$descriptor_s * devnam,
-        unsigned short * chan,
-        unsigned long acmode,
-        const struct dsc$descriptor_s * mbxnam,
-        unsigned long flags);
-
-int   SYS$CRELNM(
-	const unsigned long * attr,
-	const struct dsc$descriptor_s * table_dsc,
-	const struct dsc$descriptor_s * name_dsc,
-	const unsigned char * acmode,
-	const struct itmlst_3 * item_list);
-
-int SYS$DASSGN(unsigned short chan);
-
-int SYS$FILESCAN
-   (const struct dsc$descriptor_s * srcstr,
-    struct filescan_itmlst_2 * valuelist,
-    unsigned long * fldflags,
-    struct dsc$descriptor_s *auxout,
-    unsigned short * retlen);
-
-unsigned long SYS$QIOW(
-	unsigned long efn,
-        unsigned short chan,
-        unsigned long func,
-        void * iosb,
-        void (* astadr)(void *),
-        ...);
-
-int SYS$READEF(unsigned long efn, unsigned long * state);
-
-int   SYS$TRNLNM(
-	const unsigned long * attr,
-	const struct dsc$descriptor_s * table_dsc,
-	struct dsc$descriptor_s * name_dsc,
-	const unsigned char * acmode,
-	const struct itmlst_3 * item_list);
 
 struct vms_info_st {
 	unsigned short channel;		/* VMS channel assigned */
@@ -650,11 +554,11 @@ int vmsmode_chdir(const char * newdir) {
 char * vms_crtl_searchlist_getcwd_hack(void) {
 
     const $DESCRIPTOR(table_desc, "LNM$FILE_DEV");
-    const unsigned long attr = LNM$M_CASE_BLIND;
+    unsigned int attr = LNM$M_CASE_BLIND;
     struct dsc$descriptor_s path_desc;
     int status;
-    unsigned long field_flags;
-    struct filescan_itmlst_2 fs_list[5];
+    unsigned int field_flags;
+    struct _ile2 fs_list[5];
     char * volume;
     char * name;
     int name_len;
@@ -682,60 +586,61 @@ char * vms_crtl_searchlist_getcwd_hack(void) {
     /* I just do not like uninitialized input values */
 
     /* Sanity check, this must be the same length as input */
-    fs_list[FS_FULL].itmcode = FSCN$_FILESPEC;
-    fs_list[FS_FULL].length = 0;
-    fs_list[FS_FULL].component = NULL;
+    fs_list[FS_FULL].ile2$w_code = FSCN$_FILESPEC;
+    fs_list[FS_FULL].ile2$w_length = 0;
+    fs_list[FS_FULL].ile2$ps_bufaddr = NULL;
 
     /* Only device and dir should be present */
-    fs_list[FS_DEV].itmcode = FSCN$_DEVICE;
-    fs_list[FS_DEV].length = 0;
-    fs_list[FS_DEV].component = NULL;
+    fs_list[FS_DEV].ile2$w_code = FSCN$_DEVICE;
+    fs_list[FS_DEV].ile2$w_length = 0;
+    fs_list[FS_DEV].ile2$ps_bufaddr = NULL;
 
     /* we need any root and directory */
-    fs_list[FS_ROOT].itmcode = FSCN$_ROOT;
-    fs_list[FS_ROOT].length = 0;
-    fs_list[FS_ROOT].component = NULL;
+    fs_list[FS_ROOT].ile2$w_code = FSCN$_ROOT;
+    fs_list[FS_ROOT].ile2$w_length = 0;
+    fs_list[FS_ROOT].ile2$ps_bufaddr = NULL;
 
-    fs_list[FS_DIR].itmcode = FSCN$_DIRECTORY;
-    fs_list[FS_DIR].length = 0;
-    fs_list[FS_DIR].component = NULL;
+    fs_list[FS_DIR].ile2$w_code = FSCN$_DIRECTORY;
+    fs_list[FS_DIR].ile2$w_length = 0;
+    fs_list[FS_DIR].ile2$ps_bufaddr = NULL;
 
     /* End the list */
-    fs_list[FS_END].itmcode = 0;
-    fs_list[FS_END].length = 0;
-    fs_list[FS_END].component = NULL;
+    fs_list[FS_END].ile2$w_code = 0;
+    fs_list[FS_END].ile2$w_length = 0;
+    fs_list[FS_END].ile2$ps_bufaddr = NULL;
 
     status = SYS$FILESCAN(
-        (const struct dsc$descriptor_s *)&path_desc,
+        (struct dsc$descriptor_s *)&path_desc,
         fs_list, &field_flags, NULL, NULL);
 
     if ($VMS_STATUS_SUCCESS(status) &&
-        (fs_list[FS_FULL].length == path_desc.dsc$w_length) &&
-        (fs_list[FS_DEV].length != 0)) {
+        (fs_list[FS_FULL].ile2$w_length == path_desc.dsc$w_length) &&
+        (fs_list[FS_DEV].ile2$w_length != 0)) {
 
         /* Check if device is a search list */
         {
             struct dsc$descriptor_s dev_desc;
-            struct itmlst_3 item_list[3];
+            struct _ile3 item_list[3];
             int max_index;
             unsigned short max_index_len;
             int status;
             int dir_len;
 
-            item_list[0].buflen = 4;
-            item_list[0].itmcode = LNM$_MAX_INDEX;
-            item_list[0].bufadr = &max_index;
-            item_list[0].retlen = &max_index_len;
+            item_list[0].ile3$w_length = 4;
+            item_list[0].ile3$w_code = LNM$_MAX_INDEX;
+            item_list[0].ile3$ps_bufaddr = &max_index;
+            item_list[0].ile3$ps_retlen_addr = &max_index_len;
 
-            item_list[1].buflen = 0;
-            item_list[1].itmcode = 0;
+            item_list[1].ile3$w_length = 0;
+            item_list[1].ile3$w_code = 0;
 
-            dev_desc.dsc$w_length = fs_list[FS_DEV].length - 1;
-            dev_desc.dsc$a_pointer = fs_list[FS_DEV].component;
+            dev_desc.dsc$w_length = fs_list[FS_DEV].ile2$w_length - 1;
+            dev_desc.dsc$a_pointer = fs_list[FS_DEV].ile2$ps_bufaddr;
             dev_desc.dsc$b_dtype = DSC$K_DTYPE_T;
             dev_desc.dsc$b_class = DSC$K_CLASS_S;
 
-            status = SYS$TRNLNM(&attr, &table_desc, &dev_desc, 0, item_list);
+            status = SYS$TRNLNM(&attr, (struct dsc$descriptor_s *)&table_desc,
+				&dev_desc, 0, item_list);
             if ($VMS_STATUS_SUCCESS(status) && (max_index > 0)) {
 
                 int cur_index;
@@ -762,24 +667,25 @@ char * vms_crtl_searchlist_getcwd_hack(void) {
                     int fs_dir_len;
 
                     dir_exists = 0;
-                    item_list[0].buflen = 4;
-                    item_list[0].itmcode = LNM$_INDEX;
-                    item_list[0].bufadr = &cur_index;
-                    item_list[0].retlen = 0;
+                    item_list[0].ile3$w_length = 4;
+                    item_list[0].ile3$w_code = LNM$_INDEX;
+                    item_list[0].ile3$ps_bufaddr = &cur_index;
+                    item_list[0].ile3$ps_retlen_addr = 0;
 
-                    item_list[1].buflen = MAX_DIR_PATH;
-                    item_list[1].itmcode = LNM$_STRING;
-                    item_list[1].bufadr = new_dir_path;
-                    item_list[1].retlen = &new_dev_len;
+                    item_list[1].ile3$w_length = MAX_DIR_PATH;
+                    item_list[1].ile3$w_code = LNM$_STRING;
+                    item_list[1].ile3$ps_bufaddr = new_dir_path;
+                    item_list[1].ile3$ps_retlen_addr = &new_dev_len;
 
-                    item_list[2].buflen = 0;
-                    item_list[2].itmcode = 0;
+                    item_list[2].ile3$w_length = 0;
+                    item_list[2].ile3$w_code = 0;
 
-                    fs_dir_len = fs_list[FS_ROOT].length +
-                        fs_list[FS_DIR].length;
-                    status = SYS$TRNLNM(&attr, &table_desc, &dev_desc,
-                                        0, item_list);
-                    if ($VMS_STATUS_SUCCESS(status) && (new_dev_len > 0) &&
+                    fs_dir_len = fs_list[FS_ROOT].ile2$w_length +
+                        fs_list[FS_DIR].ile2$w_length;
+                    status = SYS$TRNLNM(&attr,
+					(struct dsc$descriptor_s *)&table_desc,
+					&dev_desc, 0, item_list);
+                    if ($VMS_STATUS_SUCCESS(status) && (new_dev_len != 0) &&
                         ((new_dev_len + fs_dir_len) < MAX_DIR_PATH)) {
                         struct stat st_buf;
                         int st_result;
@@ -787,20 +693,20 @@ char * vms_crtl_searchlist_getcwd_hack(void) {
 
                         new_dir_path[new_dev_len] = 0;
                         cur_len = new_dev_len;
-                        if (fs_list[FS_ROOT].length > 0) {
+                        if (fs_list[FS_ROOT].ile2$w_length != 0) {
                             strncat(new_dir_path,
-                                fs_list[FS_ROOT].component,
-                                fs_list[FS_ROOT].length);
-                            cur_len += fs_list[FS_ROOT].length;
+                                fs_list[FS_ROOT].ile2$ps_bufaddr,
+                                fs_list[FS_ROOT].ile2$w_length);
+                            cur_len += fs_list[FS_ROOT].ile2$w_length;
                             new_dir_path[cur_len] = 0;
                         }
 
                         /* This should always be > 0 */
-                        if (fs_list[FS_DIR].length > 0) {
+                        if (fs_list[FS_DIR].ile2$w_length != 0) {
                             strncat(new_dir_path,
-                                fs_list[FS_DIR].component,
-                                fs_list[FS_DIR].length);
-                            cur_len += fs_list[FS_DIR].length;
+                                fs_list[FS_DIR].ile2$ps_bufaddr,
+                                fs_list[FS_DIR].ile2$w_length);
+                            cur_len += fs_list[FS_DIR].ile2$w_length;
                             new_dir_path[cur_len] = 0;
                         }
 
@@ -891,7 +797,7 @@ int vms_fchdir(int fd) {
                 info->path = strdup(".");
                 if (info->path == NULL) {
                     free(info->vmscwd);
-                    info->vmscwd == NULL;
+                    info->vmscwd = NULL;
                     errno = ENOMEM;
                     return -1;
                 }
@@ -1202,7 +1108,7 @@ struct vms_info_st * info;
         errno = EIO;
         return -1;
     }
-    if (info->ref_cnt > 0) {
+    if (info->ref_cnt != 0) {
 	/* We found it */
 	*channel = info->channel;
 
@@ -1356,12 +1262,12 @@ struct term_mode_iosb_st mode_iosb;
 			   (EFN$C_ENF,
 			    term_array[i].channel,
 			    IO$_SENSEMODE | IO$M_TYPEAHDCNT,
-			    &mode_iosb,
+			    (struct _iosb*)&mode_iosb,
 			    NULL,
-			    NULL,
+			    0,
 			    &typeahead, 8, 0, 0, 0, 0);
 	    if ($VMS_STATUS_SUCCESS(status) &&
-		$VMS_STATUS_SUCCESS(mode_iosb.sts)) {
+		$VMS_STATUS_SUCCESS(mode_iosb.status)) {
 		if (typeahead.numchars != 0) {
 		    term_array[i].fd_desc_ptr->revents =
 			term_array[i].fd_desc_ptr->events & POLL_IN;
@@ -1408,9 +1314,9 @@ struct mbx_gmif_iosb_st {
 			   (EFN$C_ENF,
 			    pipe_array[i].channel,
 			    IO$_SENSEMODE,
-			    &mbx_iosb,
+			    (struct _iosb*)&mbx_iosb,
 			    NULL,
-			    NULL,
+			    0,
 			    0, 0, 0, 0, 0, 0);
 	    if ($VMS_STATUS_SUCCESS(status) &&
 		$VMS_STATUS_SUCCESS(mbx_iosb.sts)) {
@@ -1447,7 +1353,7 @@ static int vms_poll_x11_efn(const struct vms_pollfd_st * efn_array, int xi)
 int i;
 int ret_stat;
 int status;
-unsigned long state;
+unsigned int state;
 
     ret_stat = 0;
 
@@ -1603,7 +1509,7 @@ int vms_term_qio_tcgetattr(struct vms_info_st * info,
 int status;
 struct term_mode_iosb_st * mode_iosb;
 struct term_char_st * termchar;
-const unsigned long newmask = 0;
+unsigned int newmask = 0;
 unsigned int opost_active = 0;
 unsigned int any_fill = 0;
 unsigned int cflag_active = 0;
@@ -1644,12 +1550,12 @@ int ret_stat = 0;
        (EFN$C_ENF,
 	info->channel,
 	IO$_SENSEMODE,
-	info->vms_iosb,
+	(struct _iosb *)info->vms_iosb,
 	NULL,
-	NULL,
+	0,
 	termchar, sizeof(struct term_char_st), 0, 0, 0, 0);
     if ($VMS_STATUS_SUCCESS(status) &&
-	$VMS_STATUS_SUCCESS(mode_iosb->sts)) {
+	$VMS_STATUS_SUCCESS(mode_iosb->status)) {
 	    /* We have data */
 	    ret_stat = 0;
     } else {
@@ -1806,7 +1712,7 @@ int ret_stat = 0;
     }
 
 #ifdef __USE_BSD
-#if (__CRTL_VER >= 080200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000) && !defined (__VAX)
     if (termchar->tt3def.tt3$v_rts_flow) {
         my_attr->c_cflag |= CRTSCTS;	/* VMS 8.2 has CTRCTS flow control */
 	cflag_active = 1;
@@ -1881,7 +1787,7 @@ int ret_stat = 0;
     my_attr->c_cc[VEOL2] = 0;		/* Not used with VMS/Linux */
 #endif
     my_attr->c_cc[VERASE] = 127;	/* VMS default is DEL */
-#if (__CRTL_VER >= 080200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000) && !defined (__VAX)
     if (termchar->tt3def.tt3$v_bs) {
 	my_attr->c_cc[VERASE] = 8;	/* VMS 8.2 can set BS */
     }
@@ -1944,8 +1850,8 @@ int vms_term_qio_tcsetattr(struct vms_info_st * info,
 int status;
 struct term_mode_iosb_st * mode_iosb;
 struct term_char_st * termchar;
-const unsigned long newmask = LIB$M_CLI_CTRLT;
-unsigned long oldmask;
+unsigned int newmask = LIB$M_CLI_CTRLT;
+unsigned int oldmask;
 int is_modem;
 int is_scope;
 int ret_stat;
@@ -2095,7 +2001,7 @@ struct term_mode_iosb_st set_mode_iosb;
 
 #ifdef __USE_BSD
 	/* VMS 8.2 has CTRCTS flow control */
-#if (__CRTL_VER >= 080200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000) && !defined (__VAX)
 	if ((my_attr->c_cflag & CRTSCTS) != 0) {
 	    termchar->tt3def.tt3$v_rts_flow = 1;
 	} else {
@@ -2189,7 +2095,7 @@ struct term_mode_iosb_st set_mode_iosb;
 /*    my_attr->c_cc[VEOL2] = 0; */	/* Not used with VMS/Linux */
 #endif
 /*    my_attr->c_cc[VERASE] = 127; */	/* VMS default is DEL */
-#if (__CRTL_VER >= 080200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000) && !defined (__VAX)
     if (my_attr->c_cc[VERASE] == 8) {	/* VMS 8.2 can set BS */
     	termchar->tt3def.tt3$v_bs = 1;
     } else {
@@ -2226,13 +2132,13 @@ struct term_mode_iosb_st set_mode_iosb;
        (EFN$C_ENF,
 	info->channel,
 	IO$_SETMODE,
-	&set_mode_iosb,
+	(struct _iosb *)&set_mode_iosb,
 	NULL,
-	NULL,
+	0,
 	termchar, sizeof(struct term_char_st),
 	0, 0, 0, 0);
     if ($VMS_STATUS_SUCCESS(status) &&
-	$VMS_STATUS_SUCCESS(set_mode_iosb.sts)) {
+	$VMS_STATUS_SUCCESS(set_mode_iosb.status)) {
 
 	    /* We set the data, cache it */
 	    info->term_attr->c_iflag = my_attr->c_iflag;
@@ -2281,12 +2187,12 @@ int command;
        (EFN$C_ENF,
 	info->channel,
 	command,
-	&read_iosb,
+	(struct _iosb *)&read_iosb,
 	NULL,
-	NULL,
+	0,
 	buf, nbytes, 0, 0, 0, 0);
     if ($VMS_STATUS_SUCCESS(status) &&
-	$VMS_STATUS_SUCCESS(read_iosb.sts)) {
+	$VMS_STATUS_SUCCESS(read_iosb.status)) {
 	    /* We have data, include the terminator if it is in the buffer */
 	    ret_stat = read_iosb.count + read_iosb.terminator_count;
     } else {
@@ -2305,7 +2211,7 @@ vms_terminal_qio_write(struct vms_info_st * info,
 		       size_t nbytes) {
 int status;
 int ret_stat;
-struct term_write_iosb_st write_iosb;
+struct _iosb write_iosb;
 
     status = SYS$QIOW
        (EFN$C_ENF,
@@ -2313,12 +2219,12 @@ struct term_write_iosb_st write_iosb;
 	IO$_WRITEVBLK,
 	&write_iosb,
 	NULL,
-	NULL,
-	buf, nbytes, 0, 0, 0, 0);
+	0,
+	(void *)buf, nbytes, 0, 0, 0, 0);
     if ($VMS_STATUS_SUCCESS(status) &&
-	$VMS_STATUS_SUCCESS(write_iosb.sts)) {
+	$VMS_STATUS_SUCCESS(write_iosb.iosb$w_status)) {
 	    /* We have data */
-	    ret_stat = write_iosb.count;
+	    ret_stat = write_iosb.iosb$w_bcnt;
     } else {
 	/* Something really wrong */
 	ret_stat = -1;
@@ -2394,7 +2300,7 @@ int vms_terminal_fileno(FILE * stream) {
 	    unsigned short channel;
 
 	    /* Is this fd still the same terminal? */
-	    if ((vms_info != NULL) && (vms_info[fd].ref_cnt > 0)) {
+	    if ((vms_info != NULL) && (vms_info[fd].ref_cnt != 0)) {
 		char device_name[256];
 		char *retname;
 
@@ -2731,7 +2637,7 @@ const char * select_ignores_invalid_fd = "DECC$SELECT_IGNORES_INVALID_FD";
 		if (utimeleft > 0) {
 		    utimeleft -= sleeptime;
 		    if ((utimeleft <= 0) && (stimeleft != (time_t)-1) &&
-			(stimeleft > 0)) {
+			(stimeleft != 0)) {
 			stimeleft--;
 			utimeleft = 1000 * 1000; /* 1 second */
 		    }

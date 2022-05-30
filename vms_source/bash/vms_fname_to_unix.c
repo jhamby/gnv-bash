@@ -21,22 +21,15 @@
 
  */
 
+#define __NEW_STARLET 1
+
 #include <descrip.h>
 #include <stsdef.h>
-#include <dscdef.h>
+#include <lib$routines.h>
 #include <vms_sys_library/stdlib.h>
 #include <vms_sys_library/string.h>
 #include <vms_sys_library/stdio.h>
 #include <vms_sys_library/unixlib.h>
-
-#define lib$fid_to_name LIB$FID_TO_NAME
-
-int LIB$FID_TO_NAME(const struct dsc$descriptor_s * devnam,
-                    const unsigned short *fid,
-                    const struct dsc$descriptor_s * filespec,
-                    unsigned short *length,
-                    const unsigned short *did,
-                    int * acp_status);
 
 #pragma message disable questcompare
 #ifndef __VAX

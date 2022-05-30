@@ -32,45 +32,16 @@
 #include <ctype.h>
 #include <stdlib.h>
 
+#define __NEW_STARLET 1
+
 #include <descrip.h>
 #include <dvidef.h>
 #include <efndef.h>
 #include <fscndef.h>
+#include <iledef.h>
+#include <iosbdef.h>
 #include <stsdef.h>
-
-#pragma member_alignment save
-#pragma nomember_alignment longword
-struct item_list_3 {
-	unsigned short len;
-	unsigned short code;
-	void * bufadr;
-	unsigned short * retlen;
-};
-
-struct filescan_itmlst_2 {
-    unsigned short length;
-    unsigned short itmcode;
-    char * component;
-};
-
-#pragma member_alignment
-
-int SYS$GETDVIW
-       (unsigned long efn,
-	unsigned short chan,
-	const struct dsc$descriptor_s * devnam,
-	const struct item_list_3 * itmlst,
-	void * iosb,
-	void (* astadr)(unsigned long),
-	unsigned long astprm,
-	void * nullarg);
-
-int SYS$FILESCAN
-   (const struct dsc$descriptor_s * srcstr,
-    struct filescan_itmlst_2 * valuelist,
-    unsigned long * fldflags,
-    struct dsc$descriptor_s *auxout,
-    unsigned short * retlen);
+#include <starlet.h>
 
 void *MemoryAllocations[2]={NULL,NULL};
 
@@ -136,8 +107,8 @@ int exit_value;
     if (argv[0][0] == '/') {
 	char * nextslash;
 	int length;
-	struct item_list_3 itemlist[3];
-	unsigned short dvi_iosb[4];
+	struct _ile3 itemlist[3];
+	struct _iosb dvi_iosb;
 	char alldevnam[64];
 	unsigned short alldevnam_len;
 	struct dsc$descriptor_s devname_dsc;
@@ -146,16 +117,16 @@ int exit_value;
 
 	  /* Get some information about the disk */
 	/*--------------------------------------*/
-	itemlist[0].len = (sizeof alldevnam) - 1;
-	itemlist[0].code = DVI$_ALLDEVNAM;
-	itemlist[0].bufadr = alldevnam;
-	itemlist[0].retlen = &alldevnam_len;
-	itemlist[1].len = (sizeof diskvolnam) - 1 - 5;
-	itemlist[1].code = DVI$_VOLNAM;
-	itemlist[1].bufadr = &diskvolnam[5];
-	itemlist[1].retlen = &diskvolnam_len;
-	itemlist[2].len = 0;
-	itemlist[2].code = 0;
+	itemlist[0].ile3$w_length = (sizeof alldevnam) - 1;
+	itemlist[0].ile3$w_code = DVI$_ALLDEVNAM;
+	itemlist[0].ile3$ps_bufaddr = alldevnam;
+	itemlist[0].ile3$ps_retlen_addr = &alldevnam_len;
+	itemlist[1].ile3$w_length = (sizeof diskvolnam) - 1 - 5;
+	itemlist[1].ile3$w_code = DVI$_VOLNAM;
+	itemlist[1].ile3$ps_bufaddr = &diskvolnam[5];
+	itemlist[1].ile3$ps_retlen_addr = &diskvolnam_len;
+	itemlist[2].ile3$w_length = 0;
+	itemlist[2].ile3$w_code = 0;
 
 	/* Add the prefix for the volume name. */
 	/* SYS$GETDVI will append the volume name to this */
@@ -176,7 +147,7 @@ int exit_value;
 		0,
 		&devname_dsc,
 		itemlist,
-		dvi_iosb,
+		&dvi_iosb,
 		NULL, 0, 0);
 	    if (!$VMS_STATUS_SUCCESS(status)) {
 		/* If the sys$getdviw fails, then this path was passed by */
@@ -186,9 +157,9 @@ int exit_value;
 		printf("sys$getdviw failed with status %d\n", status);
 #endif
 		result = 0;
-	    } else if (!$VMS_STATUS_SUCCESS(dvi_iosb[0])) {
+	    } else if (!$VMS_STATUS_SUCCESS(dvi_iosb.iosb$w_status)) {
 #ifdef TEST_MAIN
-		printf("sys$getdviw failed with iosb %d\n", dvi_iosb[0]);
+		printf("sys$getdviw failed with iosb %d\n", dvi_iosb.iosb$w_status);
 #endif
 		result = 0;
 	    } else {
@@ -240,8 +211,8 @@ int exit_value;
 	/* be an absolute path */
 	struct dsc$descriptor_s path_desc;
 	int status;
-	unsigned long field_flags;
-	struct filescan_itmlst_2 item_list[5];
+	unsigned int field_flags;
+	struct _ile2 item_list[5];
 	char * volume;
 	char * name;
 	int name_len;
@@ -256,36 +227,34 @@ int exit_value;
 	/* I just do not like uninitialized input values */
 
 	/* Sanity check, this must be the same length as input */
-	item_list[0].itmcode = FSCN$_FILESPEC;
-	item_list[0].length = 0;
-	item_list[0].component = NULL;
+	item_list[0].ile2$w_code = FSCN$_FILESPEC;
+	item_list[0].ile2$w_length = 0;
+	item_list[0].ile2$ps_bufaddr = NULL;
 
 	/* If the device is present, then it if a VMS spec */
-	item_list[1].itmcode = FSCN$_DEVICE;
-	item_list[1].length = 0;
-	item_list[1].component = NULL;
+	item_list[1].ile2$w_code = FSCN$_DEVICE;
+	item_list[1].ile2$w_length = 0;
+	item_list[1].ile2$ps_bufaddr = NULL;
 
 	/* we need the program name and type */
-	item_list[2].itmcode = FSCN$_NAME;
-	item_list[2].length = 0;
-	item_list[2].component = NULL;
+	item_list[2].ile2$w_code = FSCN$_NAME;
+	item_list[2].ile2$w_length = 0;
+	item_list[2].ile2$ps_bufaddr = NULL;
 
-	item_list[3].itmcode = FSCN$_TYPE;
-	item_list[3].length = 0;
-	item_list[3].component = NULL;
+	item_list[3].ile2$w_code = FSCN$_TYPE;
+	item_list[3].ile2$w_length = 0;
+	item_list[3].ile2$ps_bufaddr = NULL;
 
 	/* End the list */
-	item_list[4].itmcode = 0;
-	item_list[4].length = 0;
-	item_list[4].component = NULL;
+	item_list[4].ile2$w_code = 0;
+	item_list[4].ile2$w_length = 0;
+	item_list[4].ile2$ps_bufaddr = NULL;
 
-	status = SYS$FILESCAN(
-		(const struct dsc$descriptor_s *)&path_desc,
-		item_list, &field_flags, NULL, NULL);
+	status = SYS$FILESCAN(&path_desc, item_list, &field_flags, NULL, NULL);
 
 	if ($VMS_STATUS_SUCCESS(status) &&
-	   (item_list[0].length == path_desc.dsc$w_length) &&
-	   (item_list[1].length != 0)) {
+	   (item_list[0].ile2$w_length == path_desc.dsc$w_length) &&
+	   (item_list[1].ile2$w_length != 0)) {
 
 	    char * dollar;
 	    int keep_ext;
@@ -308,8 +277,8 @@ int exit_value;
 
 	    /* There may be a xxx$ prefix on the image name.  Linux */
 	    /* programs do not handle that well, so strip the prefix */
-	    name = item_list[2].component;
-	    name_len = item_list[2].length;
+	    name = item_list[2].ile2$ps_bufaddr;
+	    name_len = item_list[2].ile2$w_length;
 	    dollar = strrchr(name, '$');
 	    if (dollar != NULL) {
 		dollar++;
@@ -322,10 +291,10 @@ int exit_value;
 
 	    /* We only keep the extension if it is not ".exe" */
 	    keep_ext = 0;
-	    ext = item_list[3].component;
+	    ext = item_list[3].ile2$ps_bufaddr;
 
-	    if (item_list[3].length != 1) {
-		if (item_list[3].length != 4) {
+	    if (item_list[3].ile2$w_length != 1) {
+		if (item_list[3].ile2$w_length != 4) {
 		    keep_ext = 1;
 		} else {
 		    int x;
@@ -337,7 +306,7 @@ int exit_value;
 	    }
 
 	    if (keep_ext == 1) {
-		strncpy(&arg_nam[name_len], ext, item_list[3].length);
+		strncpy(&arg_nam[name_len], ext, item_list[3].ile2$w_length);
 	    }
 	}
     }
@@ -468,7 +437,6 @@ int exit_value;
        }
     force_env_home_to_unix_format(env);
     exit(original_main(argc, new_argv, env));
-    return 1; /* Needed to silence compiler diagnostic */
 }
 
 #define main original_main

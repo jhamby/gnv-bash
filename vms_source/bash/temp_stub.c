@@ -19,10 +19,6 @@
  */
 
 #include <unistd.h>
-#include <unixio.h>
-#include <ssdef.h>
-#include <stdio.h>
-#include <types.h>
 #include "config.h"
 
 
