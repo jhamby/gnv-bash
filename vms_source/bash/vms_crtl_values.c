@@ -53,7 +53,15 @@ void vms_set_crtl_values(void) {
         set (enable_feature[i], 1);
     }
     // set ("DECC$POSIX_COMPLIANT_PATHNAMES", 1);  // required for realpath(), but getcwd() is failed
-    set ("DECC$PIPE_BUFFER_SIZE", 65535);
+     /* Pipe feature settings are no longer needed with virtual memory pipe
+        code. Programs that use pipe need to be converted to use the
+        virtual memory pipe code, which effectively removes the hangs and
+        left over temporary files.
+
+        Comment left here to prevent regressions, as the larger pipe size
+        actually hurts memory usage with the new algorithm.
+     */
+    /* do_not_set ("DECC$PIPE_BUFFER_SIZE", 65535); */
 
     // decc$set_reentrancy(C$C_MULTITHREAD);    // not required for bash
 

@@ -89,6 +89,7 @@
 #include <inttypes.h>
 #endif
 
+#define __NEW_STARLET 1
 #include <descrip.h>
 #include <iodef.h>
 #include <ssdef.h>
@@ -97,8 +98,13 @@
 #include <stsdef.h>
 #include <jpidef.h>
 #include <efndef.h>
+#include <gen64def.h>
+#include <iosbdef.h>
+#include <iledef.h>
 #include <builtins.h>
 #include <unixlib.h>
+#include <lib$routines.h>
+#include <starlet.h>
 
 /* These three are noise that the compiler generate for VMS specific code
  * in the more stricter modes
@@ -106,23 +112,6 @@
 #pragma message disable pragma
 #pragma message disable dollarid
 #pragma message disable valuepres
-
-#pragma member_alignment save
-#pragma nomember_alignment longword
-struct item_list_3 {
-	unsigned short len;
-	unsigned short code;
-	void * bufadr;
-	unsigned short * retlen;
-};
-
-struct mbx_iosb {
-	unsigned short status;
-	unsigned short count;
-	unsigned long value;
-};
-
-#pragma member_alignment
 
 struct mbx_buffer_hdr {
     struct mbx_buffer_hdr *flink;
@@ -138,8 +127,8 @@ struct vms_mbx {
     int write_ast_status;
     unsigned short read_chan; /*  Read from MBX, write to FIFO  */
     unsigned short write_chan; /* Read from FIFO - write to MBX */
-    struct mbx_iosb read_iosb; /* AST status for reading from MBX */
-    struct mbx_iosb write_iosb; /* AST status for writing to MBX */
+    struct _iosb read_iosb;     /* AST status for reading from MBX */
+    struct _iosb write_iosb;    /* AST status for writing to MBX */
     int read_devbufsiz;		/* How big are the buffers to transfer */
     int write_devbufsiz;	/* write must be >= read size */
     int direction;		/* 1 = parent is writer */
@@ -149,108 +138,13 @@ struct vms_mbx {
     struct mbx_buffer_hdr *rbuf_blink;
     int child_watch_ast_status;
     int status;
-    unsigned short jpi_iosb[4];	/* AST status for polling if child is alive */
+    struct _iosb jpi_iosb;   	/* AST status for polling if child is alive */
     pid_t child_pid;		/* Child Pid */
     pid_t result_pid;		/* Looked up Pid */
 };
 
-#pragma member_alignment restore
+const struct _generic_64 one_second = { -10000000 };
 
-int LIB$SIGNAL(int status);
-int LIB$STOP(int status);
-
-int SYS$ASSIGN
-       (const struct dsc$descriptor_s * devnam,
-	unsigned short * chan,
-	unsigned long acmode,
-	const struct dsc$descriptor_s * mbxnam,
-	unsigned long flags);
-
-int SYS$CANCEL(unsigned short chan);
-
-
-int SYS$CREMBX
-       (unsigned long prmflg,
-	unsigned short *chan,
-	unsigned long maxmsg,
-	unsigned long bufquo,
-	unsigned long promsk,
-	unsigned long acmode,
-	const struct dsc$descriptor_s * lognam,
-	unsigned long flags,
-	unsigned long nullarg);
-
-int SYS$DASSGN(unsigned short chan);
-
-int SYS$GETDVIW
-       (unsigned long efn,
-	unsigned short chan,
-	const struct dsc$descriptor_s * devnam,
-	const struct item_list_3 * itmlst,
-	void * iosb,
-	void (* astadr)(unsigned long),
-	unsigned long astprm,
-	void * nullarg);
-
-#pragma message save
-#pragma message disable noparmlist
-int SYS$GETJPI
-       (unsigned long efn,
-	pid_t * pid,
-	const struct dsc$descriptor_s * prcnam,
-	const struct item_list_3 * itmlst,
-	void * iosb,
-	void (* astadr)(__unknown_params),
-	void * astprm,
-	void * nullarg);
-
-int SYS$QIOW
-       (unsigned long efn,
-	unsigned short chan,
-	unsigned long func,
-	void * iosb,
-	void (* astadr)(__unknown_params),
-	void *,
-	void * p1,
-	int p2,
-	int p3,
-	int p4,
-	int p5,
-	int p6);
-
-int SYS$QIO
-       (unsigned long efn,
-	unsigned short chan,
-	unsigned long func,
-	void * iosb,
-	void (* astadr)(__unknown_params),
-	void *,
-	void * p1,
-	int p2,
-	int p3,
-	int p4,
-	int p5,
-	int p6);
-
-int SYS$SETIMR
-       (unsigned long efn,
-	const void * daytime,
-	void (* astadr)(__unknown_params),
-	void * reqid,
-	unsigned long flags);
-#pragma message restore
-
-#ifndef __VAX
-const int64_t one_second = -10000000;
-#else
-#pragma member_alignment save
-#pragma member_alignment
-const struct {
-   long low_longword;
-   long high_longword;
-} one_second = {-1, -10000000};
-#pragma member_alignment restore
-#endif
 static void check_if_child_is_alive_ast(struct vms_mbx * context);
 
 #ifdef __VAX
@@ -276,7 +170,7 @@ int status;
 
 	 /* Only need to do anything if the child is not alive */
 	/*----------------------------------------------------*/
-	if (!$VMS_STATUS_SUCCESS(context->jpi_iosb[0])) {
+	if (!$VMS_STATUS_SUCCESS(context->jpi_iosb.iosb$w_status)) {
 
 	     /* Cancel the AST reading from the child */
 	    /*---------------------------------------*/
@@ -293,7 +187,7 @@ int status;
 	   (EFN$C_ENF,
 	    &one_second,
 	    check_if_child_is_alive_ast,
-	    context,
+	    (__int64) context,
 	    0);
 	return;
     }
@@ -318,7 +212,7 @@ static void vms_write_mbx_ast(struct vms_mbx * context);
 /*-----------------------------------------------------------------*/
 static void check_if_child_is_alive_ast(struct vms_mbx * context)
 {
-struct item_list_3 itemlist[2];
+struct _ile3 itemlist[2];
 int status;
 int status1;
 
@@ -328,12 +222,12 @@ int status1;
 
 	 /* Verify that the PID is valid */
 	/*------------------------------*/
-	itemlist[0].len = 4;
-	itemlist[0].code = JPI$_PID;
-	itemlist[0].bufadr = &context->result_pid;
-	itemlist[0].retlen = NULL;
-	itemlist[1].len = 0;
-	itemlist[1].code = 0;
+	itemlist[0].ile3$w_length = 4;
+	itemlist[0].ile3$w_code = JPI$_PID;
+	itemlist[0].ile3$ps_bufaddr = &context->result_pid;
+	itemlist[0].ile3$ps_retlen_addr = NULL;
+	itemlist[1].ile3$w_length = 0;
+	itemlist[1].ile3$w_code = 0;
 
 	context->child_watch_ast_status = 1;
 	status = SYS$GETJPI
@@ -341,10 +235,9 @@ int status1;
 	    &context->child_pid,
 	    NULL,
 	    itemlist,
-	    context->jpi_iosb,
+	    &context->jpi_iosb,
 	    vms_watch_child_ast,
-	    context,
-	    0);
+	    (__int64) context);
 
          /* Check if child has already exited */
 	/*----------------------------------*/
@@ -402,13 +295,13 @@ struct timr_req * tcontext;
 
 	if (context->direction) {
 	    /* Direction = 1, child is reader */
-	    context->child_pid = context->write_iosb.value;
+	    context->child_pid = context->write_iosb.iosb$l_dev_depend;
 	}
 	else {
 	    /* Direction = 0, child is writer */
-	    context->child_pid = context->read_iosb.value;
+	    context->child_pid = context->read_iosb.iosb$l_dev_depend;
 	}
-	context->jpi_iosb[1] = SS$_NORMAL;
+	context->jpi_iosb.iosb$w_status = SS$_NORMAL;
 
 	 /* Start watching for the child to exit */
 	/*--------------------------------------*/
@@ -424,14 +317,14 @@ int status;
 
      /* if write_iosb.status is 0, then we are starting or restarting */
     /*----------------------------------------------------------------*/
-    if (context->write_iosb.status == 0) {
+    if (context->write_iosb.iosb$w_status == 0) {
     }
     else {
-	if (!$VMS_STATUS_SUCCESS(context->write_iosb.status)) {
+	if (!$VMS_STATUS_SUCCESS(context->write_iosb.iosb$w_status)) {
 
 	     /* If no reader then just discard the data */
 	    /*---------------------------------*/
-	    if (context->write_iosb.status == SS$_NOREADER) {
+	    if (context->write_iosb.iosb$w_status == SS$_NOREADER) {
 		struct mbx_buffer_hdr * rbuf;
 
 		/* No one is reading from the PIPE.  This means that the
@@ -478,7 +371,7 @@ int status;
 	    /* Direction = 0, child is writer */
 	    /* Direction = 1, child is reader */
 
-	if ((context->direction != 0) && (context->write_iosb.status != 0))
+	if ((context->direction != 0) && (context->write_iosb.iosb$w_status != 0))
 	    start_child_watcher(context);
 
 #ifdef VMS_BP_POISON
@@ -507,7 +400,7 @@ int status;
 		func,
 		&context->write_iosb,
 		vms_write_mbx_ast,
-		context,
+		(__int64) context,
 		context->rbuf_active->buffer,
 		context->rbuf_active->size,
 		0,0,0,0);
@@ -573,54 +466,54 @@ int status;
 
      /* read_iosb.status == 0, means not yet an AST - set things up */
     /*-------------------------------------------------------------*/
-    if (context->read_iosb.status == 0) {
-    struct item_list_3 itemlist[2];
-    unsigned short dvi_iosb[4];
+    if (context->read_iosb.iosb$w_status == 0) {
+    struct _ile3 itemlist[2];
+    struct _iosb dvi_iosb;
 
 	  /* Find out the buffer sizes of the read mailbox	        */
 	 /*  Not yet an AST, so use the synchronous version on purpose */
 	/*------------------------------------------------------------*/
-	itemlist[0].len = 4;
-	itemlist[0].code = DVI$_DEVBUFSIZ;
-	itemlist[0].bufadr = &context->read_devbufsiz;
-	itemlist[0].retlen = 0;
-	itemlist[1].len = 0;
-	itemlist[1].code = 0;
+	itemlist[0].ile3$w_length = 4;
+	itemlist[0].ile3$w_code = DVI$_DEVBUFSIZ;
+	itemlist[0].ile3$ps_bufaddr = &context->read_devbufsiz;
+	itemlist[0].ile3$ps_retlen_addr = NULL;
+	itemlist[1].ile3$w_length = 0;
+	itemlist[1].ile3$w_code = 0;
 
 	status = SYS$GETDVIW
 	       (EFN$C_ENF,
 		context->read_chan,
 		NULL,
 		itemlist,
-		dvi_iosb,
+		&dvi_iosb,
 		NULL, 0, 0);
 	if (!$VMS_STATUS_SUCCESS(status))
 	    LIB$STOP(status);
-	if (!$VMS_STATUS_SUCCESS(dvi_iosb[0]))
-	    LIB$STOP(dvi_iosb[0]);
+	if (!$VMS_STATUS_SUCCESS(dvi_iosb.iosb$w_status))
+	    LIB$STOP(dvi_iosb.iosb$w_status);
 
 	   /* Find out the buffer sizes of the parent mailbox     */
 	  /*  Should be same as child, but let's not be trusting */
 	 /*   DECC$ features allow these to be different	*/
 	/*-----------------------------------------------------*/
-	itemlist[0].len = 4;
-	itemlist[0].code = DVI$_DEVBUFSIZ;
-	itemlist[0].bufadr = &context->write_devbufsiz;
-	itemlist[0].retlen = 0;
-	itemlist[1].len = 0;
-	itemlist[1].code = 0;
+	itemlist[0].ile3$w_length = 4;
+	itemlist[0].ile3$w_code = DVI$_DEVBUFSIZ;
+	itemlist[0].ile3$ps_bufaddr = &context->write_devbufsiz;
+	itemlist[0].ile3$ps_retlen_addr = NULL;
+	itemlist[1].ile3$w_length = 0;
+	itemlist[1].ile3$w_code = 0;
 
 	status = SYS$GETDVIW
 	       (EFN$C_ENF,
 		context->write_chan,
 		NULL,
 		itemlist,
-		dvi_iosb,
+		&dvi_iosb,
 		NULL, 0, 0);
 	if (!$VMS_STATUS_SUCCESS(status))
 	    LIB$STOP(status);
-	if (!$VMS_STATUS_SUCCESS(dvi_iosb[0]))
-	    LIB$STOP(dvi_iosb[0]);
+	if (!$VMS_STATUS_SUCCESS(dvi_iosb.iosb$w_status))
+	    LIB$STOP(dvi_iosb.iosb$w_status);
 
 	/*
 	 * Check to see if parent buffer is large enough.  By default it
@@ -660,7 +553,7 @@ int status;
 
      /* Handle any errors as best as possible in an AST */
     /*-------------------------------------------------*/
-    switch (context->read_iosb.status) {
+    switch (context->read_iosb.iosb$w_status) {
     case 0:
     case SS$_NORMAL:
     case SS$_ENDOFFILE:
@@ -684,21 +577,21 @@ int status;
 #endif
 	free(context->read_buffer);
 	context->read_buffer = NULL;
-	if (context->read_iosb.status != SS$_IVCHAN)
+	if (context->read_iosb.iosb$w_status != SS$_IVCHAN)
 	    status = SYS$DASSGN(context->read_chan);
 	break;
     default:
 
 	 /* Die on fatal errors */
 	/*---------------------*/
-	if (!$VMS_STATUS_SUCCESS(context->read_iosb.status))
-	   LIB$STOP(context->read_iosb.status);
+	if (!$VMS_STATUS_SUCCESS(context->read_iosb.iosb$w_status))
+	   LIB$STOP(context->read_iosb.iosb$w_status);
     }
 
 
      /* If there is data? */
     /*-------------------*/
-    if (context->read_iosb.status == SS$_ENDOFFILE) {
+    if (context->read_iosb.iosb$w_status == SS$_ENDOFFILE) {
     struct mbx_buffer_hdr * rbuf;
 
 	 /* Now that we have a PID, watch for the child to die */
@@ -733,12 +626,12 @@ int status;
 	 /* Write out the buffer data */
 	/*---------------------------*/
 	if (context->write_ast_status == 0) {
-	   context->write_iosb.status = 0;
+	   context->write_iosb.iosb$w_status = 0;
 	   vms_write_mbx_ast(context);
 	}
     }
     else {
-	if ($VMS_STATUS_SUCCESS(context->read_iosb.status)) {
+	if ($VMS_STATUS_SUCCESS(context->read_iosb.iosb$w_status)) {
 	struct mbx_buffer_hdr * rbuf;
 
 	     /* Now that we have a PID, watch for the child to die */
@@ -752,7 +645,7 @@ int status;
 	     /* Add the data to the FIFO */
 	    /*--------------------------*/
 	    rbuf = malloc
-	      (sizeof(struct mbx_buffer_hdr) + context->read_iosb.count);
+	      (sizeof(struct mbx_buffer_hdr) + context->read_iosb.iosb$w_bcnt);
 	    if (rbuf == NULL) {
 		context->read_ast_status = -2;	/* AST in fatal error state */
 		LIB$STOP(SS$_INSFMEM);
@@ -761,14 +654,14 @@ int status;
 	    rbuf->flink = NULL;
 	    rbuf->blink = NULL;
 	    rbuf->flags = 0; /* Normal data */
-	    rbuf->size = context->read_iosb.count;
+	    rbuf->size = context->read_iosb.iosb$w_bcnt;
 	    rbuf->buffer = ((char *)rbuf + sizeof(struct mbx_buffer_hdr));
 
-	    if (context->read_iosb.count != 0) {
+	    if (context->read_iosb.iosb$w_bcnt != 0) {
 		memmove
 		  (rbuf->buffer,
 		   context->read_buffer,
-		   context->read_iosb.count);
+		   context->read_iosb.iosb$w_bcnt);
 	    }
 
 	     /* Put it on the end of the queue for a FIFO */
@@ -801,7 +694,7 @@ int status;
 	     /* Write out the buffer data */
 	    /*---------------------------*/
 	    if (context->write_ast_status == 0) {
-		context->write_iosb.status = 0;
+		context->write_iosb.iosb$w_status = 0;
 	        vms_write_mbx_ast(context);
 	    }
 	}
@@ -818,7 +711,7 @@ int status;
 		    read_it,
 		    &context->read_iosb,
 		    vms_read_mbx_ast,
-		    context,
+		    (__int64) context,
 		    context->read_buffer,
 		    context->read_devbufsiz,
 		    0,0,0,0);
@@ -839,7 +732,7 @@ int status;
 	     /* Write AST does most of the cleanup */
 	    /*-------------------------------------*/
 	    if (context->write_ast_status == 0) {
-		context->write_iosb.status = 0;
+		context->write_iosb.iosb$w_status = 0;
 		vms_write_mbx_ast(context);
 	    }
 	}

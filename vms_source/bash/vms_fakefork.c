@@ -1021,6 +1021,8 @@ int vms_fake_fork(void) {
     return 0;
 }
 
+#undef exit
+
 int vms_fake_fork_exit(int status) {
 /*    fprintf(stderr,
 	    "\n*DEBUG* vms_fake_fork_exit level %d status %d\n",

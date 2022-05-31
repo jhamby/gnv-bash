@@ -451,7 +451,8 @@ bash_objs = alias.obj,\
             vms_fname_to_unix.obj,\
 	    vms_mailstat.obj,\
 	    vms_terminal_io.obj,\
-	    vms_term.obj
+	    vms_term.obj,\
+	    vms_vm_pipe.obj
 
 # Nested header files
 #========================
@@ -2407,12 +2408,7 @@ bashhist.obj : bashhist.c, $(config_h) bashtypes.h $(bashansi_h) \
 		bashhist.h [.builtins]common.h $(readline_history_h) \
 		[.lib.glob]glob.h [.lib.glob]strmatch.h bashline.h
 
-lcl_root:bashline.c : src_root:bashline.c bashline.tpu
-
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-bashline.obj : lcl_root:bashline.c $(config_h) bashtypes.h \
+bashline.obj : bashline.c $(config_h) bashtypes.h \
 		[.include]posixstat.h \
 		[.include]chartypes.h $(bashansi_h) $(bashintl_h) \
 		$(shell_h) input.h $(builtins_h) \
@@ -2803,7 +2799,7 @@ vms_term.obj : vms_term.c vms_term.h
 
 vms_terminal_io.obj : vms_terminal_io.c vms_terminal_io.h
 
-#vms_vm_pipe.obj : vms_vm_pipe.c
+vms_vm_pipe.obj : vms_vm_pipe.c
 
 decw_showdisplay.obj : decw_showdisplay.c
 
