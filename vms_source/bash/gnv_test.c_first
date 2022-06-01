@@ -32,6 +32,7 @@
 
 int  decc$isatty (int __file_desc);
 
+#pragma message restore
 
 static int  vms_isatty (int file_desc) {
 int result;
