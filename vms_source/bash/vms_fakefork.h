@@ -319,7 +319,10 @@ static int vms_vfork_exec(char * command,
      /* execve() always returns here with success or failure */
     if (real_pid == 0) {
 	*status = execve (vms_command, args, env);
+	/* DECC$EXIT_AFTER_FAILED_EXEC enabled lets us _exit() on failure */
+	_exit (EXIT_FAILURE);
     }
+
     if (vms_command != command) free(vms_command);
 
     /* Are we a successful child? */
@@ -352,7 +355,7 @@ static int vms_vfork_exec(char * command,
 	}
     }
 
-    /* We should only get here on a failed exec() and we are still vforked() */
+    /* We should only get here on a failed exec() as the parent. */
     /* This means that the only return status possible is for a failure. */
     return (-1);
 }
