@@ -82,7 +82,7 @@ cinc = $(cinc2)
 # configure does not have tests for these macros; So they must be manually set.
 #
 cdefs = /define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,HAVE_REGEX_H=1,\
-HAVE_REGCOMP=1,HAVE_REGEXEC=1,__CRTL_VER_OVERRIDE=80500000)/fl=ieee/ieee=denorm
+HAVE_REGCOMP=1,HAVE_REGEXEC=1)/fl=ieee/ieee=denorm
 cflags = $(cnames)/debu$(clist)$(cprefix)$(cwarn)$(cinc)$(cdefs)
 cflagsx = $(cnames)/debu$(clist)$(cwarn)$(cinc2)
 

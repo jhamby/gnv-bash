@@ -78,6 +78,8 @@ void vms_restore_special_vars(void);
 #define MOD_SUBST 1 /* Make special definitions visible */
 #include "vms_fakefork.h"
 
+#include "vms_getcwd_hack.h"
+
 /* OpenVMS-specific declarations needed to implement the storage */
 /* and retrieval of last_made_pid values. */
 

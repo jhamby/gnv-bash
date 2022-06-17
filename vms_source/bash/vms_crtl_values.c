@@ -31,7 +31,7 @@ void vms_set_crtl_values(void) {
     const char *enable_feature[] = {
 //        "DECC$EFS_FILE_TIMESTAMPS",       // DECC$UNIX_LEVEL 30
         "DECC$ENABLE_GETENV_CACHE",
-//        "DECC$EXIT_AFTER_FAILED_EXEC",
+        "DECC$EXIT_AFTER_FAILED_EXEC",
 //        "DECC$FILE_SHARING",              // DECC$UNIX_LEVEL 30
         "DECC$MAILBOX_CTX_STM",
         "DECC$POPEN_NO_CRLF_REC_ATTR",
@@ -63,6 +63,8 @@ void vms_set_crtl_values(void) {
 //        "DECC$PIPE_BUFFER_SIZE" = 4096  // DECC$UNIX_LEVEL 10
 //        "DECC$USE_RAB64",                 // DECC$UNIX_LEVEL 10
 //        "DECC$USE_JPI$_CREATOR",          // DECC$UNIX_LEVEL 90
+
+        "DECC$POSIX_COMPLIANT_PATHNAMES",
     };
 
     for(int i = 0; i < sizeof(disable_feature)/sizeof(disable_feature[0]); ++i) {
@@ -75,7 +77,6 @@ void vms_set_crtl_values(void) {
 
     set ("DECC$EXEC_FILEATTR_INHERITANCE", 2);  // DECC$UNIX_LEVEL 30 sets to 1
 
-    // set ("DECC$POSIX_COMPLIANT_PATHNAMES", 1);  // required for realpath(), but getcwd() is failed
      /* Pipe feature settings are no longer needed with virtual memory pipe
         code. Programs that use pipe need to be converted to use the
         virtual memory pipe code, which effectively removes the hangs and
