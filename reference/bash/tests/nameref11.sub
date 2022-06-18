@@ -1,3 +1,16 @@
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 r=/; declare -n r ; unset r
 declare -n r=/ ; unset -n r
 declare -n r; r=/ ; unset -n r
@@ -39,3 +52,25 @@ unset -n ref ; unset ref
 declare -r RO RO_PID; coproc RO { :; }; declare -p RO_PID; wait; declare -p RO RO_PID
 
 declare -r RO2=a; declare -n ref_PID=RO2; coproc ref { :; }; wait; declare -p RO2
+
+unset x y
+set -- one two three
+
+y=2
+typeset -n x=y
+echo ${x}
+
+unset -n x
+
+typeset -n y
+echo $y
+
+unset -n y
+
+typeset -n y
+y=2
+echo ${y}
+
+declare -n foo=bar
+echo ${!foo[2]}
+echo ${!bar}

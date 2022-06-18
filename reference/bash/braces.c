@@ -1,6 +1,6 @@
 /* braces.c -- code for doing word expansion in curly braces. */
 
-/* Copyright (C) 1987-2012 Free Software Foundation, Inc.
+/* Copyright (C) 1987-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -59,9 +59,7 @@ extern int errno;
 
 #define BRACE_SEQ_SPECIFIER	".."
 
-extern int asprintf __P((char **, const char *, ...)) __attribute__((__format__ (printf, 2, 3)));
-
-extern int last_command_exit_value;
+extern int asprintf PARAMS((char **, const char *, ...)) __attribute__((__format__ (printf, 2, 3)));
 
 /* Basic idea:
 
@@ -75,12 +73,12 @@ extern int last_command_exit_value;
 /* The character which is used to separate arguments. */
 static const int brace_arg_separator = ',';
 
-#if defined (__P)
-static int brace_gobbler __P((char *, size_t, int *, int));
-static char **expand_amble __P((char *, size_t, int));
-static char **expand_seqterm __P((char *, size_t));
-static char **mkseq __P((intmax_t, intmax_t, intmax_t, int, int));
-static char **array_concat __P((char **, char **));
+#if defined (PARAMS)
+static int brace_gobbler PARAMS((char *, size_t, int *, int));
+static char **expand_amble PARAMS((char *, size_t, int));
+static char **expand_seqterm PARAMS((char *, size_t));
+static char **mkseq PARAMS((intmax_t, intmax_t, intmax_t, int, int));
+static char **array_concat PARAMS((char **, char **));
 #else
 static int brace_gobbler ();
 static char **expand_amble ();
@@ -188,7 +186,7 @@ brace_expand (text)
 	  if (text[j] == brace_arg_separator)
 	    {	/* { */
 	      strvec_dispose (result);
-	      last_command_exit_value = 1;
+	      set_exit_status (EXECUTION_FAILURE);
 	      report_error ("no closing `%c' in %s", '}', text);
 	      throw_to_top_level ();
 	    }
@@ -358,32 +356,13 @@ expand_amble (text, tlen, flags)
 #define ST_CHAR	2
 #define ST_ZINT	3
 
-#ifndef sh_imaxabs
-#  define sh_imaxabs(x)	(((x) >= 0) ? (x) : -(x))
-#endif
-
-/* Handle signed arithmetic overflow and underflow.  Have to do it this way
-   to avoid compilers optimizing out simpler overflow checks. */
-
-/* Make sure that a+b does not exceed MAXV or is smaller than MINV (if b < 0).
-   Assumes that b > 0 if a > 0 and b < 0 if a < 0 */
-#define ADDOVERFLOW(a,b,minv,maxv) \
-	((((a) > 0) && ((b) > ((maxv) - (a)))) || \
-	 (((a) < 0) && ((b) < ((minv) - (a)))))
-
-/* Make sure that a-b is not smaller than MINV or exceeds MAXV (if b < 0).
-   Assumes that b > 0 if a > 0 and b < 0 if a < 0 */
-#define SUBOVERFLOW(a,b,minv,maxv) \
-	((((b) > 0) && ((a) < ((minv) + (b)))) || \
-	 (((b) < 0) && ((a) > ((maxv) + (b)))))
-
 static char **
 mkseq (start, end, incr, type, width)
      intmax_t start, end, incr;
      int type, width;
 {
   intmax_t n, prevn;
-  int i, j, nelem;
+  int i, nelem;
   char **result, *t;
 
   if (incr == 0)
@@ -418,13 +397,13 @@ mkseq (start, end, incr, type, width)
   /* Instead of a simple nelem = prevn + 1, something like:
   	nelem = (prevn / imaxabs(incr)) + 1;
      would work */
-  nelem = (prevn / sh_imaxabs(incr)) + 1;
-  if (nelem > INT_MAX - 2)		/* Don't overflow int */
+  if ((prevn / sh_imaxabs (incr)) > INT_MAX - 3)	/* check int overflow */
     return ((char **)NULL);
+  nelem = (prevn / sh_imaxabs(incr)) + 1;
   result = strvec_mcreate (nelem + 1);
   if (result == 0)
     {
-      internal_error (_("brace expansion: failed to allocate memory for %d elements"), nelem);
+      internal_error (_("brace expansion: failed to allocate memory for %u elements"), (unsigned int)nelem);
       return ((char **)NULL);
     }
 
@@ -436,6 +415,7 @@ mkseq (start, end, incr, type, width)
 #if defined (SHELL)
       if (ISINTERRUPT)
         {
+          result[i] = (char *)NULL;
           strvec_dispose (result);
           result = (char **)NULL;
         }
@@ -494,7 +474,7 @@ expand_seqterm (text, tlen)
      size_t tlen;
 {
   char *t, *lhs, *rhs;
-  int i, lhs_t, rhs_t, lhs_l, rhs_l, width;
+  int lhs_t, rhs_t, lhs_l, rhs_l, width;
   intmax_t lhs_v, rhs_v, incr;
   intmax_t tl, tr;
   char **result, *ep, *oep;
@@ -743,20 +723,6 @@ comsub:
   return (c);
 }
 
-/* Return 1 if ARR has any non-empty-string members.  Used to short-circuit
-   in array_concat() below. */
-static int
-degenerate_array (arr)
-     char **arr;
-{
-  register int i;
-
-  for (i = 0; arr[i]; i++)
-    if (arr[i][0] != '\0')
-      return 0;
-  return 1;
-}
-
 /* Return a new array of strings which is the result of appending each
    string in ARR2 to each string in ARR1.  The resultant array is
    len (arr1) * len (arr2) long.  For convenience, ARR1 (and its contents)
@@ -790,7 +756,9 @@ array_concat (arr1, arr2)
   len1 = strvec_len (arr1);
   len2 = strvec_len (arr2);
 
-  result = (char **)xmalloc ((1 + (len1 * len2)) * sizeof (char *));
+  result = (char **)malloc ((1 + (len1 * len2)) * sizeof (char *));
+  if (result == 0)
+    return (result);
 
   len = 0;
   for (i = 0; i < len1; i++)

@@ -3,7 +3,7 @@
 /* See Makefile for compilation details. */
 
 /*
-   Copyright (C) 1999-2009 Free Software Foundation, Inc.
+   Copyright (C) 1999-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash.
    Bash is free software: you can redistribute it and/or modify
@@ -30,6 +30,7 @@
 #include "builtins.h"
 #include "shell.h"
 #include "common.h"
+#include "bashgetopt.h"
 
 int
 basename_builtin (list)
@@ -38,14 +39,14 @@ basename_builtin (list)
   int slen, sufflen, off;
   char *string, *suffix, *fn;
 
+  if (no_options (list))
+    return (EX_USAGE);
+  list = loptend;
   if (list == 0)
     {
       builtin_usage ();
       return (EX_USAGE);
-    }
-
-  if (no_options (list))
-    return (EX_USAGE);
+    }    
 
   string = list->word->word;
   suffix = (char *)NULL;

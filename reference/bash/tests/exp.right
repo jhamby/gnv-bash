@@ -150,6 +150,9 @@ argv[4] = <d>
 argv[5] = <e>
 a?b?c
 a b c
+argv[1] = <a>
+argv[2] = <b>
+argv[3] = <>
 argv[1] = <^?>
 argv[1] = <^?>
 argv[1] = <^?>
@@ -216,6 +219,12 @@ argv[2] = <^C>
 argv[3] = <^C>
 argv[4] = <^C>
 argv[1] = <^A>
+argv[1] = <XY>
+argv[2] = <YX>
+argv[1] = <XY^AYX>
+argv[1] = <XY>
+argv[2] = <Y>
+argv[1] = <XY^AY>
 argv[1] = <x^Ay^?z>
 argv[1] = <x^Ay^?z>
 declare -- var="xyz"
@@ -226,7 +235,7 @@ declare -- var="x\001y\177z"$
 argv[1] = <$'x\001y\177z'>
 argv[1] = <x^Ay^?z>
 var=$'x\001y\177z'
-./exp8.sub: line 16: xyz: syntax error: invalid arithmetic operator (error token is "z")
+./exp8.sub: line 29: xyz: syntax error: invalid arithmetic operator (error token is "z")
 declare -a array=()
 declare -a array=([0]=$'x\001y\177z')
 argv[1] = <x^Ay^?z>
@@ -291,7 +300,9 @@ var=abc:def ghi:jkl
 abcdef ghijkl
 abcdef ghijkl
 abcdef ghijkl
-abcdef ghijkl
+abc
+def ghi
+jkl
 abcdef ghijkl
 abcdef ghijkl
 abcdef ghijkl
@@ -332,3 +343,68 @@ jkl
 []
 [foo]
 []
+< A >< B >< A >< B >
+< A >< B >< A >< B >
+< A >< B >< a >< b >
+< A >< B >< A >< B >
+< A >< B ><' A '><' B '>
+-----
+< A >< B >< A >< B >
+< A >< B >< A >< B >
+< A >< B >< a >< b >
+< A >< B >< A >< B >
+< A >< B ><' A '><' B '>
+argv[1] = <1>
+argv[2] = <2>
+argv[1] = <1>
+argv[2] = <2>
+argv[1] = <1>
+argv[2] = <2>
+argv[1] = <1 2>
+argv[1] = <a b>
+argv[1] = <a>
+argv[2] = <b>
+argv[1] = <a b>
+argv[1] = <1>
+argv[2] = <2>
+argv[1] = <1>
+argv[2] = <2>
+argv[1] = <1>
+argv[2] = <2>
+argv[1] = <12>
+argv[1] = <12>
+argv[1] = <1>
+argv[2] = <2>
+argv[1] = <1>
+argv[2] = <2>
+argv[1] = < >
+argv[1] = < >
+argv[1] = < >
+argv[1] = < >
+argv[1] = < >
+argv[1] = <12>
+argv[1] = <12>
+argv[1] = <12>
+argv[1] = <12>
+ok 1
+ok 2
+ok 3
+ok 4
+ok 5
+ok 6
+ok 7
+ok 8
+ok 9
+argv[1] = <file.o>
+argv[1] = <posix>
+argv[1] = </src/cmd>
+argv[1] = <three>
+argv[1] = </one/two/three>
+abcdefg
+abcdefg
+abcdefg
+abcdefg
+cdefg
+abcdefg
+abcde
+abcdefg

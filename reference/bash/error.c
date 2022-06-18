@@ -1,6 +1,6 @@
 /* error.c -- Functions for handling errors. */
 
-/* Copyright (C) 1993-2009 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -44,6 +44,7 @@ extern int errno;
 #include "bashintl.h"
 
 #include "shell.h"
+#include "execute_cmd.h"
 #include "flags.h"
 #include "input.h"
 
@@ -51,20 +52,18 @@ extern int errno;
 #  include "bashhist.h"
 #endif
 
-extern int executing_line_number __P((void));
+extern int executing_line_number PARAMS((void));
 
-extern int last_command_exit_value;
-extern char *shell_name;
 #if defined (JOB_CONTROL)
 extern pid_t shell_pgrp;
-extern int give_terminal_to __P((pid_t, int));
+extern int give_terminal_to PARAMS((pid_t, int));
 #endif /* JOB_CONTROL */
 
 #if defined (ARRAY_VARS)
 extern const char * const bash_badsub_errmsg;
 #endif
 
-static void error_prolog __P((int));
+static void error_prolog PARAMS((int));
 
 /* The current maintainer of the shell.  You change this in the
    Makefile. */
@@ -202,7 +201,7 @@ report_error (format, va_alist)
   if (exit_immediately_on_error)
     {
       if (last_command_exit_value == 0)
-	last_command_exit_value = 1;
+	last_command_exit_value = EXECUTION_FAILURE;
       exit_shell (last_command_exit_value);
     }
 }

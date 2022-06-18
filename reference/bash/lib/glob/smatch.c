@@ -1,7 +1,7 @@
 /* strmatch.c -- ksh-like extended pattern matching for the shell and filename
 		globbing. */
 
-/* Copyright (C) 1991-2011 Free Software Foundation, Inc.
+/* Copyright (C) 1991-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
    
@@ -30,6 +30,18 @@
 #include "shmbutil.h"
 #include "xmalloc.h"
 
+#include <errno.h>
+
+#if !defined (errno)
+extern int errno;
+#endif
+
+#if FNMATCH_EQUIV_FALLBACK
+/* We don't include <fnmatch.h> in order to avoid namespace collisions; the
+   internal strmatch still uses the FNM_ constants. */
+extern int fnmatch (const char *, const char *, int);
+#endif
+
 /* First, compile `sm_loop.c' for single-byte characters. */
 #define CHAR	unsigned char
 #define U_CHAR	unsigned char
@@ -49,6 +61,32 @@
 
 int glob_asciirange = GLOBASCII_DEFAULT;
 
+#if FNMATCH_EQUIV_FALLBACK
+/* Construct a string w1 = "c1" and a pattern w2 = "[[=c2=]]" and pass them
+   to fnmatch to see if wide characters c1 and c2 collate as members of the
+   same equivalence class. We can't really do this portably any other way */
+static int
+_fnmatch_fallback (s, p)
+     int s, p;			/* string char, patchar */
+{
+  char s1[2];			/* string */
+  char s2[8];			/* constructed pattern */
+
+  s1[0] = (unsigned char)s;
+  s1[1] = '\0';
+
+  /* reconstruct the pattern */
+  s2[0] = s2[1] = '[';
+  s2[2] = '=';
+  s2[3] = (unsigned char)p;
+  s2[4] = '=';
+  s2[5] = s2[6] = ']';
+  s2[7] = '\0';
+
+  return (fnmatch ((const char *)s2, (const char *)s1, 0));
+}
+#endif
+
 /* We use strcoll(3) for range comparisons in bracket expressions,
    even though it can have unwanted side effects in locales
    other than POSIX or US.  For instance, in the de locale, [A-Z] matches
@@ -57,9 +95,11 @@ int glob_asciirange = GLOBASCII_DEFAULT;
    straight ordering as if in the C locale. */
 
 #if defined (HAVE_STRCOLL)
-/* Helper function for collating symbol equivalence. */
+/* Helper functions for collating symbol equivalence. */
+
+/* Return 0 if C1 == C2 or collates equally if FORCECOLL is non-zero. */
 static int
-rangecmp (c1, c2, forcecoll)
+charcmp (c1, c2, forcecoll)
      int c1, c2;
      int forcecoll;
 {
@@ -80,23 +120,45 @@ rangecmp (c1, c2, forcecoll)
   s1[0] = c1;
   s2[0] = c2;
 
-  if ((ret = strcoll (s1, s2)) != 0)
-    return ret;
-  return (c1 - c2);
+  return (strcoll (s1, s2));
+}
+
+static int
+rangecmp (c1, c2, forcecoll)
+     int c1, c2;
+     int forcecoll;
+{
+  int r;
+
+  r = charcmp (c1, c2, forcecoll);
+
+  /* We impose a total ordering here by returning c1-c2 if charcmp returns 0 */
+  if (r != 0)
+    return r;
+  return (c1 - c2);		/* impose total ordering */
 }
 #else /* !HAVE_STRCOLL */
 #  define rangecmp(c1, c2, f)	((int)(c1) - (int)(c2))
 #endif /* !HAVE_STRCOLL */
 
 #if defined (HAVE_STRCOLL)
+/* Returns 1 if chars C and EQUIV collate equally in the current locale. */
 static int
-collequiv (c1, c2)
-     int c1, c2;
+collequiv (c, equiv)
+     int c, equiv;
 {
-  return (rangecmp (c1, c2, 1) == 0);
+  if (charcmp (c, equiv, 1) == 0)
+    return 1;
+
+#if FNMATCH_EQUIV_FALLBACK
+  return (_fnmatch_fallback (c, equiv) == 0);
+#else
+  return 0;
+#endif
+  
 }
 #else
-#  define collequiv(c1, c2)	((c1) == (c2))
+#  define collequiv(c, equiv)	((c) == (equiv))
 #endif
 
 #define _COLLSYM	_collsym
@@ -144,25 +206,33 @@ static char const *const cclass_name[] =
 
 #define N_CHAR_CLASS (sizeof(cclass_name) / sizeof (cclass_name[0]))
 
-static int
-is_cclass (c, name)
-     int c;
+static enum char_class
+is_valid_cclass (name)
      const char *name;
 {
-  enum char_class char_class = CC_NO_CLASS;
-  int i, result;
+  enum char_class ret;
+  int i;
+
+  ret = CC_NO_CLASS;
 
   for (i = 1; i < N_CHAR_CLASS; i++)
     {
       if (STREQ (name, cclass_name[i]))
 	{
-	  char_class = (enum char_class)i;
+	  ret = (enum char_class)i;
 	  break;
 	}
     }
 
-  if (char_class == 0)
-    return -1;
+  return ret;
+}
+
+static int
+cclass_test (c, char_class)
+     int c;
+     enum char_class char_class;
+{
+  int result;
 
   switch (char_class)
     {
@@ -215,6 +285,22 @@ is_cclass (c, name)
 
   return result;  
 }
+	
+static int
+is_cclass (c, name)
+     int c;
+     const char *name;
+{
+  enum char_class char_class;
+  int result;
+
+  char_class = is_valid_cclass (name);
+  if (char_class == CC_NO_CLASS)
+    return -1;
+
+  result = cclass_test (c, char_class);
+  return (result);
+}
 
 /* Now include `sm_loop.c' for single-byte characters. */
 /* The result of FOLD is an `unsigned char' */
@@ -230,6 +316,8 @@ is_cclass (c, name)
 #define PATSCAN			glob_patscan
 #define STRCOMPARE		strcompare
 #define EXTMATCH		extmatch
+#define DEQUOTE_PATHNAME	udequote_pathname
+#define STRUCT			smat_struct
 #define STRCHR(S, C)		strchr((S), (C))
 #define MEMCHR(S, C, N)		memchr((S), (C), (N))
 #define STRCOLL(S1, S2)		strcoll((S1), (S2))
@@ -255,15 +343,47 @@ is_cclass (c, name)
 #  define STREQ(s1, s2) ((wcscmp (s1, s2) == 0))
 #  define STREQN(a, b, n) ((a)[0] == (b)[0] && wcsncmp(a, b, n) == 0)
 
-extern char *mbsmbchar __P((const char *));
+extern char *mbsmbchar PARAMS((const char *));
+
+#if FNMATCH_EQUIV_FALLBACK
+/* Construct a string w1 = "c1" and a pattern w2 = "[[=c2=]]" and pass them
+   to fnmatch to see if wide characters c1 and c2 collate as members of the
+   same equivalence class. We can't really do this portably any other way */
+static int
+_fnmatch_fallback_wc (c1, c2)
+     wchar_t c1, c2;			/* string char, patchar */
+{
+  char w1[MB_LEN_MAX+1];		/* string */
+  char w2[MB_LEN_MAX+8];		/* constructed pattern */
+  int l1, l2;
+
+  l1 = wctomb (w1, c1);
+  if (l1 == -1)
+    return (2);
+  w1[l1] = '\0';
+
+  /* reconstruct the pattern */
+  w2[0] = w2[1] = '[';
+  w2[2] = '=';
+  l2 = wctomb (w2+3, c2);
+  if (l2 == -1)
+    return (2);
+  w2[l2+3] = '=';
+  w2[l2+4] = w2[l2+5] = ']';
+  w2[l2+6] = '\0';
+
+  return (fnmatch ((const char *)w2, (const char *)w1, 0));
+}
+#endif
 
 static int
-rangecmp_wc (c1, c2, forcecoll)
+charcmp_wc (c1, c2, forcecoll)
      wint_t c1, c2;
      int forcecoll;
 {
   static wchar_t s1[2] = { L' ', L'\0' };
   static wchar_t s2[2] = { L' ', L'\0' };
+  int r;
 
   if (c1 == c2)
     return 0;
@@ -278,10 +398,42 @@ rangecmp_wc (c1, c2, forcecoll)
 }
 
 static int
+rangecmp_wc (c1, c2, forcecoll)
+     wint_t c1, c2;
+     int forcecoll;
+{
+  int r;
+
+  r = charcmp_wc (c1, c2, forcecoll);
+
+  /* We impose a total ordering here by returning c1-c2 if charcmp returns 0,
+     as we do above in the single-byte case. */
+  if (r != 0 || forcecoll)
+    return r;
+  return ((int)(c1 - c2));		/* impose total ordering */
+}
+
+/* Returns 1 if wide chars C and EQUIV collate equally in the current locale. */
+static int
 collequiv_wc (c, equiv)
      wint_t c, equiv;
 {
-  return (c == equiv);
+  wchar_t s, p;
+
+  if (charcmp_wc (c, equiv, 1) == 0)
+    return 1;
+
+#if FNMATCH_EQUIV_FALLBACK
+/* We check explicitly for success (fnmatch returns 0) to avoid problems if
+   our local definition of FNM_NOMATCH (strmatch.h) doesn't match the
+   system's (fnmatch.h). We don't care about error return values here. */
+
+  s = c;
+  p = equiv;
+  return (_fnmatch_fallback_wc (s, p) == 0);
+#else
+  return 0;
+#endif
 }
 
 /* Helper function for collating symbol. */
@@ -355,6 +507,50 @@ is_wcclass (wc, name)
     return (iswctype (wc, desc));
 }
 
+/* Return 1 if there are no char class [:class:] expressions (degenerate case)
+   or only posix-specified (C locale supported) char class expressions in
+   PATTERN.  These are the ones where it's safe to punt to the single-byte
+   code, since wide character support allows locale-defined char classes.
+   This only uses single-byte code, but is only needed to support multibyte
+   locales. */
+static int
+posix_cclass_only (pattern)
+     char *pattern;
+{
+  char *p, *p1;
+  char cc[16];		/* sufficient for all valid posix char class names */
+  enum char_class valid;
+
+  p = pattern;
+  while (p = strchr (p, '['))
+    {
+      if (p[1] != ':')
+	{
+	  p++;
+	  continue;
+        }
+      p += 2;		/* skip past "[:" */
+      /* Find end of char class expression */
+      for (p1 = p; *p1;  p1++)
+	if (*p1 == ':' && p1[1] == ']')
+	  break;
+      if (*p1 == 0)	/* no char class expression found */
+	break;
+      /* Find char class name and validate it against posix char classes */
+      if ((p1 - p) >= sizeof (cc))
+	return 0;
+      bcopy (p, cc, p1 - p);
+      cc[p1 - p] = '\0';
+      valid = is_valid_cclass (cc);
+      if (valid == CC_NO_CLASS)
+	return 0;		/* found unrecognized char class name */
+
+      p = p1 + 2;		/* found posix char class name */
+    }
+    
+  return 1;			/* no char class names or only posix */
+}      
+
 /* Now include `sm_loop.c' for multibyte characters. */
 #define FOLD(c) ((flags & FNM_CASEFOLD) && iswupper (c) ? towlower (c) : (c))
 #define FCT			internal_wstrmatch
@@ -365,6 +561,8 @@ is_wcclass (wc, name)
 #define PATSCAN			glob_patscan_wc
 #define STRCOMPARE		wscompare
 #define EXTMATCH		extmatch_wc
+#define DEQUOTE_PATHNAME	wcdequote_pathname
+#define STRUCT			wcsmat_struct
 #define STRCHR(S, C)		wcschr((S), (C))
 #define MEMCHR(S, C, N)		wmemchr((S), (C), (N))
 #define STRCOLL(S1, S2)		wcscoll((S1), (S2))
@@ -390,10 +588,10 @@ xstrmatch (pattern, string, flags)
   wchar_t *wpattern, *wstring;
   size_t plen, slen, mplen, mslen;
 
-  if (mbsmbchar (string) == 0 && mbsmbchar (pattern) == 0)
+  if (MB_CUR_MAX == 1)
     return (internal_strmatch ((unsigned char *)pattern, (unsigned char *)string, flags));
 
-  if (MB_CUR_MAX == 1)
+  if (mbsmbchar (string) == 0 && mbsmbchar (pattern) == 0 && posix_cclass_only (pattern))
     return (internal_strmatch ((unsigned char *)pattern, (unsigned char *)string, flags));
 
   n = xdupmbstowcs (&wpattern, NULL, pattern);

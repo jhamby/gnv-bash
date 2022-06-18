@@ -86,15 +86,19 @@ WORD_LIST	*list;
 		case 'v':
 			vflag = 1;
 			break;
+		CASE_HELPOPT;
 		default:
 			builtin_usage();
+			return (EX_USAGE);
 		}
 	}
 
 	list = loptend;
 
-	if (list == 0)
+	if (list == 0) {
 		builtin_usage();
+		return (EX_USAGE);
+	}
 
 	for (es = EXECUTION_SUCCESS; list; list = list->next) {
 		p = list->word->word;
@@ -126,7 +130,7 @@ char *realpath_doc[] = {
 	"Display the canonicalized version of each PATHNAME argument, resolving",
 	"symbolic links.  The -c option checks whether or not each resolved name",
 	"exists.  The -s option produces no output; the exit status determines the",
-	"valididty of each PATHNAME.  The -v option produces verbose output.  The",
+	"validity of each PATHNAME.  The -v option produces verbose output.  The",
 	"exit status is 0 if each PATHNAME was resolved; non-zero otherwise.",
 	(char *)NULL
 };

@@ -1,6 +1,6 @@
 /* shell.c -- GNU's idea of the POSIX shell specification. */
 
-/* Copyright (C) 1987-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1987-2019 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -51,6 +51,7 @@
 #define NEED_SH_SETLINEBUF_DECL		/* used in externs.h */
 
 #include "shell.h"
+#include "parser.h"
 #include "flags.h"
 #include "trap.h"
 #include "mailcheck.h"
@@ -60,8 +61,9 @@
 #if defined (JOB_CONTROL)
 #include "jobs.h"
 #else
-extern int initialize_job_control __P((int));
-extern int get_tty_state __P((void));
+extern int running_in_background;
+extern int initialize_job_control PARAMS((int));
+extern int get_tty_state PARAMS((void));
 #endif /* JOB_CONTROL */
 
 #include "input.h"
@@ -101,22 +103,12 @@ extern int errno;
 extern char **environ;	/* used if no third argument to main() */
 #endif
 
-extern char *dist_version, *release_status;
-extern int patch_level, build_version;
-extern int shell_level;
-extern int subshell_environment;
-extern int running_in_background;
-extern int last_command_exit_value;
-extern int line_number;
-extern int expand_aliases;
-extern int array_needs_making;
 extern int gnu_error_format;
-extern char *primary_prompt, *secondary_prompt;
-extern char *this_command_name;
 
 /* Non-zero means that this shell has already been run; i.e. you should
    call shell_reinitialize () if you need to start afresh. */
 int shell_initialized = 0;
+int bash_argv_initialized = 0;
 
 COMMAND *global_command = (COMMAND *)NULL;
 
@@ -187,6 +179,7 @@ char *shell_name = (char *)NULL;
 
 /* time in seconds when the shell was started */
 time_t shell_start_time;
+struct timeval shellstart;
 
 /* Are we running in an emacs shell window? */
 int running_under_emacs;
@@ -232,6 +225,8 @@ int dump_po_strings;		/* Dump strings in $"..." in po format */
 int wordexp_only = 0;		/* Do word expansion only */
 int protected_mode = 0;		/* No command substitution with --wordexp */
 
+int pretty_print_mode = 0;	/* pretty-print a shell script */
+
 #if defined (STRICT_POSIX)
 int posixly_correct = 1;	/* Non-zero means posix.2 superset. */
 #else
@@ -260,6 +255,7 @@ static const struct {
   { "noprofile", Int, &no_profile, (char **)0x0 },
   { "norc", Int, &no_rc, (char **)0x0 },
   { "posix", Int, &posixly_correct, (char **)0x0 },
+  { "pretty-print", Int, &pretty_print_mode, (char **)0x0 },
 #if defined (WORDEXP_OPTION)
   { "protected", Int, &protected_mode, (char **)0x0 },
 #endif
@@ -297,6 +293,7 @@ int want_pending_command;	/* -c flag supplied */
 
 /* This variable is not static so it can be bound to $BASH_EXECUTION_STRING */
 char *command_execution_string;	/* argument to -c option */
+char *shell_script_filename; 	/* shell script */
 
 int malloc_trace_at_exit = 0;
 
@@ -307,35 +304,38 @@ static FILE *default_input;
 static STRING_INT_ALIST *shopt_alist;
 static int shopt_ind = 0, shopt_len = 0;
 
-static int parse_long_options __P((char **, int, int));
-static int parse_shell_options __P((char **, int, int));
-static int bind_args __P((char **, int, int, int));
+static int parse_long_options PARAMS((char **, int, int));
+static int parse_shell_options PARAMS((char **, int, int));
+static int bind_args PARAMS((char **, int, int, int));
 
-static void start_debugger __P((void));
+static void start_debugger PARAMS((void));
 
-static void add_shopt_to_alist __P((char *, int));
-static void run_shopt_alist __P((void));
+static void add_shopt_to_alist PARAMS((char *, int));
+static void run_shopt_alist PARAMS((void));
 
-static void execute_env_file __P((char *));
-static void run_startup_files __P((void));
-static int open_shell_script __P((char *));
-static void set_bash_input __P((void));
-static int run_one_command __P((char *));
+static void execute_env_file PARAMS((char *));
+static void run_startup_files PARAMS((void));
+static int open_shell_script PARAMS((char *));
+static void set_bash_input PARAMS((void));
+static int run_one_command PARAMS((char *));
 #if defined (WORDEXP_OPTION)
-static int run_wordexp __P((char *));
+static int run_wordexp PARAMS((char *));
 #endif
 
-static int uidget __P((void));
+static int uidget PARAMS((void));
 
-static void init_interactive __P((void));
-static void init_noninteractive __P((void));
-static void init_interactive_script __P((void));
+static void set_option_defaults PARAMS((void));
+static void reset_option_defaults PARAMS((void));
 
-static void set_shell_name __P((char *));
-static void shell_initialize __P((void));
-static void shell_reinitialize __P((void));
+static void init_interactive PARAMS((void));
+static void init_noninteractive PARAMS((void));
+static void init_interactive_script PARAMS((void));
 
-static void show_shell_usage __P((FILE *, int));
+static void set_shell_name PARAMS((char *));
+static void shell_initialize PARAMS((void));
+static void shell_reinitialize PARAMS((void));
+
+static void show_shell_usage PARAMS((FILE *, int));
 
 #ifdef __CYGWIN__
 static void
@@ -433,7 +433,7 @@ main (argc, argv, env)
   arg_index = 1;
   if (arg_index > argc)
     arg_index = argc;
-  command_execution_string = (char *)NULL;
+  command_execution_string = shell_script_filename = (char *)NULL;
   want_pending_command = locally_skip_execution = read_from_stdin = 0;
   default_input = stdin;
 #if defined (BUFFERED_INPUT)
@@ -459,7 +459,9 @@ main (argc, argv, env)
 
   shell_environment = env;
   set_shell_name (argv[0]);
-  shell_start_time = NOW;	/* NOW now defined in general.h */
+
+  gettimeofday (&shellstart, 0);
+  shell_start_time = shellstart.tv_sec;
 
   /* Parse argument flags from the input line. */
 
@@ -584,7 +586,7 @@ main (argc, argv, env)
    */
   if (interactive_shell)
     {
-      char *term, *emacs, *inside_emacs;;
+      char *term, *emacs, *inside_emacs;
       int emacs_term, in_emacs;
 
       term = get_string_value ("TERM");
@@ -673,6 +675,22 @@ main (argc, argv, env)
   restricted = 0;
 #endif
 
+  /* Set positional parameters before running startup files. top_level_arg_index
+     holds the index of the current argument before setting the positional
+     parameters, so any changes performed in the startup files won't affect
+     later option processing. */
+  if (wordexp_only)
+    ;			/* nothing yet */
+  else if (command_execution_string)
+    arg_index = bind_args (argv, arg_index, argc, 0);	/* $0 ... $n */
+  else if (arg_index != argc && read_from_stdin == 0)
+    {
+      shell_script_filename = argv[arg_index++];
+      arg_index = bind_args (argv, arg_index, argc, 1);	/* $1 ... $n */
+    }
+  else
+    arg_index = bind_args (argv, arg_index, argc, 1);	/* $1 ... $n */
+
   /* The startup files are run with `set -e' temporarily disabled. */
   if (locally_skip_execution == 0 && running_setuid == 0)
     {
@@ -703,7 +721,7 @@ main (argc, argv, env)
   if (wordexp_only)
     {
       startup_state = 3;
-      last_command_exit_value = run_wordexp (argv[arg_index]);
+      last_command_exit_value = run_wordexp (argv[top_level_arg_index]);
       exit_shell (last_command_exit_value);
     }
 #endif
@@ -713,7 +731,6 @@ main (argc, argv, env)
 
   if (command_execution_string)
     {
-      arg_index = bind_args (argv, arg_index, argc, 0);
       startup_state = 2;
 
       if (debugging_mode)
@@ -731,11 +748,8 @@ main (argc, argv, env)
 
   /* Get possible input filename and set up default_buffered_input or
      default_input as appropriate. */
-  if (arg_index != argc && read_from_stdin == 0)
-    {
-      open_shell_script (argv[arg_index]);
-      arg_index++;
-    }
+  if (shell_script_filename)
+    open_shell_script (shell_script_filename);
   else if (interactive == 0)
     {
       /* In this mode, bash is reading a script from stdin, which is a
@@ -747,15 +761,12 @@ main (argc, argv, env)
 #endif /* !BUFFERED_INPUT */
       read_from_stdin = 1;
     }
-  else if (arg_index == argc)
+  else if (top_level_arg_index == argc)		/* arg index before startup files */
     /* "If there are no operands and the -c option is not specified, the -s
        option shall be assumed." */
     read_from_stdin = 1;
 
   set_bash_input ();
-
-  /* Bind remaining args to $1 ... $n */
-  arg_index = bind_args (argv, arg_index, argc, 1);
 
   if (debugging_mode && locally_skip_execution == 0 && running_setuid == 0 && (reading_shell_script || interactive_shell == 0))
     start_debugger ();
@@ -787,6 +798,14 @@ main (argc, argv, env)
 #endif /* !ONESHOT */
 
   shell_initialized = 1;
+
+  if (pretty_print_mode && interactive_shell)
+    {
+      internal_warning (_("pretty-printing mode ignored in interactive shells"));
+      pretty_print_mode = 0;
+    }
+  if (pretty_print_mode)
+    exit_shell (pretty_print_loop ());
 
   /* Read commands until exit condition. */
   reader_loop ();
@@ -894,7 +913,9 @@ parse_shell_options (argv, arg_start, arg_end)
 	      o_option = argv[next_arg];
 	      if (o_option == 0)
 		{
+		  set_option_defaults ();
 		  list_minus_o_opts (-1, (on_or_off == '-') ? 0 : 1);
+		  reset_option_defaults ();
 		  break;
 		}
 	      if (set_minus_o_option (on_or_off, o_option) != EXECUTION_SUCCESS)
@@ -960,7 +981,7 @@ exit_shell (s)
     s = run_exit_trap ();
 
 #if defined (PROCESS_SUBSTITUTION)
-  unlink_fifo_list ();
+  unlink_all_fifos ();
 #endif /* PROCESS_SUBSTITUTION */
 
 #if defined (HISTORY)
@@ -999,7 +1020,7 @@ sh_exit (s)
      int s;
 {
 #if defined (MALLOC_DEBUG) && defined (USING_BASH_MALLOC)
-  if (malloc_trace_at_exit)
+  if (malloc_trace_at_exit && (subshell_environment & (SUBSHELL_COMSUB|SUBSHELL_PROCSUB)) == 0)
     trace_malloc_stats (get_name_for_error (), (char *)NULL);
   /* mlocation_write_table (); */
 #endif
@@ -1023,6 +1044,13 @@ subshell_exit (s)
     s = run_exit_trap ();
 
   sh_exit (s);
+}
+
+void
+set_exit_status (s)
+     int s;
+{
+  set_pipestatus_from_exit (last_command_exit_value = s);
 }
 
 /* Source the bash startup files.  If POSIXLY_CORRECT is non-zero, we obey
@@ -1236,10 +1264,15 @@ maybe_make_restricted (name)
     temp++;
   if (restricted || (STREQ (temp, RESTRICTED_SHELL_NAME)))
     {
+#if defined (RBASH_STATIC_PATH_VALUE)
+      bind_variable ("PATH", RBASH_STATIC_PATH_VALUE, 0);
+      stupidly_hack_special_variables ("PATH");		/* clear hash table */
+#endif
       set_var_read_only ("PATH");
       set_var_read_only ("SHELL");
       set_var_read_only ("ENV");
       set_var_read_only ("BASH_ENV");
+      set_var_read_only ("HISTFILE");
       restricted = 1;
     }
   return (restricted);
@@ -1276,7 +1309,11 @@ disable_priv_mode ()
 {
   int e;
 
+#if HAVE_SETRESUID
+  if (setresuid (current_user.uid, current_user.uid, current_user.uid) < 0)
+#else
   if (setuid (current_user.uid) < 0)
+#endif
     {
       e = errno;
       sys_error (_("cannot set uid to %d: effective uid %d"), current_user.uid, current_user.euid);
@@ -1285,7 +1322,11 @@ disable_priv_mode ()
 	exit (e);
 #endif
     }
+#if HAVE_SETRESGID
+  if (setresgid (current_user.gid, current_user.gid, current_user.gid) < 0)
+#else
   if (setgid (current_user.gid) < 0)
+#endif
     sys_error (_("cannot set gid to %d: effective gid %d"), current_user.gid, current_user.egid);
 
   current_user.euid = current_user.uid;
@@ -1396,7 +1437,7 @@ run_one_command (command)
 	  command_error ("run_one_command", CMDERR_BADJUMP, code, 0);
 	}
     }
-   return (parse_and_execute (savestring (command), "-c", SEVAL_NOHIST));
+   return (parse_and_execute (savestring (command), "-c", SEVAL_NOHIST|SEVAL_RESETLINE));
 }
 #endif /* ONESHOT */
 
@@ -1406,13 +1447,21 @@ bind_args (argv, arg_start, arg_end, start_index)
      int arg_start, arg_end, start_index;
 {
   register int i;
-  WORD_LIST *args;
+  WORD_LIST *args, *tl;
 
-  for (i = arg_start, args = (WORD_LIST *)NULL; i < arg_end; i++)
-    args = make_word_list (make_word (argv[i]), args);
+  for (i = arg_start, args = tl = (WORD_LIST *)NULL; i < arg_end; i++)
+    {
+      if (args == 0)
+	args = tl = make_word_list (make_word (argv[i]), args);
+      else
+	{
+	  tl->next = make_word_list (make_word (argv[i]), (WORD_LIST *)NULL);
+	  tl = tl->next;
+	}
+    }
+
   if (args)
     {
-      args = REVERSE_LIST (args, WORD_LIST *);
       if (start_index == 0)	/* bind to $0...$n for sh -c command */
 	{
 	  /* Posix.2 4.56.3 says that the first argument after sh -c command
@@ -1421,12 +1470,23 @@ bind_args (argv, arg_start, arg_end, start_index)
 	  FREE (dollar_vars[0]);
 	  dollar_vars[0] = savestring (args->word->word);
 	  remember_args (args->next, 1);
-	  push_args (args->next);	/* BASH_ARGV and BASH_ARGC */
+	  if (debugging_mode)
+	    {
+	      push_args (args->next);	/* BASH_ARGV and BASH_ARGC */
+	      bash_argv_initialized = 1;
+	    }
 	}
       else			/* bind to $1...$n for shell script */
         {
 	  remember_args (args, 1);
-	  push_args (args);		/* BASH_ARGV and BASH_ARGC */
+	  /* We do this unconditionally so something like -O extdebug doesn't
+	     do it first.  We're setting the definitive positional params
+	     here. */
+	  if (debugging_mode)
+	    {
+	      push_args (args);		/* BASH_ARGV and BASH_ARGC */
+	      bash_argv_initialized = 1;
+	    }
         }
 
       dispose_words (args);
@@ -1504,6 +1564,9 @@ open_shell_script (script_name)
     {
       e = errno;
       file_error (filename);
+#if defined (JOB_CONTROL)
+      end_job_control ();	/* just in case we were run as bash -i script */
+#endif
       sh_exit ((e == ENOENT) ? EX_NOTFOUND : EX_NOINPUT);
     }
 
@@ -1523,6 +1586,9 @@ open_shell_script (script_name)
       errno = EINVAL;
 #endif
       file_error (filename);
+#if defined (JOB_CONTROL)
+      end_job_control ();	/* just in case we were run as bash -i script */
+#endif
       sh_exit (EX_NOINPUT);
     }
 
@@ -1571,11 +1637,17 @@ open_shell_script (script_name)
 	      errno = e;
 	      file_error (filename);
 	    }
+#if defined (JOB_CONTROL)
+	  end_job_control ();	/* just in case we were run as bash -i script */
+#endif
 	  exit (EX_NOEXEC);
 	}
       else if (sample_len > 0 && (check_binary_file (sample, sample_len)))
 	{
 	  internal_error (_("%s: cannot execute binary file"), filename);
+#if defined (JOB_CONTROL)
+	  end_job_control ();	/* just in case we were run as bash -i script */
+#endif
 	  exit (EX_BINARY_FILE);
 	}
       /* Now rewind the file back to the beginning. */
@@ -1715,13 +1787,39 @@ set_shell_name (argv0)
     shell_name = PROGRAM;
 }
 
+/* Some options are initialized to -1 so we have a way to determine whether
+   they were set on the command line. This is an issue when listing the option
+   values at invocation (`bash -o'), so we set the defaults here and reset
+   them after the call to list_minus_o_options (). */
+/* XXX - could also do this for histexp_flag, jobs_m_flag */
+static void
+set_option_defaults ()
+{
+#if defined (HISTORY)
+  enable_history_list = 0;
+#endif
+}
+
+static void
+reset_option_defaults ()
+{
+#if defined (HISTORY)
+  enable_history_list = -1;
+#endif
+}
+
 static void
 init_interactive ()
 {
   expand_aliases = interactive_shell = startup_state = 1;
   interactive = 1;
 #if defined (HISTORY)
-  remember_on_history = enable_history_list = 1;	/* XXX */
+  if (enable_history_list == -1)
+    enable_history_list = 1;				/* set default  */
+  remember_on_history = enable_history_list;
+#  if defined (BANG_HISTORY)
+  histexp_flag = history_expansion;			/* XXX */
+#  endif
 #endif
 }
 
@@ -1729,6 +1827,8 @@ static void
 init_noninteractive ()
 {
 #if defined (HISTORY)
+  if (enable_history_list == -1)			/* set default */
+    enable_history_list = 0;
   bash_history_reinit (0);
 #endif /* HISTORY */
   interactive_shell = startup_state = interactive = 0;
@@ -1744,10 +1844,14 @@ init_noninteractive ()
 static void
 init_interactive_script ()
 {
+#if defined (HISTORY)
+  if (enable_history_list == -1)
+    enable_history_list = 1;
+#endif
   init_noninteractive ();
   expand_aliases = interactive_shell = startup_state = 1;
 #if defined (HISTORY)
-  remember_on_history = enable_history_list = 1;	/* XXX */
+  remember_on_history = enable_history_list;	/* XXX */
 #endif
 }
 
@@ -1889,6 +1993,7 @@ shell_reinitialize ()
   forced_interactive = interactive_shell = 0;
   subshell_environment = running_in_background = 0;
   expand_aliases = 0;
+  bash_argv_initialized = 0;
 
   /* XXX - should we set jobs_m_flag to 0 here? */
 
@@ -1939,7 +2044,11 @@ show_shell_usage (fp, extra)
 
   for (i = 0, set_opts = 0; shell_builtins[i].name; i++)
     if (STREQ (shell_builtins[i].name, "set"))
-      set_opts = savestring (shell_builtins[i].short_doc);
+      {
+	set_opts = savestring (shell_builtins[i].short_doc);
+	break;
+      }
+
   if (set_opts)
     {
       s = strchr (set_opts, '[');

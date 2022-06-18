@@ -49,8 +49,8 @@
  *  * Tables are converted but some features are not possible in html.
  *  * The tabbing environment is converted by counting characters and adding
  *    spaces. This might go wrong (outside <PRE>)
- *  * Some pages look beter if man2html works in troff mode, especially pages
- *    with tables. You can deside at compile time which made you want to use.
+ *  * Some pages look better if man2html works in troff mode, especially pages
+ *    with tables. You can decide at compile time which made you want to use.
  *
  *    -DNROFF=0     troff mode
  *    -DNROFF=1     nroff mode   (default)
@@ -522,6 +522,7 @@ read_man_page(char *filename)
 			man_buf[buf_size] = '\n';
 			man_buf[buf_size + 1] = man_buf[buf_size + 2] = '\0';
 		} else {
+			free(man_buf);
 			man_buf = NULL;
 		}
 		fclose(man_stream);
@@ -1992,7 +1993,7 @@ unescape (char *c)
 	while (i < l && c[i]) {
 		if (c[i] == '\a') {
 			if (c[i+1])
-				strcpy(c + i, c + i + 1);	/* should be memmove */
+				memmove (c + i, c + i + 1, l - i);
 			else {
 				c[i] = '\0';
 				break;
@@ -2562,7 +2563,6 @@ scan_request(char *c)
 					h = name;
 				if (stat(h, &stbuf) != -1)
 					l = stbuf.st_size;
-				buf = stralloc(l + 4);
 #if NOCGI
 				if (!out_length) {
 					char   *t, *s;
@@ -3805,7 +3805,7 @@ scan_troff(char *c, int san, char **result)
 			   && *(h + 1) && islower(*(h + 1))
 			   && *(h + 2) && isspace(*(h + 2))) {
 			/*
-			 * BSD imbedded command eg ".It Fl Ar arg1 Fl Ar
+			 * BSD embedded command eg ".It Fl Ar arg1 Fl Ar
 			 * arg2"
 			 */
 			FLUSHIBP;

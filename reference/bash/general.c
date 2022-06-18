@@ -1,6 +1,6 @@
 /* general.c -- Stuff that is used by all files. */
 
-/* Copyright (C) 1987-2016 Free Software Foundation, Inc.
+/* Copyright (C) 1987-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -39,8 +39,14 @@
 #include "bashintl.h"
 
 #include "shell.h"
+#include "parser.h"
+#include "flags.h"
+#include "findcmd.h"
 #include "test.h"
 #include "trap.h"
+#include "pathexp.h"
+
+#include "builtins/common.h"
 
 #if defined (HAVE_MBSTR_H) && defined (HAVE_MBSCHR)
 #  include <mbstr.h>		/* mbschr */
@@ -52,22 +58,47 @@
 extern int errno;
 #endif /* !errno */
 
-extern int expand_aliases;
-extern int interactive_comments;
-extern int check_hashed_filenames;
-extern int source_uses_path;
-extern int source_searches_cwd;
-extern int posixly_correct;
-extern int inherit_errexit;
+#ifdef __CYGWIN__
+#  include <sys/cygwin.h>
+#endif
 
-static char *bash_special_tilde_expansions __P((char *));
-static int unquoted_tilde_word __P((const char *));
-static void initialize_group_array __P((void));
+static char *bash_special_tilde_expansions PARAMS((char *));
+static int unquoted_tilde_word PARAMS((const char *));
+static void initialize_group_array PARAMS((void));
 
 /* A standard error message to use when getcwd() returns NULL. */
 const char * const bash_getcwd_errstr = N_("getcwd: cannot access parent directories");
 
-/* Do whatever is necessary to initialize `Posix mode'. */
+/* Do whatever is necessary to initialize `Posix mode'.  This currently
+   modifies the following variables which are controlled via shopt:
+      interactive_comments
+      source_uses_path
+      expand_aliases
+      inherit_errexit
+      print_shift_error
+      posixglob
+
+   and the following variables which cannot be user-modified:
+
+      source_searches_cwd
+
+  If we add to the first list, we need to change the table and functions
+  below */
+
+static struct {
+  int *posix_mode_var;
+} posix_vars[] = 
+{
+  &interactive_comments,
+  &source_uses_path,
+  &expand_aliases,
+  &inherit_errexit,
+  &print_shift_error,
+  0
+};
+
+static char *saved_posix_vars = 0;
+
 void
 posix_initialize (on)
      int on;
@@ -78,14 +109,58 @@ posix_initialize (on)
       interactive_comments = source_uses_path = expand_aliases = 1;
       inherit_errexit = 1;
       source_searches_cwd = 0;
+      print_shift_error = 1;
     }
 
   /* Things that should be turned on when posix mode is disabled. */
-  if (on == 0)
+  else if (saved_posix_vars)		/* on == 0, restore saved settings */
+    {
+      set_posix_options (saved_posix_vars);
+      free (saved_posix_vars);
+      saved_posix_vars = 0;
+    }
+  else	/* on == 0, restore a default set of settings */
     {
       source_searches_cwd = 1;
       expand_aliases = interactive_shell;
+      print_shift_error = 0;
     }
+}
+
+int
+num_posix_options ()
+{
+  return ((sizeof (posix_vars) / sizeof (posix_vars[0])) - 1);
+}
+
+char *
+get_posix_options (bitmap)
+     char *bitmap;
+{
+  register int i;
+
+  if (bitmap == 0)
+    bitmap = (char *)xmalloc (num_posix_options ());	/* no trailing NULL */
+  for (i = 0; posix_vars[i].posix_mode_var; i++)
+    bitmap[i] = *(posix_vars[i].posix_mode_var);
+  return bitmap;
+}
+
+#undef save_posix_options
+void
+save_posix_options ()
+{
+  saved_posix_vars = get_posix_options (saved_posix_vars);
+}
+
+void
+set_posix_options (bitmap)
+     const char *bitmap;
+{
+  register int i;
+
+  for (i = 0; posix_vars[i].posix_mode_var; i++)
+    *(posix_vars[i].posix_mode_var) = bitmap[i];
 }
 
 /* **************************************************************** */
@@ -265,7 +340,7 @@ check_selfref (name, value, flags)
 #if defined (ARRAY_VARS)
   if (valid_array_reference (value, 0))
     {
-      t = array_variable_name (value, (char **)NULL, (int *)NULL);
+      t = array_variable_name (value, 0, (char **)NULL, (int *)NULL);
       if (t && STREQ (name, t))
 	{
 	  free (t);
@@ -279,21 +354,21 @@ check_selfref (name, value, flags)
 }
 
 /* Make sure that WORD is a valid shell identifier, i.e.
-   does not contain a dollar sign, nor is quoted in any way.  Nor
-   does it consist of all digits.  If CHECK_WORD is non-zero,
+   does not contain a dollar sign, nor is quoted in any way.
+   If CHECK_WORD is non-zero,
    the word is checked to ensure that it consists of only letters,
-   digits, and underscores. */
+   digits, and underscores, and does not consist of all digits. */
 int
 check_identifier (word, check_word)
      WORD_DESC *word;
      int check_word;
 {
-  if ((word->flags & (W_HASDOLLAR|W_QUOTED)) || all_digits (word->word))
+  if (word->flags & (W_HASDOLLAR|W_QUOTED))	/* XXX - HASDOLLAR? */
     {
       internal_error (_("`%s': not a valid identifier"), word->word);
       return (0);
     }
-  else if (check_word && legal_identifier (word->word) == 0)
+  else if (check_word && (all_digits (word->word) || legal_identifier (word->word) == 0))
     {
       internal_error (_("`%s': not a valid identifier"), word->word);
       return (0);
@@ -349,7 +424,9 @@ legal_alias_name (string, flags)
 }
 
 /* Returns non-zero if STRING is an assignment statement.  The returned value
-   is the index of the `=' sign. */
+   is the index of the `=' sign.  If FLAGS&1 we are expecting a compound assignment
+   and require an array subscript before the `=' to denote an assignment
+   statement. */
 int
 assignment (string, flags)
      const char *string;
@@ -361,7 +438,17 @@ assignment (string, flags)
   c = string[indx = 0];
 
 #if defined (ARRAY_VARS)
-  if ((legal_variable_starter (c) == 0) && (flags == 0 || c != '[')) /* ] */
+  /* If parser_state includes PST_COMPASSIGN, FLAGS will include 1, so we are
+     parsing the contents of a compound assignment. If parser_state includes
+     PST_REPARSE, we are in the middle of an assignment statement and breaking
+     the words between the parens into words and assignment statements, but
+     we don't need to check for that right now. Within a compound assignment,
+     the subscript is required to make the word an assignment statement. If
+     we don't have a subscript, even if the word is a valid assignment
+     statement otherwise, we don't want to treat it as one. */
+  if ((flags & 1) && c != '[')		/* ] */
+    return (0);
+  else if ((flags & 1) == 0 && legal_variable_starter (c) == 0)
 #else
   if (legal_variable_starter (c) == 0)
 #endif
@@ -377,7 +464,9 @@ assignment (string, flags)
 #if defined (ARRAY_VARS)
       if (c == '[')
 	{
-	  newi = skipsubscript (string, indx, 0);
+	  newi = skipsubscript (string, indx, (flags & 2) ? 1 : 0);
+	  /* XXX - why not check for blank subscripts here, if we do in
+	     valid_array_reference? */
 	  if (string[newi++] != ']')
 	    return (0);
 	  if (string[newi] == '+' && string[newi+1] == '=')
@@ -398,6 +487,20 @@ assignment (string, flags)
       indx++;
     }
   return (0);
+}
+
+int
+line_isblank (line)
+     const char *line;
+{
+  register int i;
+
+  if (line == 0)
+    return 0;		/* XXX */
+  for (i = 0; line[i]; i++)
+    if (isblank ((unsigned char)line[i]) == 0)
+      break;
+  return (line[i] == '\0');  
 }
 
 /* **************************************************************** */
@@ -445,6 +548,14 @@ sh_unset_nodelay_mode (fd)
     }
 
   return 0;
+}
+
+/* Just a wrapper for the define in include/filecntl.h */
+int
+sh_setclexec (fd)
+     int fd;
+{
+  return (SET_CLOSE_ON_EXEC (fd));
 }
 
 /* Return 1 if file descriptor FD is valid; 0 otherwise. */
@@ -718,7 +829,8 @@ make_absolute (string, dot_path)
     {
       char pathbuf[PATH_MAX + 1];
 
-      cygwin_conv_to_full_posix_path (string, pathbuf);
+      /* WAS cygwin_conv_to_full_posix_path (string, pathbuf); */
+      cygwin_conv_path (CCP_WIN_A_TO_POSIX, string, pathbuf, PATH_MAX);
       result = savestring (pathbuf);
     }
 #else
@@ -938,7 +1050,7 @@ extract_colon_unit (string, p_index)
 /* **************************************************************** */
 
 #if defined (PUSHD_AND_POPD)
-extern char *get_dirstack_from_string __P((char *));
+extern char *get_dirstack_from_string PARAMS((char *));
 #endif
 
 static char **bash_tilde_prefixes;
@@ -1087,20 +1199,8 @@ bash_tilde_expand (s, assign_p)
      const char *s;
      int assign_p;
 {
-  int old_immed, old_term, r;
+  int r;
   char *ret;
-
-#if 0
-  old_immed = interrupt_immediately;
-  old_term = terminate_immediately;
-  /* We want to be able to interrupt tilde expansion. Ordinarily, we can just
-     jump to top_level, but we don't want to run any trap commands in a signal
-     handler context.  We might be able to get away with just checking for
-     things like SIGINT and SIGQUIT. */
-  if (any_signals_trapped () < 0)
-    interrupt_immediately = 1;
-  terminate_immediately = 1;
-#endif
 
   tilde_additional_prefixes = assign_p == 0 ? (char **)0
   					    : (assign_p == 2 ? bash_tilde_prefixes2 : bash_tilde_prefixes);
@@ -1109,11 +1209,6 @@ bash_tilde_expand (s, assign_p)
 
   r = (*s == '~') ? unquoted_tilde_word (s) : 1;
   ret = r ? tilde_expand (s) : savestring (s);
-
-#if 0
-  interrupt_immediately = old_immed;
-  terminate_immediately = old_term;
-#endif
 
   QUIT;
 
@@ -1321,3 +1416,26 @@ conf_standard_path ()
 #  endif /* !CS_PATH */
 #endif /* !_CS_PATH || !HAVE_CONFSTR */
 }
+
+int
+default_columns ()
+{
+  char *v;
+  int c;
+
+  c = -1;
+  v = get_string_value ("COLUMNS");
+  if (v && *v)
+    {
+      c = atoi (v);
+      if (c > 0)
+	return c;
+    }
+
+  if (check_window_size)
+    get_new_window_size (0, (int *)0, &c);
+
+  return (c > 0 ? c : 80);
+}
+
+  

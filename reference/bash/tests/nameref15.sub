@@ -1,3 +1,16 @@
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 f() { local -n a=$1; a=X; }
 
 a=(0); f 'a[0]'
@@ -25,6 +38,23 @@ ref=
 add_X_echo ref
 echo outside "$ref"
 unset ref
+
+# same test, but assigning nameref variable circular reference directly
+xxx_func()
+{
+	typeset -n xxx=xxx
+	xxx=foo
+	declare -p xxx
+	echo $FUNCNAME: inside: xxx = $xxx
+}
+
+xxx=7
+echo before: $xxx
+xxx_func
+echo after: $xxx
+
+unset xxx
+unset -f xxx_func
 
 typeset -n ref=ref
 
@@ -85,4 +115,3 @@ v=(0 1)
 declare -n n=v[1]
 unset n
 declare -p n v
-

@@ -1,6 +1,6 @@
 /* shquote - functions to quote and dequote strings */
 
-/* Copyright (C) 1999-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1999-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -36,8 +36,8 @@
 #include "shmbchar.h"
 #include "shmbutil.h"
 
-extern char *ansic_quote __P((char *, int, int *));
-extern int ansic_shouldquote __P((const char *));
+extern char *ansic_quote PARAMS((char *, int, int *));
+extern int ansic_shouldquote PARAMS((const char *));
 
 /* Default set of characters that should be backslash-quoted in strings */
 static const char bstab[256] =
@@ -136,8 +136,15 @@ sh_double_quote (string)
      const char *string;
 {
   register unsigned char c;
+  int mb_cur_max;
   char *result, *r;
-  const char *s;
+  size_t slen;
+  const char *s, *send;
+  DECLARE_MBSTATE;
+
+  slen = strlen (string);
+  send = string + slen;
+  mb_cur_max = MB_CUR_MAX;
 
   result = (char *)xmalloc (3 + (2 * strlen (string)));
   r = result;
@@ -148,12 +155,19 @@ sh_double_quote (string)
       /* Backslash-newline disappears within double quotes, so don't add one. */
       if ((sh_syntaxtab[c] & CBSDQUOTE) && c != '\n')
 	*r++ = '\\';
-#if 0
-      /* Assume that the string will not be further expanded. */
-      else if (c == CTLESC || c == CTLNUL)
-	*r++ = CTLESC;		/* could be '\\'? */
+
+#if defined (HANDLE_MULTIBYTE)
+      if ((locale_utf8locale && (c & 0x80)) ||
+	  (locale_utf8locale == 0 && mb_cur_max > 1 && is_basic (c) == 0))
+	{
+	  COPY_CHAR_P (r, s, send);
+	  s--;		/* compensate for auto-increment in loop above */
+	  continue;
+	}
 #endif
 
+      /* Assume that the string will not be further expanded, so no need to
+	 add CTLESC to protect CTLESC or CTLNUL. */
       *r++ = c;
     }
 
@@ -171,16 +185,29 @@ sh_mkdoublequoted (s, slen, flags)
      int slen, flags;
 {
   char *r, *ret;
-  int rlen;
+  const char *send;
+  int rlen, mb_cur_max;
+  DECLARE_MBSTATE;
 
+  send = s + slen;
+  mb_cur_max = flags ? MB_CUR_MAX : 1;
   rlen = (flags == 0) ? slen + 3 : (2 * slen) + 1;
   ret = r = (char *)xmalloc (rlen);
-  
+
   *r++ = '"';
   while (*s)
     {
       if (flags && *s == '"')
 	*r++ = '\\';
+
+#if defined (HANDLE_MULTIBYTE)
+      if  (flags && ((locale_utf8locale && (*s & 0x80)) ||
+		     (locale_utf8locale == 0 && mb_cur_max > 1 && is_basic (*s) == 0)))
+	{
+	  COPY_CHAR_P (r, s, send);
+	  continue;
+	}
+#endif
       *r++ = *s++;
     }
   *r++ = '"';
@@ -228,7 +255,8 @@ sh_un_double_quote (string)
    going through the shell parser, which will protect the internal
    quoting characters.  TABLE, if set, points to a map of the ascii code
    set with char needing to be backslash-quoted if table[char]==1.  FLAGS,
-   if 1, causes tildes to be quoted as well. */
+   if 1, causes tildes to be quoted as well.  If FLAGS&2, backslash-quote
+   other shell blank characters. */
    
 char *
 sh_backslash_quote (string, table, flags)
@@ -258,7 +286,8 @@ sh_backslash_quote (string, table, flags)
 	  *r++ = c;
 	  continue;
 	}
-      if (mb_cur_max > 1 && is_basic (c) == 0)
+      if ((locale_utf8locale && (c & 0x80)) ||
+	  (locale_utf8locale == 0 && mb_cur_max > 1 && is_basic (c) == 0))
 	{
 	  COPY_CHAR_P (r, s, send);
 	  s--;		/* compensate for auto-increment in loop above */
@@ -272,6 +301,8 @@ sh_backslash_quote (string, table, flags)
       else if ((flags&1) && c == '~' && (s == string || s[-1] == ':' || s[-1] == '='))
         /* Tildes are special at the start of a word or after a `:' or `='
 	   (technically unquoted, but it doesn't make a difference in practice) */
+	*r++ = '\\';
+      else if ((flags&2) && shellblank((unsigned char)c))
 	*r++ = '\\';
       *r++ = c;
     }
@@ -288,17 +319,34 @@ sh_backslash_quote_for_double_quotes (string)
      char *string;
 {
   unsigned char c;
-  char *result, *r, *s;
-
-  result = (char *)xmalloc (2 * strlen (string) + 1);
+  char *result, *r, *s, *send;
+  size_t slen;
+  int mb_cur_max;
+  DECLARE_MBSTATE;
+ 
+  slen = strlen (string);
+  send = string + slen;
+  mb_cur_max = MB_CUR_MAX;
+  result = (char *)xmalloc (2 * slen + 1);
 
   for (r = result, s = string; s && (c = *s); s++)
     {
-      if (sh_syntaxtab[c] & CBSDQUOTE)
+      /* Backslash-newline disappears within double quotes, so don't add one. */
+      if ((sh_syntaxtab[c] & CBSDQUOTE) && c != '\n')
 	*r++ = '\\';
-      /* I should probably add flags for these to sh_syntaxtab[] */
+      /* I should probably use the CSPECL flag for these in sh_syntaxtab[] */
       else if (c == CTLESC || c == CTLNUL)
 	*r++ = CTLESC;		/* could be '\\'? */
+
+#if defined (HANDLE_MULTIBYTE)
+      if ((locale_utf8locale && (c & 0x80)) ||
+	  (locale_utf8locale == 0 && mb_cur_max > 1 && is_basic (c) == 0))
+	{
+	  COPY_CHAR_P (r, s, send);
+	  s--;		/* compensate for auto-increment in loop above */
+	  continue;
+	}
+#endif
 
       *r++ = c;
     }

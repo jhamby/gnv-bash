@@ -1,6 +1,6 @@
 /* arrayfunc.c -- High-level array functions used by other parts of the shell. */
 
-/* Copyright (C) 2001-2016 Free Software Foundation, Inc.
+/* Copyright (C) 2001-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -30,6 +30,7 @@
 #include "bashintl.h"
 
 #include "shell.h"
+#include "execute_cmd.h"
 #include "pathexp.h"
 
 #include "shmbutil.h"
@@ -39,16 +40,27 @@
 
 #include "builtins/common.h"
 
-extern char *this_command_name;
-extern int last_command_exit_value;
-extern int array_needs_making;
+#ifndef LBRACK
+#  define LBRACK '['
+#  define RBRACK ']'
+#endif
 
-static SHELL_VAR *bind_array_var_internal __P((SHELL_VAR *, arrayind_t, char *, char *, int));
-static SHELL_VAR *assign_array_element_internal __P((SHELL_VAR *, char *, char *, char *, int, char *, int));
+/* This variable means to not expand associative array subscripts more than
+   once, when performing variable expansion. */
+int assoc_expand_once = 0;
 
-static char *quote_assign __P((const char *));
-static void quote_array_assignment_chars __P((WORD_LIST *));
-static char *array_value_internal __P((const char *, int, int, int *, arrayind_t *));
+/* Ditto for indexed array subscripts -- currently unused */
+int array_expand_once = 0;
+
+static SHELL_VAR *bind_array_var_internal PARAMS((SHELL_VAR *, arrayind_t, char *, char *, int));
+static SHELL_VAR *assign_array_element_internal PARAMS((SHELL_VAR *, char *, char *, char *, int, char *, int));
+
+static void assign_assoc_from_kvlist PARAMS((SHELL_VAR *, WORD_LIST *, HASH_TABLE *, int));
+
+static char *quote_assign PARAMS((const char *));
+static void quote_array_assignment_chars PARAMS((WORD_LIST *));
+static char *quote_compound_array_word PARAMS((char *, int));
+static char *array_value_internal PARAMS((const char *, int, int, int *, arrayind_t *));
 
 /* Standard error message to use when encountering an invalid array subscript */
 const char * const bash_badsub_errmsg = N_("bad array subscript");
@@ -85,7 +97,8 @@ convert_var_to_array (var)
     array_needs_making++;
 
   VSETATTR (var, att_array);
-  VUNSETATTR (var, att_invisible);
+  if (oldval)
+    VUNSETATTR (var, att_invisible);
 
   /* Make sure it's not marked as an associative array any more */
   VUNSETATTR (var, att_assoc);
@@ -122,7 +135,8 @@ convert_var_to_assoc (var)
     array_needs_making++;
 
   VSETATTR (var, att_assoc);
-  VUNSETATTR (var, att_invisible);
+  if (oldval)
+    VUNSETATTR (var, att_invisible);
 
   /* Make sure it's not marked as an indexed array any more */
   VUNSETATTR (var, att_array);
@@ -173,7 +187,41 @@ make_array_variable_value (entry, ind, key, value, flags)
 
   return newval;
 }
-  
+
+/* Assign HASH[KEY]=VALUE according to FLAGS. ENTRY is an associative array
+   variable; HASH is the hash table to assign into. HASH may or may not be
+   the hash table associated with ENTRY; if it's not, the caller takes care
+   of it.
+   XXX - make sure that any dynamic associative array variables recreate the
+   hash table on each assignment. BASH_CMDS and BASH_ALIASES already do this */
+static SHELL_VAR *
+bind_assoc_var_internal (entry, hash, key, value, flags)
+     SHELL_VAR *entry;
+     HASH_TABLE *hash;
+     char *key;
+     char *value;
+     int flags;
+{
+  char *newval;
+
+  /* Use the existing array contents to expand the value */
+  newval = make_array_variable_value (entry, 0, key, value, flags);
+
+  if (entry->assign_func)
+    (*entry->assign_func) (entry, newval, 0, key);
+  else
+    assoc_insert (hash, key, newval);
+
+  FREE (newval);
+
+  VUNSETATTR (entry, att_invisible);	/* no longer invisible */
+
+  /* check mark_modified_variables if we ever want to export array vars */
+  return (entry);
+}
+
+/* Perform ENTRY[IND]=VALUE or ENTRY[KEY]=VALUE. This is not called for every
+   assignment to an associative array; see assign_compound_array_list below. */
 static SHELL_VAR *
 bind_array_var_internal (entry, ind, key, value, flags)
      SHELL_VAR *entry;
@@ -195,6 +243,8 @@ bind_array_var_internal (entry, ind, key, value, flags)
   FREE (newval);
 
   VUNSETATTR (entry, att_invisible);	/* no longer invisible */
+
+  /* check mark_modified_variables if we ever want to export array vars */
   return (entry);
 }
 
@@ -258,9 +308,6 @@ bind_assoc_variable (entry, name, key, value, flags)
      char *value;
      int flags;
 {
-  SHELL_VAR *dentry;
-  char *newval;
-
   if ((readonly_p (entry) && (flags&ASS_FORCE) == 0) || noassign_p (entry))
     {
       if (readonly_p (entry))
@@ -268,33 +315,36 @@ bind_assoc_variable (entry, name, key, value, flags)
       return (entry);
     }
 
-  return (bind_array_var_internal (entry, 0, key, value, flags));
+  return (bind_assoc_var_internal (entry, assoc_cell (entry), key, value, flags));
 }
 
 /* Parse NAME, a lhs of an assignment statement of the form v[s], and
-   assign VALUE to that array element by calling bind_array_variable(). */
+   assign VALUE to that array element by calling bind_array_variable().
+   Flags are ASS_ assignment flags */
 SHELL_VAR *
 assign_array_element (name, value, flags)
      char *name, *value;
      int flags;
 {
   char *sub, *vname;
-  int sublen;
-  SHELL_VAR *entry, *nv;
+  int sublen, isassoc;
+  SHELL_VAR *entry;
 
-  vname = array_variable_name (name, &sub, &sublen);
+  vname = array_variable_name (name, (flags & ASS_NOEXPAND) != 0, &sub, &sublen);
 
   if (vname == 0)
     return ((SHELL_VAR *)NULL);
 
-  if ((ALL_ELEMENT_SUB (sub[0]) && sub[1] == ']') || (sublen <= 1))
+  entry = find_variable (vname);
+  isassoc = entry && assoc_p (entry);
+
+  if (((isassoc == 0 || (flags & ASS_NOEXPAND) == 0) && (ALL_ELEMENT_SUB (sub[0]) && sub[1] == ']')) || (sublen <= 1))
     {
       free (vname);
       err_badarraysub (name);
       return ((SHELL_VAR *)NULL);
     }
 
-  entry = find_variable (vname);
   entry = assign_array_element_internal (entry, name, vname, sub, sublen, value, flags);
 
   free (vname);
@@ -317,7 +367,10 @@ assign_array_element_internal (entry, name, vname, sub, sublen, value, flags)
   if (entry && assoc_p (entry))
     {
       sub[sublen-1] = '\0';
-      akey = expand_assignment_string_to_string (sub, 0);	/* [ */
+      if ((flags & ASS_NOEXPAND) == 0)
+	akey = expand_assignment_string_to_string (sub, 0);	/* [ */
+      else
+	akey = savestring (sub);
       sub[sublen-1] = ']';
       if (akey == 0 || *akey == 0)
 	{
@@ -329,7 +382,7 @@ assign_array_element_internal (entry, name, vname, sub, sublen, value, flags)
     }
   else
     {
-      ind = array_expand_index (entry, sub, sublen);
+      ind = array_expand_index (entry, sub, sublen, 0);
       /* negative subscripts to indexed arrays count back from end */
       if (entry && ind < 0)
 	ind = (array_p (entry) ? array_max_index (array_cell (entry)) : 0) + 1 + ind;
@@ -389,7 +442,7 @@ find_or_make_array_variable (name, flags)
     }
   else if ((flags & 2) && array_p (var))
     {
-      last_command_exit_value = 1;
+      set_exit_status (EXECUTION_FAILURE);
       report_error (_("%s: cannot convert indexed to associative array"), name);
       return ((SHELL_VAR *)NULL);
     }
@@ -450,7 +503,6 @@ expand_compound_array_assignment (var, value, flags)
      int flags;
 {
   WORD_LIST *list, *nlist;
-  WORD_LIST *hd, *tl, *t, *n;
   char *val;
   int ni;
 
@@ -473,6 +525,9 @@ expand_compound_array_assignment (var, value, flags)
      (ksh93 seems to do this). */
   list = parse_string_to_word_list (val, 1, "array assign");
 
+  /* Note that we defer expansion of the assignment statements for associative
+     arrays here, so we don't have to scan the subscript and find the ending
+     bracket twice. See the caller below. */
   if (var && assoc_p (var))
     {
       if (val != value)
@@ -499,7 +554,75 @@ expand_compound_array_assignment (var, value, flags)
   return nlist;
 }
 
-/* Callers ensure that VAR is not NULL */
+#if ASSOC_KVPAIR_ASSIGNMENT
+static void
+assign_assoc_from_kvlist (var, nlist, h, flags)
+     SHELL_VAR *var;
+     WORD_LIST *nlist;
+     HASH_TABLE *h;
+     int flags;
+{
+  WORD_LIST *list;
+  char *akey, *aval, *k, *v;
+
+  for (list = nlist; list; list = list->next)
+    {
+      k = list->word->word;
+      v = list->next ? list->next->word->word : 0;
+
+      if (list->next)
+        list = list->next;
+
+      akey = expand_assignment_string_to_string (k, 0);
+      if (akey == 0 || *akey == 0)
+	{
+	  err_badarraysub (k);
+	  FREE (akey);
+	  continue;
+	}	      
+
+      aval = expand_assignment_string_to_string (v, 0);
+      if (aval == 0)
+	{
+	  aval = (char *)xmalloc (1);
+	  aval[0] = '\0';	/* like do_assignment_internal */
+	}
+
+      bind_assoc_var_internal (var, h, akey, aval, flags);
+      free (aval);
+    }
+}
+
+/* Return non-zero if L appears to be a key-value pair associative array
+   compound assignment. */ 
+int
+kvpair_assignment_p (l)
+     WORD_LIST *l;
+{
+  return (l && (l->word->flags & W_ASSIGNMENT) == 0 && l->word->word[0] != '[');	/*]*/
+}
+
+char *
+expand_and_quote_kvpair_word (w)
+     char *w;
+{
+  char *t, *r;
+
+  t = w ? expand_assignment_string_to_string (w, 0) : 0;
+  r = sh_single_quote (t ? t : "");
+  free (t);
+  return r;
+}
+#endif
+     
+/* Callers ensure that VAR is not NULL. Associative array assignments have not
+   been expanded when this is called, or have been expanded once and single-
+   quoted, so we don't have to scan through an unquoted expanded subscript to
+   find the ending bracket; indexed array assignments have been expanded and
+   possibly single-quoted to prevent further expansion.
+
+   If this is an associative array, we perform the assignments into NHASH and
+   set NHASH to be the value of VAR after processing the assignments in NLIST */
 void
 assign_compound_array_list (var, nlist, flags)
      SHELL_VAR *var;
@@ -507,7 +630,7 @@ assign_compound_array_list (var, nlist, flags)
      int flags;
 {
   ARRAY *a;
-  HASH_TABLE *h;
+  HASH_TABLE *h, *nhash;
   WORD_LIST *list;
   char *w, *val, *nval, *savecmd;
   int len, iflags, free_val;
@@ -515,7 +638,7 @@ assign_compound_array_list (var, nlist, flags)
   char *akey;
 
   a = (var && array_p (var)) ? array_cell (var) : (ARRAY *)0;
-  h = (var && assoc_p (var)) ? assoc_cell (var) : (HASH_TABLE *)0;
+  nhash = h = (var && assoc_p (var)) ? assoc_cell (var) : (HASH_TABLE *)0;
 
   akey = (char *)0;
   ind = 0;
@@ -527,10 +650,25 @@ assign_compound_array_list (var, nlist, flags)
       if (a && array_p (var))
 	array_flush (a);
       else if (h && assoc_p (var))
-	assoc_flush (h);
+	nhash = assoc_create (h->nbuckets);
     }
 
   last_ind = (a && (flags & ASS_APPEND)) ? array_max_index (a) + 1 : 0;
+
+#if ASSOC_KVPAIR_ASSIGNMENT
+  if (assoc_p (var) && kvpair_assignment_p (nlist))
+    {
+      iflags = flags & ~ASS_APPEND;
+      assign_assoc_from_kvlist (var, nlist, nhash, iflags);
+      if (nhash && nhash != h)
+	{
+	  h = assoc_cell (var);
+	  var_setassoc (var, nhash);
+	  assoc_dispose (h);
+	}
+      return;
+    }
+#endif
 
   for (list = nlist; list; list = list->next)
     {
@@ -573,7 +711,7 @@ assign_compound_array_list (var, nlist, flags)
 
 	  if (ALL_ELEMENT_SUB (w[1]) && len == 2)
 	    {
-	      last_command_exit_value = 1;
+	      set_exit_status (EXECUTION_FAILURE);
 	      if (assoc_p (var))
 		report_error (_("%s: invalid associative array key"), w);
 	      else
@@ -583,7 +721,7 @@ assign_compound_array_list (var, nlist, flags)
 
 	  if (array_p (var))
 	    {
-	      ind = array_expand_index (var, w + 1, len);
+	      ind = array_expand_index (var, w + 1, len, 0);
 	      /* negative subscripts to indexed arrays count back from end */
 	      if (ind < 0)
 		ind = array_max_index (array_cell (var)) + 1 + ind;
@@ -621,7 +759,7 @@ assign_compound_array_list (var, nlist, flags)
 	}
       else if (assoc_p (var))
 	{
-	  last_command_exit_value = 1;
+	  set_exit_status (EXECUTION_FAILURE);
 	  report_error (_("%s: %s: must use subscript when assigning associative array"), var->name, w);
 	  continue;
 	}
@@ -647,12 +785,22 @@ assign_compound_array_list (var, nlist, flags)
       savecmd = this_command_name;
       if (integer_p (var))
 	this_command_name = (char *)NULL;	/* no command name for errors */
-      bind_array_var_internal (var, ind, akey, val, iflags);
+      if (assoc_p (var))
+	bind_assoc_var_internal (var, nhash, akey, val, iflags);
+      else
+	bind_array_var_internal (var, ind, akey, val, iflags);
       last_ind++;
       this_command_name = savecmd;
 
       if (free_val)
 	free (val);
+    }
+
+  if (assoc_p (var) && nhash && nhash != h)
+    {
+      h = assoc_cell (var);
+      var_setassoc (var, nhash);
+      assoc_dispose (h);
     }
 }
 
@@ -727,6 +875,119 @@ quote_assign (string)
   return temp;
 }
 
+/* Take a word W of the form [IND]=VALUE and transform it to ['IND']='VALUE'
+   to prevent further expansion. This is called for compound assignments to
+   indexed arrays. W has already undergone word expansions. If W has no [IND]=,
+   just single-quote and return it. */
+static char *
+quote_compound_array_word (w, type)
+     char *w;
+     int type;
+{
+  char *nword, *sub, *value, *t;
+  int ind, wlen, i;
+
+  if (w[0] != LBRACK)
+    return (sh_single_quote (w));
+  ind = skipsubscript (w, 0, 0);
+  if (w[ind] != RBRACK)
+    return (sh_single_quote (w));
+
+  wlen = strlen (w);
+  w[ind] = '\0';
+  sub = sh_single_quote (w+1);
+  w[ind] = RBRACK;
+
+  nword = xmalloc (wlen * 4 + 5);	/* wlen*4 is max single quoted length */
+  nword[0] = LBRACK;
+  i = STRLEN (sub);
+  memcpy (nword+1, sub, i);
+  i++;				/* accommodate the opening LBRACK */
+  nword[i++] = w[ind++];	/* RBRACK */
+  if (w[ind] == '+')
+    nword[i++] = w[ind++];
+  nword[i++] = w[ind++];
+  value = sh_single_quote (w + ind);
+  strcpy (nword + i, value);
+
+  return nword;
+}
+
+/* Expand the key and value in W, which is of the form [KEY]=VALUE, and
+   reconstruct W with the expanded and single-quoted version:
+   ['expanded-key']='expanded-value'. If there is no [KEY]=, single-quote the
+   word and return it. Very similar to previous function, but does not assume
+   W has already been expanded, and expands the KEY and VALUE separately.
+   Used for compound assignments to associative arrays that are arguments to
+   declaration builtins (declare -A a=( list )). */
+char *
+expand_and_quote_assoc_word (w, type)
+     char *w;
+     int type;
+{
+  char *nword, *key, *value, *t;
+  int ind, wlen, i;
+
+  if (w[0] != LBRACK)
+    return (sh_single_quote (w));     
+  ind = skipsubscript (w, 0, 0);
+  if (w[ind] != RBRACK)
+    return (sh_single_quote (w));
+
+  w[ind] = '\0';
+  t = expand_assignment_string_to_string (w+1, 0);
+  w[ind] = RBRACK;
+  key = sh_single_quote (t ? t : "");
+  free (t);
+
+  wlen = STRLEN (key);
+  nword = xmalloc (wlen + 5);
+  nword[0] = LBRACK;
+  memcpy (nword+1, key, wlen);
+  i = wlen + 1;			/* accommodate the opening LBRACK */
+
+  nword[i++] = w[ind++];	/* RBRACK */
+  if (w[ind] == '+')
+    nword[i++] = w[ind++];
+  nword[i++] = w[ind++];
+
+  t = expand_assignment_string_to_string (w+ind, 0);
+  value = sh_single_quote (t ? t : "");
+  free (t);
+  nword = xrealloc (nword, wlen + 5 + STRLEN (value));
+  strcpy (nword + i, value);
+
+  free (key);
+  free (value);
+
+  return nword;
+}
+
+/* For each word in a compound array assignment, if the word looks like
+   [ind]=value, single-quote ind and value, but leave the brackets and
+   the = sign (and any `+') alone. If it's not an assignment, just single-
+   quote the word. This is used for indexed arrays. */
+void
+quote_compound_array_list (list, type)
+     WORD_LIST *list;
+     int type;
+{
+  char *t;
+  WORD_LIST *l;
+
+  for (l = list; l; l = l->next)
+    {
+      if (l->word == 0 || l->word->word == 0)
+	continue;	/* should not happen, but just in case... */
+      if ((l->word->flags & W_ASSIGNMENT) == 0)
+	t = sh_single_quote (l->word->word);
+      else 
+	t = quote_compound_array_word (l->word->word, type);
+      free (l->word->word);
+      l->word->word = t;
+    }
+}
+
 /* For each word in a compound array assignment, if the word looks like
    [ind]=value, quote globbing chars and characters in $IFS before the `='. */
 static void
@@ -759,17 +1020,19 @@ quote_array_assignment_chars (list)
 /* This function is called with SUB pointing to just after the beginning
    `[' of an array subscript and removes the array element to which SUB
    expands from array VAR.  A subscript of `*' or `@' unsets the array. */
+/* If FLAGS&1 we don't expand the subscript; we just use it as-is. */
 int
-unbind_array_element (var, sub)
+unbind_array_element (var, sub, flags)
      SHELL_VAR *var;
      char *sub;
+     int flags;
 {
   int len;
   arrayind_t ind;
   char *akey;
   ARRAY_ELEMENT *ae;
 
-  len = skipsubscript (sub, 0, (var && assoc_p(var)));
+  len = skipsubscript (sub, 0, (flags&1) || (var && assoc_p(var)));	/* XXX */
   if (sub[len] != ']' || len == 0)
     {
       builtin_error ("%s[%s: %s", var->name, sub, _(bash_badsub_errmsg));
@@ -790,7 +1053,7 @@ unbind_array_element (var, sub)
 
   if (assoc_p (var))
     {
-      akey = expand_assignment_string_to_string (sub, 0);     /* [ */
+      akey = (flags & 1) ? sub : expand_assignment_string_to_string (sub, 0);
       if (akey == 0 || *akey == 0)
 	{
 	  builtin_error ("[%s]: %s", sub, _(bash_badsub_errmsg));
@@ -798,11 +1061,12 @@ unbind_array_element (var, sub)
 	  return -1;
 	}
       assoc_remove (assoc_cell (var), akey);
-      free (akey);
+      if (akey != sub)
+	free (akey);
     }
   else if (array_p (var))
     {
-      ind = array_expand_index (var, sub, len+1);
+      ind = array_expand_index (var, sub, len+1, 0);
       /* negative subscripts to indexed arrays count back from end */
       if (ind < 0)
 	ind = array_max_index (array_cell (var)) + 1 + ind;
@@ -818,7 +1082,7 @@ unbind_array_element (var, sub)
   else	/* array_p (var) == 0 && assoc_p (var) == 0 */
     {
       akey = this_command_name;
-      ind = array_expand_index (var, sub, len+1);
+      ind = array_expand_index (var, sub, len+1, 0);
       this_command_name = akey;
       if (ind == 0)
 	{
@@ -879,42 +1143,62 @@ print_assoc_assignment (var, quoted)
 /***********************************************************************/
 
 /* Return 1 if NAME is a properly-formed array reference v[sub]. */
+
+/* We need to reserve 1 for FLAGS, which we pass to skipsubscript. */
 int
 valid_array_reference (name, flags)
      const char *name;
      int flags;
 {
   char *t;
-  int r, len;
+  int r, len, isassoc;
+  SHELL_VAR *entry;
 
   t = mbschr (name, '[');	/* ] */
+  isassoc = 0;
   if (t)
     {
       *t = '\0';
       r = legal_identifier (name);
+      if (flags & VA_NOEXPAND)	/* Don't waste a lookup if we don't need one */
+	isassoc = (entry = find_variable (name)) && assoc_p (entry);      
       *t = '[';
       if (r == 0)
 	return 0;
-      /* Check for a properly-terminated non-blank subscript. */
-      len = skipsubscript (t, 0, 0);
-      if (t[len] != ']' || len == 1)
+
+      if (isassoc && ((flags & (VA_NOEXPAND|VA_ONEWORD)) == (VA_NOEXPAND|VA_ONEWORD)))
+	len = strlen (t) - 1;
+      else if (isassoc)
+	len = skipsubscript (t, 0, flags&VA_NOEXPAND);	/* VA_NOEXPAND must be 1 */
+      else
+	/* Check for a properly-terminated non-null subscript. */
+	len = skipsubscript (t, 0, 0);		/* arithmetic expression */
+
+      if (t[len] != ']' || len == 1 || t[len+1] != '\0')
 	return 0;
-      if (t[len+1] != '\0')
-	return 0;
+
+#if 0
+      /* Could check and allow subscripts consisting only of whitespace for
+	 existing associative arrays, using isassoc */
       for (r = 1; r < len; r++)
 	if (whitespace (t[r]) == 0)
 	  return 1;
       return 0;
+#else
+      /* This allows blank subscripts */
+      return 1;
+#endif
     }
   return 0;
 }
 
 /* Expand the array index beginning at S and extending LEN characters. */
 arrayind_t
-array_expand_index (var, s, len)
+array_expand_index (var, s, len, flags)
      SHELL_VAR *var;
      char *s;
      int len;
+     int flags;
 {
   char *exp, *t, *savecmd;
   int expok;
@@ -923,16 +1207,23 @@ array_expand_index (var, s, len)
   exp = (char *)xmalloc (len);
   strncpy (exp, s, len - 1);
   exp[len - 1] = '\0';
+#if 0	/* TAG: maybe bash-5.2 */
+  if ((flags & AV_NOEXPAND) == 0)
+    t = expand_arith_string (exp, Q_DOUBLE_QUOTES|Q_ARITH|Q_ARRAYSUB);	/* XXX - Q_ARRAYSUB for future use */
+  else
+    t = exp;
+#endif
   t = expand_arith_string (exp, Q_DOUBLE_QUOTES|Q_ARITH|Q_ARRAYSUB);	/* XXX - Q_ARRAYSUB for future use */
   savecmd = this_command_name;
   this_command_name = (char *)NULL;
-  val = evalexp (t, &expok);
+  val = evalexp (t, EXP_EXPANDED, &expok);	/* XXX - was 0 but we expanded exp already */
   this_command_name = savecmd;
-  free (t);
+  if (t != exp)
+    free (t);
   free (exp);
   if (expok == 0)
     {
-      last_command_exit_value = EXECUTION_FAILURE;
+      set_exit_status (EXECUTION_FAILURE);
 
       if (no_longjmp_on_fatal_error)
 	return 0;
@@ -947,8 +1238,9 @@ array_expand_index (var, s, len)
    in *SUBP. If LENP is non-null, the length of the subscript is returned
    in *LENP.  This returns newly-allocated memory. */
 char *
-array_variable_name (s, subp, lenp)
+array_variable_name (s, flags, subp, lenp)
      const char *s;
+     int flags;
      char **subp;
      int *lenp;
 {
@@ -965,7 +1257,7 @@ array_variable_name (s, subp, lenp)
       return ((char *)NULL);
     }
   ind = t - s;
-  ni = skipsubscript (s, ind, 0);
+  ni = skipsubscript (s, ind, flags);	/* XXX - was 0 not flags */
   if (ni <= ind + 1 || s[ni] != ']')
     {
       err_badarraysub (s);
@@ -992,15 +1284,16 @@ array_variable_name (s, subp, lenp)
    non-null, return a pointer to the start of the subscript in *SUBP.
    If LENP is non-null, the length of the subscript is returned in *LENP. */
 SHELL_VAR *
-array_variable_part (s, subp, lenp)
+array_variable_part (s, flags, subp, lenp)
      const char *s;
+     int flags;
      char **subp;
      int *lenp;
 {
   char *t;
   SHELL_VAR *var;
 
-  t = array_variable_name (s, subp, lenp);
+  t = array_variable_name (s, flags, subp, lenp);
   if (t == 0)
     return ((SHELL_VAR *)NULL);
   var = find_variable (t);		/* XXX - handle namerefs here? */
@@ -1042,7 +1335,7 @@ array_value_internal (s, quoted, flags, rtype, indp)
   WORD_LIST *l;
   SHELL_VAR *var;
 
-  var = array_variable_part (s, &t, &len);
+  var = array_variable_part (s, (flags&AV_NOEXPAND) ? 1 : 0, &t, &len);	/* XXX */
 
   /* Expand the index, even if the variable doesn't exist, in case side
      effects are needed, like ${w[i++]} where w is unset. */
@@ -1067,6 +1360,8 @@ array_value_internal (s, quoted, flags, rtype, indp)
 	}
       else if (var == 0 || value_cell (var) == 0)	/* XXX - check for invisible_p(var) ? */
 	return ((char *)NULL);
+      else if (invisible_p (var))
+	return ((char *)NULL);
       else if (array_p (var) == 0 && assoc_p (var) == 0)
 	l = add_string_to_list (value_cell (var), (WORD_LIST *)NULL);
       else if (assoc_p (var))
@@ -1082,15 +1377,16 @@ array_value_internal (s, quoted, flags, rtype, indp)
 	    return ((char *) NULL);
 	}
 
+      /* Caller of array_value takes care of inspecting rtype and duplicating
+	 retval if rtype == 0, so this is not a memory leak */
       if (t[0] == '*' && (quoted & (Q_HERE_DOCUMENT|Q_DOUBLE_QUOTES)))
 	{
-	  temp = string_list_dollar_star (l);
-	  retval = quote_string (temp);		/* XXX - leak here */
+	  temp = string_list_dollar_star (l, quoted, (flags & AV_ASSIGNRHS) ? PF_ASSIGNRHS : 0);
+	  retval = quote_string (temp);
 	  free (temp);
 	}
       else	/* ${name[@]} or unquoted ${name[*]} */
-        /* XXX - bash-4.4/bash-5.0 test AV_ASSIGNRHS and pass PF_ASSIGNRHS */
-	retval = string_list_dollar_at (l, quoted, (flags & AV_ASSIGNRHS) ? PF_ASSIGNRHS : 0);	/* XXX - leak here */
+	retval = string_list_dollar_at (l, quoted, (flags & AV_ASSIGNRHS) ? PF_ASSIGNRHS : 0);
 
       dispose_words (l);
     }
@@ -1102,7 +1398,7 @@ array_value_internal (s, quoted, flags, rtype, indp)
 	{
 	  if ((flags & AV_USEIND) == 0 || indp == 0)
 	    {
-	      ind = array_expand_index (var, t, len);
+	      ind = array_expand_index (var, t, len, flags);
 	      if (ind < 0)
 		{
 		  /* negative subscripts to indexed arrays count back from end */
@@ -1120,7 +1416,10 @@ array_value_internal (s, quoted, flags, rtype, indp)
       else if (assoc_p (var))
 	{
 	  t[len - 1] = '\0';
-	  akey = expand_assignment_string_to_string (t, 0);	/* [ */
+	  if ((flags & AV_NOEXPAND) == 0)
+	    akey = expand_assignment_string_to_string (t, 0);	/* [ */
+	  else
+	    akey = savestring (t);
 	  t[len - 1] = ']';
 	  if (akey == 0 || *akey == 0)
 	    {
@@ -1130,6 +1429,11 @@ array_value_internal (s, quoted, flags, rtype, indp)
 	}
      
       if (var == 0 || value_cell (var) == 0)	/* XXX - check invisible_p(var) ? */
+	{
+          FREE (akey);
+	  return ((char *)NULL);
+	}
+      else if (invisible_p (var))
 	{
           FREE (akey);
 	  return ((char *)NULL);
@@ -1173,16 +1477,16 @@ get_array_value (s, flags, rtype, indp)
 }
 
 char *
-array_keys (s, quoted)
+array_keys (s, quoted, pflags)
      char *s;
-     int quoted;
+     int quoted, pflags;
 {
   int len;
   char *retval, *t, *temp;
   WORD_LIST *l;
   SHELL_VAR *var;
 
-  var = array_variable_part (s, &t, &len);
+  var = array_variable_part (s, 0, &t, &len);
 
   /* [ */
   if (var == 0 || ALL_ELEMENT_SUB (t[0]) == 0 || t[1] != ']')
@@ -1200,14 +1504,7 @@ array_keys (s, quoted)
   if (l == (WORD_LIST *)NULL)
     return ((char *) NULL);
 
-  if (t[0] == '*' && (quoted & (Q_HERE_DOCUMENT|Q_DOUBLE_QUOTES)))
-    {
-      temp = string_list_dollar_star (l);
-      retval = quote_string (temp);
-      free (temp);
-    }
-  else	/* ${!name[@]} or unquoted ${!name[*]} */
-    retval = string_list_dollar_at (l, quoted, 0);
+  retval = string_list_pos_params (t[0], l, quoted, pflags);
 
   dispose_words (l);
   return retval;

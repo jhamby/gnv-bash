@@ -1,7 +1,7 @@
 This file is declare.def, from which is created declare.c.
 It implements the builtins "declare" and "local" in Bash.
 
-Copyright (C) 1987-2016 Free Software Foundation, Inc.
+Copyright (C) 1987-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -22,7 +22,7 @@ $PRODUCES declare.c
 
 $BUILTIN declare
 $FUNCTION declare_builtin
-$SHORT_DOC declare [-aAfFgilnrtux] [-p] [name[=value] ...]
+$SHORT_DOC declare [-aAfFgiIlnrtux] [-p] [name[=value] ...]
 Set variable values and attributes.
 
 Declare variables and give them attributes.  If no NAMEs are given,
@@ -34,17 +34,19 @@ Options:
 		source file when debugging)
   -g	create global variables when used in a shell function; otherwise
 		ignored
+  -I	if creating a local variable, inherit the attributes and value
+		of a variable with the same name at a previous scope
   -p	display the attributes and value of each NAME
 
 Options which set attributes:
   -a	to make NAMEs indexed arrays (if supported)
   -A	to make NAMEs associative arrays (if supported)
   -i	to make NAMEs have the `integer' attribute
-  -l	to convert NAMEs to lower case on assignment
+  -l	to convert the value of each NAME to lower case on assignment
   -n	make NAME a reference to the variable named by its value
   -r	to make NAMEs readonly
   -t	to make NAMEs have the `trace' attribute
-  -u	to convert NAMEs to upper case on assignment
+  -u	to convert the value of each NAME to upper case on assignment
   -x	to make NAMEs export
 
 Using `+' instead of `-' turns off the given attribute.
@@ -62,7 +64,7 @@ $END
 
 $BUILTIN typeset
 $FUNCTION declare_builtin
-$SHORT_DOC typeset [-aAfFgilnrtux] [-p] name[=value] ...
+$SHORT_DOC typeset [-aAfFgiIlnrtux] [-p] name[=value] ...
 Set variable values and attributes.
 
 A synonym for `declare'.  See `help declare'.
@@ -88,10 +90,8 @@ $END
 #include "builtext.h"
 #include "bashgetopt.h"
 
-extern int array_needs_making;
-extern int posixly_correct;
-
-static int declare_internal __P((register WORD_LIST *, int));
+static SHELL_VAR *declare_find_variable PARAMS((const char *, int, int));
+static int declare_internal PARAMS((register WORD_LIST *, int));
 
 /* Declare or change variable attributes. */
 int
@@ -120,6 +120,13 @@ int
 local_builtin (list)
      register WORD_LIST *list;
 {
+  /* Catch a straight `local --help' before checking function context */
+  if (list && list->word && STREQ (list->word->word, "--help"))
+    {
+      builtin_help ();
+      return (EX_USAGE);
+    }
+    
   if (variable_context)
     return (declare_internal (list, 1));
   else
@@ -130,10 +137,30 @@ local_builtin (list)
 }
 
 #if defined (ARRAY_VARS)
-#  define DECLARE_OPTS	"+acfgilnprtuxAF"
+#  define DECLARE_OPTS	"+acfgilnprtuxAFGI"
 #else
-#  define DECLARE_OPTS	"+cfgilnprtuxF"
+#  define DECLARE_OPTS	"+cfgilnprtuxFGI"
 #endif
+
+static SHELL_VAR *
+declare_find_variable (name, mkglobal, chklocal)
+     const char *name;
+     int mkglobal, chklocal;
+{
+  SHELL_VAR *var;
+
+  if (mkglobal == 0)
+    return (find_variable (name));
+  else if (chklocal)
+    {
+      var = find_variable (name);
+      if (var && local_p (var) && var->context == variable_context)
+	return var;
+      return (find_global_variable (name));
+    }
+  else
+    return (find_global_variable (name));
+}
 
 /* The workhorse function. */
 static int
@@ -142,12 +169,14 @@ declare_internal (list, local_var)
      int local_var;
 {
   int flags_on, flags_off, *flags;
-  int any_failed, assign_error, pflag, nodefs, opt, mkglobal, onref, offref;
+  int any_failed, assign_error, pflag, nodefs, opt, onref, offref;
+  int mkglobal, chklocal, inherit_flag;
   char *t, *subscript_start;
   SHELL_VAR *var, *refvar, *v;
   FUNCTION_DEF *shell_fn;
 
-  flags_on = flags_off = any_failed = assign_error = pflag = nodefs = mkglobal = 0;
+  flags_on = flags_off = any_failed = assign_error = pflag = nodefs = 0;
+  mkglobal = chklocal = inherit_flag = 0;
   refvar = (SHELL_VAR *)NULL;
   reset_internal_getopt ();
   while ((opt = internal_getopt (list, DECLARE_OPTS)) != -1)
@@ -175,7 +204,7 @@ declare_internal (list, local_var)
 	  return (EX_USAGE);
 #endif
 	case 'p':
-	  if (local_var == 0)
+/*	  if (local_var == 0) */
 	    pflag++;
 	  break;
         case 'F':
@@ -185,6 +214,10 @@ declare_internal (list, local_var)
 	case 'f':
 	  *flags |= att_function;
 	  break;
+	case 'G':
+	  if (flags == &flags_on)
+	    chklocal = 1;
+	  /*FALLTHROUGH*/
 	case 'g':
 	  if (flags == &flags_on)
 	    mkglobal = 1;
@@ -224,6 +257,9 @@ declare_internal (list, local_var)
 	    flags_off |= att_capcase|att_lowercase;
 	  break;
 #endif /* CASEMOD_ATTRS */
+	case 'I':
+	  inherit_flag = MKLOC_INHERIT;
+	  break;
 	CASE_HELPOPT;
 	default:
 	  builtin_usage ();
@@ -240,20 +276,7 @@ declare_internal (list, local_var)
       /* Show local variables defined at this context level if this is
 	 the `local' builtin. */
       if (local_var)
-	{
-	  register SHELL_VAR **vlist;
-	  register int i;
-
-	  vlist = all_local_variables ();
-
-	  if (vlist)
-	    {
-	      for (i = 0; vlist[i]; i++)
-		print_assignment (vlist[i]);
-
-	      free (vlist);
-	    }
-	}
+	show_local_var_attributes (0, nodefs);	/* XXX - fix up args later */
       else if (pflag && (flags_on == 0 || flags_on == att_function))
 	show_all_var_attributes (flags_on == 0, nodefs);
       else if (flags_on == 0)
@@ -270,6 +293,8 @@ declare_internal (list, local_var)
 	{
 	  if (flags_on & att_function)
 	    pflag = show_func_attributes (list->word->word, nodefs);
+	  else if (local_var)
+	    pflag = show_localname_attributes (list->word->word, nodefs);
 	  else
 	    pflag = show_name_attributes (list->word->word, nodefs);
 	  if (pflag)
@@ -288,6 +313,7 @@ declare_internal (list, local_var)
     {
       char *value, *name, *oldname;
       int offset, aflags, wflags, created_var, namelen;
+      int assoc_noexpand;
 #if defined (ARRAY_VARS)
       int making_array_special, compound_array_assign, simple_array_assign;
       int var_exists, array_exists, creating_array, array_subscript_assignment;
@@ -295,13 +321,18 @@ declare_internal (list, local_var)
 
       name = savestring (list->word->word);
       wflags = list->word->flags;
-      offset = assignment (name, 0);
+#if defined (ARRAY_VARS)
+      assoc_noexpand = assoc_expand_once && (wflags & W_ASSIGNMENT);
+#else
+      assoc_noexpand = 0;
+#endif
+      offset = assignment (name, assoc_noexpand ? 2 : 0);
       aflags = 0;
       created_var = 0;
 
       if (local_var && variable_context && STREQ (name, "-"))
 	{
-	  var = make_local_variable ("-");
+	  var = make_local_variable ("-", 0);
 	  FREE (value_cell (var));		/* just in case */
 	  value = get_current_options ();
 	  var_setvalue (var, value);
@@ -363,7 +394,7 @@ restart_new_var_name:
       compound_array_assign = simple_array_assign = 0;
       array_subscript_assignment = 0;
       subscript_start = (char *)NULL;
-      if (t = strchr (name, '['))	/* ] */
+      if ((t = strchr (name, '[')) && (flags_on & att_function) == 0)	/* ] */
 	{
 	  /* If offset != 0 we have already validated any array reference
 	     because assignment() calls skipsubscript() */
@@ -403,19 +434,38 @@ restart_new_var_name:
       refvar = (SHELL_VAR *)NULL;
       if (variable_context && mkglobal == 0 && ((flags_on & att_function) == 0))
 	{
+	  char *newname;
+
 	  /* check name for validity here? */
+	  var = find_variable (name);
+	  if (var == 0)
+	    newname = nameref_transform_name (name, ASS_MKLOCAL);
+	  else if ((flags_on & att_nameref) == 0 && (flags_off & att_nameref) == 0)
+	    {
+	      /* Ok, we're following namerefs here, so let's make sure that if
+		 we followed one, it was at the same context (see below for
+		 more details). */
+	      refvar = find_variable_last_nameref (name, 1);
+	      newname = (refvar && refvar->context != variable_context) ? name : var->name;
+	      refvar = (SHELL_VAR *)NULL;
+	    }
+	  else
+	    newname = name;	/* dealing with nameref attribute */
+
 #if defined (ARRAY_VARS)
+	  /* Pass 1 as second argument to make_local_{assoc,array}_variable
+	     return an existing {array,assoc} variable to be flagged as an
+	     error below. */
 	  if (flags_on & att_assoc)
-	    var = make_local_assoc_variable (name);
+	    var = make_local_assoc_variable (newname, MKLOC_ARRAYOK|inherit_flag);
 	  else if ((flags_on & att_array) || making_array_special)
-	    var = make_local_array_variable (name, making_array_special);
+	    var = make_local_array_variable (newname, MKLOC_ASSOCOK|inherit_flag);
 	  else
 #endif
 	  if (offset == 0 && (flags_on & att_nameref))
 	    {
 	      /* First look for refvar at current scope */
 	      refvar = find_variable_last_nameref (name, 1);
-	      var = find_variable (name);
 	      /* VARIABLE_CONTEXT != 0, so we are attempting to create or modify
 		 the attributes for a local variable at the same scope.  If we've
 		 used a reference from a previous context to resolve VAR, we
@@ -423,18 +473,19 @@ restart_new_var_name:
 	      if (refvar && refvar->context != variable_context)
 		{
 		  refvar = 0;
-		  var = make_local_variable (name);
+		  var = make_local_variable (name, inherit_flag);
 		}
 	      else if (refvar && refvar->context == variable_context)
 		var = refvar;
 	      /* Maybe we just want to create a new local variable */
 	      else if (var == 0 || var->context != variable_context)
-		var = make_local_variable (name);
+		var = make_local_variable (name, inherit_flag);
 	      /* otherwise we have a var at the right context */
 	    }
 	  else
 	    /* XXX - check name for validity here with valid_nameref_value */
-	    var = make_local_variable (name);	/* sets att_invisible for new vars */
+	    var = make_local_variable ((flags_on & att_nameref) ? name : newname, inherit_flag);	/* sets att_invisible for new vars */
+
 	  if (var == 0)
 	    {
 	      any_failed++;
@@ -476,7 +527,12 @@ restart_new_var_name:
 		      any_failed++;
 		      NEXT_VARIABLE ();
 		    }
-
+		  else if (flags_on & (att_array|att_assoc))
+		    {
+		      sh_invalidopt ((flags_on & att_array) ? "-a" : "-A");
+		      any_failed++;
+		      NEXT_VARIABLE ();
+		    }
 		  /* declare -[Ff] name [name...] */
 		  if (flags_on == att_function && flags_off == 0)
 		    {
@@ -501,6 +557,7 @@ restart_new_var_name:
 		  else		/* declare -[fF] -[rx] name [name...] */
 		    {
 		      VSETATTR (var, flags_on);
+		      flags_off &= ~att_function;	/* makes no sense */
 		      VUNSETATTR (var, flags_off);
 		    }
 		}
@@ -528,21 +585,17 @@ restart_new_var_name:
 #endif
 	  if (var == 0 && (flags_on & att_nameref))
 	    {
-#if 0
-	      /* See if we are trying to modify an existing nameref variable */
-	      var = mkglobal ? find_global_variable_last_nameref (name, 1) : find_variable_last_nameref (name, 1);
-#else
 	      /* See if we are trying to modify an existing nameref variable,
 		 but don't follow the nameref chain. */
 	      var = mkglobal ? find_global_variable_noref (name) : find_variable_noref (name);
-#endif
 	      if (var && nameref_p (var) == 0)
 		var = 0;
 	    }
 	  /* However, if we're turning off the nameref attribute on an existing
 	     nameref variable, we first follow the nameref chain to the end,
-	     modify the value of the variable this nameref variable references,
-	     *CHANGING ITS VALUE AS A SIDE EFFECT* then turn off the nameref
+	     modify the value of the variable this nameref variable references
+	     if there is an assignment statement argument,
+	     *CHANGING ITS VALUE AS A SIDE EFFECT*, then turn off the nameref
 	     flag *LEAVING THE NAMEREF VARIABLE'S VALUE UNCHANGED* */
 	  else if (var == 0 && (flags_off & att_nameref))
 	    {
@@ -560,7 +613,18 @@ restart_new_var_name:
 		  any_failed++;
 		  NEXT_VARIABLE ();
 		}
+
+	      /* If all we're doing is turning off the nameref attribute, don't
+		 bother with VAR at all, whether it exists or not. Just turn it
+		 off and go on. */
+	      if (refvar && flags_on == 0 && offset == 0 && (flags_off & ~att_nameref) == 0)
+		{
+		  VUNSETATTR (refvar, att_nameref);
+		  NEXT_VARIABLE ();
+		}
+
 	      if (refvar)
+		/* XXX - use declare_find_variable here? */
 		var = mkglobal ? find_global_variable (nameref_cell (refvar)) : find_variable (nameref_cell (refvar));
 	    }
 #if defined (ARRAY_VARS)
@@ -579,19 +643,20 @@ restart_new_var_name:
 	    }
 #endif
 
-	  /* See if we are trying to set flags or value for an existing nameref
-	     that points to a non-existent variable: e.g.,
+	  /* See if we are trying to set flags or value (or create) for an
+	     existing nameref that points to a non-existent variable: e.g.,
 		declare -n foo=bar
 		unset foo	# unsets bar
 		declare -i foo
 		foo=4+4
 		declare -p foo */
-	  if (var == 0 && (flags_on || flags_off || offset))
+	  if (var == 0 && (mkglobal || flags_on || flags_off || offset))
 	    {
 	      refvar = mkglobal ? find_global_variable_last_nameref (name, 0) : find_variable_last_nameref (name, 0);
 	      if (refvar && nameref_p (refvar) == 0)
 		refvar = 0;
 	      if (refvar)
+		/* XXX - use declare_find_variable here? */
 		var = mkglobal ? find_global_variable (nameref_cell (refvar)) : find_variable (nameref_cell (refvar));
 	      if (refvar && var == 0)
 		{
@@ -637,12 +702,18 @@ restart_new_var_name:
 		      value = name + namelen;
 		    }
 		  free (oldname);
+
+		  /* OK, let's turn off the nameref attribute.
+		     Now everything else applies to VAR. */
+		  if (flags_off & att_nameref)
+		    VUNSETATTR (refvar, att_nameref);
+
 		  goto restart_new_var_name;
 		  /* NOTREACHED */
 		}
 	    }
 	  if (var == 0)
-	    var = mkglobal ? find_global_variable (name) : find_variable (name);
+	    var = declare_find_variable (name, mkglobal, chklocal);
 
 #if defined (ARRAY_VARS)
 	  var_exists = var != 0;
@@ -656,20 +727,20 @@ restart_new_var_name:
 	      if (flags_on & att_assoc)
 		{
 		  var = make_new_assoc_variable (name);
-		  if (var && offset == 0 && no_invisible_vars == 0)
+		  if (var && offset == 0)
 		    VSETATTR (var, att_invisible);
 		}
 	      else if ((flags_on & att_array) || making_array_special)
 		{
 		  var = make_new_array_variable (name);
-		  if (var && offset == 0 && no_invisible_vars == 0)
+		  if (var && offset == 0)
 		    VSETATTR (var, att_invisible);
 		}
 	      else
 #endif
 		{
 		  var = mkglobal ? bind_global_variable (name, (char *)NULL, ASS_FORCE) : bind_variable (name, (char *)NULL, ASS_FORCE);
-		  if (var && offset == 0 && no_invisible_vars == 0)
+		  if (var && offset == 0)
 		    VSETATTR (var, att_invisible);
 		}
 	      if (var == 0)
@@ -821,10 +892,13 @@ restart_new_var_name:
 	    assign_array_var_from_string (var, value, aflags|ASS_FORCE);
 	  else if (simple_array_assign && subscript_start)
 	    {
+	      int local_aflags;
 	      /* declare [-aA] name[N]=value */
 	      *subscript_start = '[';	/* ] */
 	      /* XXX - problem here with appending */
-	      var = assign_array_element (name, value, aflags&ASS_APPEND);	/* XXX - not aflags */
+	      local_aflags = aflags&ASS_APPEND;
+	      local_aflags |= assoc_noexpand ? ASS_NOEXPAND : 0;
+	      var = assign_array_element (name, value, local_aflags);	/* XXX - not aflags */
 	      *subscript_start = '\0';
 	      if (var == 0)	/* some kind of assignment error */
 		{
@@ -885,9 +959,12 @@ restart_new_var_name:
 		{
 		  tvalue = var_isset (var) ? savestring (value_cell (var)) : savestring ("");
 	          tv = bind_variable (var->name, tvalue, 0);
-	          tv->attributes |= var->attributes & ~att_tempvar;
-	          if (tv->context > 0)
-		    VSETATTR (tv, att_propagate);
+		  if (tv)
+		    {
+		      tv->attributes |= var->attributes & ~att_tempvar;
+		      if (tv->context > 0)
+			VSETATTR (tv, att_propagate);
+		    }
 	          free (tvalue);
 		}
 	      VSETATTR (var, att_propagate);

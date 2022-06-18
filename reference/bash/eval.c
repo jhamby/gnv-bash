@@ -1,6 +1,6 @@
 /* eval.c -- reading and evaluating commands. */
 
-/* Copyright (C) 1996-2011 Free Software Foundation, Inc.
+/* Copyright (C) 1996-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -35,6 +35,7 @@
 #include "bashintl.h"
 
 #include "shell.h"
+#include "parser.h"
 #include "flags.h"
 #include "trap.h"
 
@@ -47,22 +48,8 @@
 #  include "bashhist.h"
 #endif
 
-extern int EOF_reached;
-extern int indirection_level;
-extern int posixly_correct;
-extern int subshell_environment, running_under_emacs;
-extern int last_command_exit_value, stdin_redir;
-extern int need_here_doc;
-extern int current_command_number, current_command_line_count, line_number;
-extern int expand_aliases;
-extern char *ps0_prompt;
-
-#if defined (HAVE_POSIX_SIGNALS)
-extern sigset_t top_level_mask;
-#endif
-
-static void send_pwd_to_eterm __P((void));
-static sighandler alrm_catcher __P((int));
+static void send_pwd_to_eterm PARAMS((void));
+static sighandler alrm_catcher PARAMS((int));
 
 /* Read and execute commands until EOF is reached.  This assumes that
    the input source has already been initialized. */
@@ -78,6 +65,9 @@ reader_loop ()
 
   our_indirection_level = ++indirection_level;
 
+  if (just_one_command)
+    reset_readahead_token ();
+
   while (EOF_Reached == 0)
     {
       int code;
@@ -90,7 +80,7 @@ reader_loop ()
 
       /* XXX - why do we set this every time through the loop?  And why do
 	 it if SIGINT is trapped in an interactive shell? */
-      if (interactive_shell && signal_is_ignored (SIGINT) == 0)
+      if (interactive_shell && signal_is_ignored (SIGINT) == 0 && signal_is_trapped (SIGINT) == 0)
 	set_signal_handler (SIGINT, sigint_sighandler);
 
       if (code != NOT_JUMPED)
@@ -114,7 +104,7 @@ reader_loop ()
 		 leave existing non-zero values (e.g., > 128 on signal)
 		 alone. */
 	      if (last_command_exit_value == 0)
-		last_command_exit_value = EXECUTION_FAILURE;
+		set_exit_status (EXECUTION_FAILURE);
 	      if (subshell_environment)
 		{
 		  current_command = (COMMAND *)NULL;
@@ -127,9 +117,8 @@ reader_loop ()
 		  dispose_command (current_command);
 		  current_command = (COMMAND *)NULL;
 		}
-#if defined (HAVE_POSIX_SIGNALS)
-	      sigprocmask (SIG_SETMASK, &top_level_mask, (sigset_t *)NULL);
-#endif
+
+	      restore_sigmask ();
 	      break;
 
 	    default:
@@ -150,17 +139,13 @@ reader_loop ()
 	{
 	  if (interactive_shell == 0 && read_but_dont_execute)
 	    {
-	      last_command_exit_value = EXECUTION_SUCCESS;
+	      set_exit_status (EXECUTION_SUCCESS);
 	      dispose_command (global_command);
 	      global_command = (COMMAND *)NULL;
 	    }
 	  else if (current_command = global_command)
 	    {
 	      global_command = (COMMAND *)NULL;
-	      current_command_number++;
-
-	      executing = 1;
-	      stdin_redir = 0;
 
 	      /* If the shell is interactive, expand and display $PS0 after reading a
 		 command (possibly a list or pipeline) and before executing it. */
@@ -176,6 +161,11 @@ reader_loop ()
 		    }
 		  free (ps0_string);
 		}
+
+	      current_command_number++;
+
+	      executing = 1;
+	      stdin_redir = 0;
 
 	      execute_command (current_command);
 
@@ -202,12 +192,56 @@ reader_loop ()
   return (last_command_exit_value);
 }
 
+/* Pretty print shell scripts */
+int
+pretty_print_loop ()
+{
+  COMMAND *current_command;
+  char *command_to_print;
+  int code;
+  int global_posix_mode, last_was_newline;
+
+  global_posix_mode = posixly_correct;
+  last_was_newline = 0;
+  while (EOF_Reached == 0)
+    {
+      code = setjmp_nosigs (top_level);
+      if (code)
+        return (EXECUTION_FAILURE);
+      if (read_command() == 0)
+	{
+	  current_command = global_command;
+	  global_command = 0;
+	  posixly_correct = 1;			/* print posix-conformant */
+	  if (current_command && (command_to_print = make_command_string (current_command)))
+	    {
+	      printf ("%s\n", command_to_print);	/* for now */
+	      last_was_newline = 0;
+	    }
+	  else if (last_was_newline == 0)
+	    {
+	       printf ("\n");
+	       last_was_newline = 1;
+	    }
+	  posixly_correct = global_posix_mode;
+	  dispose_command (current_command);
+	}
+      else
+	return (EXECUTION_FAILURE);
+    }
+    
+  return (EXECUTION_SUCCESS);
+}
+
 static sighandler
 alrm_catcher(i)
      int i;
 {
-  printf (_("\007timed out waiting for input: auto-logout\n"));
-  fflush (stdout);
+  char *msg;
+
+  msg = _("\007timed out waiting for input: auto-logout\n");
+  write (1, msg, strlen (msg));
+
   bash_logout ();	/* run ~/.bash_logout if this is a login shell */
   jump_to_top_level (EXITPROG);
   SIGRETURN (0);
@@ -228,6 +262,58 @@ send_pwd_to_eterm ()
   free (f);
 }
 
+#if defined (ARRAY_VARS)
+/* Caller ensures that A has a non-zero number of elements */
+int
+execute_array_command (a, v)
+     ARRAY *a;
+     void *v;
+{
+  char *tag;
+  char **argv;
+  int argc, i;
+
+  tag = (char *)v;
+  argc = 0;
+  argv = array_to_argv (a, &argc);
+  for (i = 0; i < argc; i++)
+    {
+      if (argv[i] && argv[i][0])
+	execute_variable_command (argv[i], tag);
+    }
+  strvec_dispose (argv);
+  return 0;
+}
+#endif
+  
+static void
+execute_prompt_command ()
+{
+  char *command_to_execute;
+  SHELL_VAR *pcv;
+#if defined (ARRAY_VARS)
+  ARRAY *pcmds;
+#endif
+
+  pcv = find_variable ("PROMPT_COMMAND");
+  if (pcv  == 0 || var_isset (pcv) == 0 || invisible_p (pcv))
+    return;
+#if defined (ARRAY_VARS)
+  if (array_p (pcv))
+    {
+      if ((pcmds = array_cell (pcv)) && array_num_elements (pcmds) > 0)
+	execute_array_command (pcmds, "PROMPT_COMMAND");
+      return;
+    }
+  else if (assoc_p (pcv))
+    return;	/* currently don't allow associative arrays here */
+#endif
+
+  command_to_execute = value_cell (pcv);
+  if (command_to_execute && *command_to_execute)
+    execute_variable_command (command_to_execute, "PROMPT_COMMAND");
+}
+
 /* Call the YACC-generated parser and return the status of the parse.
    Input is read from the current input stream (bash_input).  yyparse
    leaves the parsed command in the global variable GLOBAL_COMMAND.
@@ -236,22 +322,22 @@ int
 parse_command ()
 {
   int r;
-  char *command_to_execute;
 
   need_here_doc = 0;
   run_pending_traps ();
 
   /* Allow the execution of a random command just before the printing
      of each primary prompt.  If the shell variable PROMPT_COMMAND
-     is set then the value of it is the command to execute. */
+     is set then its value (array or string) is the command(s) to execute. */
   /* The tests are a combination of SHOULD_PROMPT() and prompt_again() 
      from parse.y, which are the conditions under which the prompt is
      actually printed. */
   if (interactive && bash_input.type != st_string && parser_expanding_alias() == 0)
     {
-      command_to_execute = get_string_value ("PROMPT_COMMAND");
-      if (command_to_execute)
-	execute_variable_command (command_to_execute, "PROMPT_COMMAND");
+#if defined (READLINE)
+      if (no_line_editing || (bash_input.type == st_stdin && parser_will_prompt ()))
+#endif
+        execute_prompt_command ();
 
       if (running_under_emacs == 2)
 	send_pwd_to_eterm ();	/* Yuck */

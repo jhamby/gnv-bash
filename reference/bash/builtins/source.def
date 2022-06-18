@@ -1,7 +1,7 @@
 This file is source.def, from which is created source.c.
 It implements the builtins "." and  "source" in Bash.
 
-Copyright (C) 1987-2015 Free Software Foundation, Inc.
+Copyright (C) 1987-2020 Free Software Foundation, Inc.
 
 This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -69,6 +69,7 @@ $END
 #include "../bashintl.h"
 
 #include "../shell.h"
+#include "../execute_cmd.h"
 #include "../flags.h"
 #include "../findcmd.h"
 #include "common.h"
@@ -79,11 +80,7 @@ $END
 extern int errno;
 #endif /* !errno */
 
-extern int posixly_correct;
-extern int last_command_exit_value;
-extern int executing_command_builtin;
-
-static void maybe_pop_dollar_vars __P((void));
+static void maybe_pop_dollar_vars PARAMS((void));
 
 /* If non-zero, `.' uses $PATH to look up the script to be sourced. */
 int source_uses_path = 1;
@@ -159,7 +156,7 @@ source_builtin (list)
 	    free (x);
 	  if (posixly_correct && interactive_shell == 0 && executing_command_builtin == 0)
 	    {
-	      last_command_exit_value = 1;
+	      last_command_exit_value = EXECUTION_FAILURE;
 	      jump_to_top_level (EXITPROG);
 	    }
 	  return (EXECUTION_FAILURE);
@@ -169,12 +166,14 @@ source_builtin (list)
     }
 
   begin_unwind_frame ("source");
-  add_unwind_protect ((Function *)xfree, filename);
+  add_unwind_protect (xfree, filename);
 
   if (list->next)
     {
       push_dollar_vars ();
       add_unwind_protect ((Function *)maybe_pop_dollar_vars, (char *)NULL);
+      if (debugging_mode || shell_compatibility_level <= 44)
+	init_bash_argv ();	/* Initialize BASH_ARGV and BASH_ARGC */
       remember_args (list->next, 1);
       if (debugging_mode)
 	push_args (list->next);	/* Update BASH_ARGV and BASH_ARGC */

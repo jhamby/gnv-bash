@@ -1,6 +1,6 @@
 /* shell.h -- The data structures used by the shell */
 
-/* Copyright (C) 1993-2009 Free Software Foundation, Inc.
+/* Copyright (C) 1993-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -72,6 +72,7 @@ extern int EOF_Reached;
 #define EX_REDIRFAIL	259	/* redirection failed */
 #define EX_BADASSIGN	260	/* variable assignment error */
 #define EX_EXPFAIL	261	/* word expansion failed */
+#define EX_DISKFALLBACK	262	/* fall back to disk command from builtin */
 
 /* Flag values that control parameter pattern substitution. */
 #define MATCH_ANY	0x000
@@ -90,14 +91,43 @@ extern char **shell_environment;
 extern WORD_LIST *rest_of_args;
 
 /* Generalized global variables. */
+extern char *command_execution_string;
+
 extern int debugging_mode;
 extern int executing, login_shell;
 extern int interactive, interactive_shell;
 extern int startup_state;
+extern int reading_shell_script;
+extern int shell_initialized;
+extern int bash_argv_initialized;
 extern int subshell_environment;
+extern int current_command_number;
+extern int indirection_level;
 extern int shell_compatibility_level;
+extern int running_under_emacs;
+
+extern int posixly_correct;
+extern int no_line_editing;
+
+extern char *shell_name;
+extern char *current_host_name;
+
+extern int subshell_argc;
+extern char **subshell_argv;
+extern char **subshell_envp;
+
+/* variables managed using shopt */
+extern int hup_on_exit;
+extern int check_jobs_at_exit;
+extern int autocd;
+extern int check_window_size;
+
+/* from version.c */
+extern int build_version, patch_level;
+extern char *dist_version, *release_status;
 
 extern int locale_mb_cur_max;
+extern int locale_utf8locale;
 
 /* Structure to pass around that holds a bitmap of file descriptors
    to close, and the size of that structure.  Used in execute_cmd.c. */
@@ -183,13 +213,17 @@ typedef struct _sh_input_line_state_t {
   size_t input_line_index;
   size_t input_line_size;
   size_t input_line_len;
+#if defined (HANDLE_MULTIBYTE)
+  char *input_property;
+  size_t input_propsize;
+#endif
 } sh_input_line_state_t;
 
 /* Let's try declaring these here. */
-extern char *parser_remaining_input __P((void));
+extern char *parser_remaining_input PARAMS((void));
 
-extern sh_parser_state_t *save_parser_state __P((sh_parser_state_t *));
-extern void restore_parser_state __P((sh_parser_state_t *));
+extern sh_parser_state_t *save_parser_state PARAMS((sh_parser_state_t *));
+extern void restore_parser_state PARAMS((sh_parser_state_t *));
 
-extern sh_input_line_state_t *save_input_line_state __P((sh_input_line_state_t *));
-extern void restore_input_line_state __P((sh_input_line_state_t *));
+extern sh_input_line_state_t *save_input_line_state PARAMS((sh_input_line_state_t *));
+extern void restore_input_line_state PARAMS((sh_input_line_state_t *));

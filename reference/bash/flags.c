@@ -1,7 +1,7 @@
 /* flags.c -- Everything about flags except the `set' command.  That
    is in builtins.c */
 
-/* Copyright (C) 1987-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1987-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -25,6 +25,7 @@
 #endif
 
 #include "shell.h"
+#include "execute_cmd.h"
 #include "flags.h"
 
 #if defined (BANG_HISTORY)
@@ -32,18 +33,8 @@
 #endif
 
 #if defined (JOB_CONTROL)
-extern int set_job_control __P((int));
+extern int set_job_control PARAMS((int));
 #endif
-
-#if defined (RESTRICTED_SHELL)
-extern char *shell_name;
-#endif
-
-extern int shell_initialized;
-extern int builtin_ignoring_errexit;
-
-/* -c, -s invocation options -- not really flags, but they show up in $- */
-extern int want_pending_command, read_from_stdin;
 
 /* **************************************************************** */
 /*								    */
@@ -121,20 +112,14 @@ int no_symbolic_links = 0;
 int lexical_scoping = 0;
 #endif
 
-/* Non-zero means no such thing as invisible variables. */
-int no_invisible_vars = 0;
-
 /* Non-zero means look up and remember command names in a hash table, */
 int hashing_enabled = 1;
 
 #if defined (BANG_HISTORY)
 /* Non-zero means that we are doing history expansion.  The default.
    This means !22 gets the 22nd line of history. */
-#  if defined (STRICT_POSIX)
-int history_expansion = 0;
-#  else
-int history_expansion = 1;
-#  endif
+int history_expansion = HISTEXPAND_DEFAULT;
+int histexp_flag = 0;
 #endif /* BANG_HISTORY */
 
 /* Non-zero means that we allow comments to appear in interactive commands. */
@@ -211,9 +196,8 @@ const struct flags_alist shell_flags[] = {
   { 'C', &noclobber },
   { 'E', &error_trace_mode },
 #if defined (BANG_HISTORY)
-  { 'H', &history_expansion },
+  { 'H', &histexp_flag },
 #endif /* BANG_HISTORY */
-  { 'I', &no_invisible_vars },
   { 'P', &no_symbolic_links },
   { 'T', &function_trace_mode },
   {0, (int *)NULL}
@@ -265,6 +249,7 @@ change_flag (flag, on_or_off)
     {
 #if defined (BANG_HISTORY)
     case 'H':
+      history_expansion = histexp_flag;
       if (on_or_off == FLAG_ON)
 	bash_initialize_history ();
       break;
@@ -360,7 +345,7 @@ reset_shell_flags ()
   place_keywords_in_env = read_but_dont_execute = just_one_command = 0;
   noclobber = unbound_vars_is_error = 0;
   echo_command_at_execute = jobs_m_flag = forced_interactive = 0;
-  no_symbolic_links = no_invisible_vars = 0;
+  no_symbolic_links = 0;
   privileged_mode = pipefail_opt = 0;
 
   error_trace_mode = function_trace_mode = 0;
@@ -375,11 +360,7 @@ reset_shell_flags ()
 #endif
 
 #if defined (BANG_HISTORY)
-#  if defined (STRICT_POSIX)
-  history_expansion = 0;
-#  else
-  history_expansion = 1;
-#  endif /* STRICT_POSIX */
+  histexp_flag = 0;
 #endif
 
 #if defined (BRACE_EXPANSION)

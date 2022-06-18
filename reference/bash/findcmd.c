@@ -1,6 +1,6 @@
 /* findcmd.c -- Functions to search for commands by name. */
 
-/* Copyright (C) 1997-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1997-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -38,6 +38,7 @@
 
 #include "memalloc.h"
 #include "shell.h"
+#include "execute_cmd.h"
 #include "flags.h"
 #include "hashlib.h"
 #include "pathexp.h"
@@ -50,17 +51,14 @@
 extern int errno;
 #endif
 
-extern int posixly_correct;
-extern int last_command_exit_value;
-
 /* Static functions defined and used in this file. */
-static char *_find_user_command_internal __P((const char *, int));
-static char *find_user_command_internal __P((const char *, int));
-static char *find_user_command_in_path __P((const char *, char *, int));
-static char *find_in_path_element __P((const char *, char *, int, int, struct stat *));
-static char *find_absolute_program __P((const char *, int));
+static char *_find_user_command_internal PARAMS((const char *, int));
+static char *find_user_command_internal PARAMS((const char *, int));
+static char *find_user_command_in_path PARAMS((const char *, char *, int));
+static char *find_in_path_element PARAMS((const char *, char *, int, int, struct stat *));
+static char *find_absolute_program PARAMS((const char *, int));
 
-static char *get_next_path_element __P((char *, int *));
+static char *get_next_path_element PARAMS((char *, int *));
 
 /* The file name which we would try to execute, except that it isn't
    possible to execute it.  This is the first file that matches the
@@ -339,7 +337,7 @@ search_for_command (pathname, flags)
      const char *pathname;
      int flags;
 {
-  char *hashed_file, *command, *pathlist;
+  char *hashed_file, *command, *path_list;
   int temp_path, st;
   SHELL_VAR *path;
 
@@ -380,13 +378,13 @@ search_for_command (pathname, flags)
   else
     {
       if (flags & CMDSRCH_STDPATH)
-	pathlist = conf_standard_path ();
+	path_list = conf_standard_path ();
       else if (temp_path || path)
-	pathlist = value_cell (path);
+	path_list = value_cell (path);
       else
-	pathlist = 0;
+	path_list = 0;
 
-      command = find_user_command_in_path (pathname, pathlist, FS_EXEC_PREFERRED|FS_NODIRS);
+      command = find_user_command_in_path (pathname, path_list, FS_EXEC_PREFERRED|FS_NODIRS);
 
       if (command && hashing_enabled && temp_path == 0 && (flags & CMDSRCH_HASH))
 	{
@@ -399,12 +397,20 @@ search_for_command (pathname, flags)
 	      if (st & FS_EXECABLE)
 	        phash_insert ((char *)pathname, command, dot_found_in_search, 1);
 	    }
+	  /* If we're in posix mode, don't add files without the execute bit
+	     to the hash table. */
+	  else if (posixly_correct)
+	    {
+	      st = file_status (command);
+	      if (st & FS_EXECABLE)
+	        phash_insert ((char *)pathname, command, dot_found_in_search, 1);
+	    }
 	  else
 	    phash_insert ((char *)pathname, command, dot_found_in_search, 1);
 	}
 
       if (flags & CMDSRCH_STDPATH)
-	free (pathlist);
+	free (path_list);
     }
 
   return (command);

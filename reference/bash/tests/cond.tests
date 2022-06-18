@@ -1,3 +1,16 @@
+#   This program is free software: you can redistribute it and/or modify
+#   it under the terms of the GNU General Public License as published by
+#   the Free Software Foundation, either version 3 of the License, or
+#   (at your option) any later version.
+#
+#   This program is distributed in the hope that it will be useful,
+#   but WITHOUT ANY WARRANTY; without even the implied warranty of
+#   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#   GNU General Public License for more details.
+#
+#   You should have received a copy of the GNU General Public License
+#   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+#
 #
 # the test/[ code is tested elsewhere, and the [[...]] just uses the same
 # code.  this tests the special features of [[...]]
@@ -179,6 +192,9 @@ echo ${BASH_REMATCH[@]}
 # bug in all versions up to and including bash-2.05b
 if [[ "123abc" == *?(a)bc ]]; then echo ok 42; else echo bad 42; fi
 if [[ "123abc" == *?(a)bc ]]; then echo ok 43; else echo bad 43; fi
+
+match() { [[ $1 == $2 ]]; }
+match $'? *x\1y\177z' $'??\\*\\x\\\1\\y\\\177\\z' || echo bad 44
 
 foo=""
 [[ bar == *"${foo,,}"* ]] && echo ok 1

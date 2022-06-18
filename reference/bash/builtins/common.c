@@ -1,6 +1,6 @@
 /* common.c - utility functions for all builtins */
 
-/* Copyright (C) 1987-2016 Free Software Foundation, Inc.
+/* Copyright (C) 1987-2020 Free Software Foundation, Inc.
 
    This file is part of GNU Bash, the Bourne Again SHell.
 
@@ -49,6 +49,7 @@
 #include "../shell.h"
 #include "maxpath.h"
 #include "../flags.h"
+#include "../parser.h"
 #include "../jobs.h"
 #include "../builtins.h"
 #include "../input.h"
@@ -67,13 +68,6 @@
 extern int errno;   
 #endif /* !errno */
 
-extern int indirection_level, subshell_environment;
-extern int line_number;
-extern int last_command_exit_value;
-extern int trap_saved_exit_value;
-extern int running_trap;
-extern int posixly_correct;
-extern char *this_command_name, *shell_name;
 extern const char * const bash_getcwd_errstr;
 
 /* Used by some builtins and the mainline code. */
@@ -379,13 +373,16 @@ make_builtin_argv (list, ip)
 
 /* Remember LIST in $1 ... $9, and REST_OF_ARGS.  If DESTRUCTIVE is
    non-zero, then discard whatever the existing arguments are, else
-   only discard the ones that are to be replaced. */
+   only discard the ones that are to be replaced.  Set POSPARAM_COUNT
+   to the number of args assigned (length of LIST). */
 void
 remember_args (list, destructive)
      WORD_LIST *list;
      int destructive;
 {
   register int i;
+
+  posparam_count = 0;
 
   for (i = 1; i < 10; i++)
     {
@@ -397,7 +394,7 @@ remember_args (list, destructive)
 
       if (list)
 	{
-	  dollar_vars[i] = savestring (list->word->word);
+	  dollar_vars[posparam_count = i] = savestring (list->word->word);
 	  list = list->next;
 	}
     }
@@ -409,12 +406,65 @@ remember_args (list, destructive)
     {
       dispose_words (rest_of_args);
       rest_of_args = copy_word_list (list);
+      posparam_count += list_length (list);
     }
 
   if (destructive)
     set_dollar_vars_changed ();
 
   invalidate_cached_quoted_dollar_at ();
+}
+
+void
+shift_args (times)
+     int times;
+{
+  WORD_LIST *temp;
+  int count;
+
+  if (times <= 0)		/* caller should check */
+    return;
+
+  while (times-- > 0)
+    {
+      if (dollar_vars[1])
+	free (dollar_vars[1]);
+
+      for (count = 1; count < 9; count++)
+	dollar_vars[count] = dollar_vars[count + 1];
+
+      if (rest_of_args)
+	{
+	  temp = rest_of_args;
+	  dollar_vars[9] = savestring (temp->word->word);
+	  rest_of_args = rest_of_args->next;
+	  temp->next = (WORD_LIST *)NULL;
+	  dispose_words (temp);
+	}
+      else
+	dollar_vars[9] = (char *)NULL;
+
+      posparam_count--;
+    }
+}
+
+int
+number_of_args ()
+{
+#ifdef DEBUG
+  register WORD_LIST *list;
+  int n;
+
+  for (n = 0; n < 9 && dollar_vars[n+1]; n++)
+    ;
+  for (list = rest_of_args; list; list = list->next)
+    n++;
+
+if (n != posparam_count)
+  itrace("number_of_args: n (%d) != posparam_count (%d)", n, posparam_count);
+#endif
+
+  return posparam_count;
 }
 
 static int changed_dollar_vars;
@@ -543,7 +593,7 @@ read_octal (string)
     {
       digits++;
       result = (result * 8) + (*string++ - '0');
-      if (result > 0777)
+      if (result > 07777)
 	return -1;
     }
 
@@ -684,7 +734,7 @@ get_job_spec (list)
   if (DIGIT (*word) && all_digits (word))
     {
       job = atoi (word);
-      return (job > js.j_jobslots ? NO_JOB : job - 1);
+      return ((job < 0 || job > js.j_jobslots) ? NO_JOB : job - 1);
     }
 
   jflags = 0;
@@ -782,13 +832,9 @@ display_signal_list (list, forcecols)
 	      list = list->next;
 	      continue;
 	    }
-#if defined (JOB_CONTROL)
 	  /* POSIX.2 says that `kill -l signum' prints the signal name without
 	     the `SIG' prefix. */
-	  printf ("%s\n", (this_shell_builtin == kill_builtin) ? name + 3 : name);
-#else
-	  printf ("%s\n", name);
-#endif
+	  printf ("%s\n", (this_shell_builtin == kill_builtin && signum > 0) ? name + 3 : name);
 	}
       else
 	{
@@ -918,3 +964,54 @@ builtin_help ()
   printf ("%s: %s\n", this_command_name, _("help not available in this version"));
 }
 #endif
+
+/* **************************************************************** */
+/*								    */
+/*	    Variable assignments during builtin commands	    */
+/*								    */
+/* **************************************************************** */
+
+SHELL_VAR *
+builtin_bind_variable (name, value, flags)
+     char *name;
+     char *value;
+     int flags;
+{
+  SHELL_VAR *v;
+
+#if defined (ARRAY_VARS)
+  if (valid_array_reference (name, assoc_expand_once ? (VA_NOEXPAND|VA_ONEWORD) : 0) == 0)
+    v = bind_variable (name, value, flags);
+  else
+    v = assign_array_element (name, value, flags | (assoc_expand_once ? ASS_NOEXPAND : 0));
+#else /* !ARRAY_VARS */
+  v = bind_variable (name, value, flags);
+#endif /* !ARRAY_VARS */
+
+  if (v && readonly_p (v) == 0 && noassign_p (v) == 0)
+    VUNSETATTR (v, att_invisible);
+
+  return v;
+}
+
+/* Like check_unbind_variable, but for use by builtins (only matters for
+   error messages). */
+int
+builtin_unbind_variable (vname)
+     const char *vname;
+{
+  SHELL_VAR *v;
+
+  v = find_variable (vname);
+  if (v && readonly_p (v))
+    {
+      builtin_error (_("%s: cannot unset: readonly %s"), vname, "variable");
+      return -2;
+    }
+  else if (v && non_unsettable_p (v))
+    {
+      builtin_error (_("%s: cannot unset"), vname);
+      return -2;
+    }
+  return (unbind_variable (vname));
+}

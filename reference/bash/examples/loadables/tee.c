@@ -84,6 +84,7 @@ tee_builtin (list)
 	case 'i':
 	  nointr = 1;
 	  break;
+	CASE_HELPOPT;
 	default:
 	  builtin_usage ();
 	  return (EX_USAGE);
@@ -163,7 +164,7 @@ char *tee_doc[] = {
 	"Duplicate standard output.",
 	"",
 	"Copy standard input to standard output, making a copy in each",
-	"filename argument.  If the `-a' option is gived, the specified",
+	"filename argument.  If the `-a' option is given, the specified",
 	"files are appended to, otherwise they are overwritten.  If the",
 	"`-i' option is supplied, tee ignores interrupts.",
 	(char *)NULL

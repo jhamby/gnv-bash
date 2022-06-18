@@ -1,6 +1,6 @@
 /* complete.c -- filename completion for readline. */
 
-/* Copyright (C) 1987-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1987-2020 Free Software Foundation, Inc.
 
    This file is part of the GNU Readline Library (Readline), a library
    for reading lines of text with interactive input and history editing.
@@ -21,11 +21,18 @@
 
 #define READLINE_LIBRARY
 
+#if defined (__TANDEM)
+#  define _XOPEN_SOURCE_EXTENDED 1
+#endif
+
 #if defined (HAVE_CONFIG_H)
 #  include <config.h>
 #endif
 
 #include <sys/types.h>
+#if defined (__TANDEM)
+#  include <sys/stat.h>
+#endif
 #include <fcntl.h>
 #if defined (HAVE_SYS_FILE_H)
 #  include <sys/file.h>
@@ -141,6 +148,7 @@ static int complete_fncmp PARAMS((const char *, int, const char *, int));
 static void display_matches PARAMS((char **));
 static int compute_lcd_of_matches PARAMS((char **, int, const char *));
 static int postprocess_matches PARAMS((char ***, int));
+static int compare_match PARAMS((char *, const char *));
 static int complete_get_screenwidth PARAMS((void));
 
 static char *make_quoted_replacement PARAMS((char *, int, char *));
@@ -198,15 +206,6 @@ int _rl_completion_prefix_display_length = 0;
    matches.  If < 0 or > _rl_screenwidth, it is ignored. */
 int _rl_completion_columns = -1;
 
-/* Global variables available to applications using readline. */
-
-#if defined (VISIBLE_STATS)
-/* Non-zero means add an additional character to each filename displayed
-   during listing completion iff rl_filename_completion_desired which helps
-   to indicate the type of file being listed. */
-int rl_visible_stats = 0;
-#endif /* VISIBLE_STATS */
-
 #if defined (COLOR_SUPPORT)
 /* Non-zero means to use colors to indicate file type when listing possible
    completions.  The colors used are taken from $LS_COLORS, if set. */
@@ -226,6 +225,15 @@ int _rl_skip_completed_text = 0;
 /* If non-zero, menu completion displays the common prefix first in the
    cycle of possible completions instead of the last. */
 int _rl_menu_complete_prefix_first = 0;
+
+/* Global variables available to applications using readline. */
+
+#if defined (VISIBLE_STATS)
+/* Non-zero means add an additional character to each filename displayed
+   during listing completion iff rl_filename_completion_desired which helps
+   to indicate the type of file being listed. */
+int rl_visible_stats = 0;
+#endif /* VISIBLE_STATS */
 
 /* If non-zero, then this is the address of a function to call when
    completing on a directory name.  The function is called with
@@ -406,6 +414,7 @@ int rl_sort_completion_matches = 1;
 
 /* Local variable states what happened during the last completion attempt. */
 static int completion_changed_buffer;
+static int last_completion_failed = 0;
 
 /* The result of the query to the user about displaying completion matches */
 static int completion_y_or_n;
@@ -422,14 +431,17 @@ static int _rl_complete_display_matches_interrupt = 0;
    that does the initial simple matching selection algorithm (see
    rl_completion_matches ()).  The default is to do filename completion. */
 int
-rl_complete (ignore, invoking_key)
-     int ignore, invoking_key;
+rl_complete (int ignore, int invoking_key)
 {
   rl_completion_invoking_key = invoking_key;
 
   if (rl_inhibit_completion)
     return (_rl_insert_char (ignore, invoking_key));
-  else if (rl_last_func == rl_complete && !completion_changed_buffer)
+#if 0
+  else if (rl_last_func == rl_complete && completion_changed_buffer == 0 && last_completion_failed == 0)
+#else
+  else if (rl_last_func == rl_complete && completion_changed_buffer == 0)
+#endif
     return (rl_complete_internal ('?'));
   else if (_rl_complete_show_all)
     return (rl_complete_internal ('!'));
@@ -441,16 +453,14 @@ rl_complete (ignore, invoking_key)
 
 /* List the possible completions.  See description of rl_complete (). */
 int
-rl_possible_completions (ignore, invoking_key)
-     int ignore, invoking_key;
+rl_possible_completions (int ignore, int invoking_key)
 {
   rl_completion_invoking_key = invoking_key;
   return (rl_complete_internal ('?'));
 }
 
 int
-rl_insert_completions (ignore, invoking_key)
-     int ignore, invoking_key;
+rl_insert_completions (int ignore, int invoking_key)
 {
   rl_completion_invoking_key = invoking_key;
   return (rl_complete_internal ('*'));
@@ -462,8 +472,7 @@ rl_insert_completions (ignore, invoking_key)
    an application-specific completion function to honor the
    show-all-if-ambiguous readline variable. */
 int
-rl_completion_mode (cfunc)
-     rl_command_func_t *cfunc;
+rl_completion_mode (rl_command_func_t *cfunc)
 {
   if (rl_last_func == cfunc && !completion_changed_buffer)
     return '?';
@@ -481,18 +490,16 @@ rl_completion_mode (cfunc)
 /*				    */
 /************************************/
 
-/* Reset readline state on a signal or other event. */
+/* Reset public readline state on a signal or other event. */
 void
-_rl_reset_completion_state ()
+_rl_reset_completion_state (void)
 {
   rl_completion_found_quote = 0;
   rl_completion_quote_character = 0;
 }
 
 static void
-_rl_complete_sigcleanup (sig, ptr)
-     int sig;
-     void *ptr;
+_rl_complete_sigcleanup (int sig, void *ptr)
 {
   if (sig == SIGINT)	/* XXX - for now */
     {
@@ -504,8 +511,7 @@ _rl_complete_sigcleanup (sig, ptr)
 /* Set default values for readline word completion.  These are the variables
    that application completion functions can change or inspect. */
 static void
-set_completion_defaults (what_to_do)
-     int what_to_do;
+set_completion_defaults (int what_to_do)
 {
   /* Only the completion entry function can change these. */
   rl_filename_completion_desired = 0;
@@ -523,8 +529,7 @@ set_completion_defaults (what_to_do)
 
 /* The user must press "y" or "n". Non-zero return means "y" pressed. */
 static int
-get_y_or_n (for_pager)
-     int for_pager;
+get_y_or_n (int for_pager)
 {
   int c;
 
@@ -557,8 +562,7 @@ get_y_or_n (for_pager)
 }
 
 static int
-_rl_internal_pager (lines)
-     int lines;
+_rl_internal_pager (int lines)
 {
   int i;
 
@@ -575,8 +579,7 @@ _rl_internal_pager (lines)
 }
 
 static int
-path_isdir (filename)
-     const char *filename;
+path_isdir (const char *filename)
 {
   struct stat finfo;
 
@@ -593,8 +596,7 @@ path_isdir (filename)
      `%' for character special devices
      `#' for block special devices */
 static int
-stat_char (filename)
-     char *filename;
+stat_char (char *filename)
 {
   struct stat finfo;
   int character, r;
@@ -625,7 +627,10 @@ stat_char (filename)
 #endif
 
   if (r == -1)
-    return (0);
+    {
+      xfree (f);
+      return (0);
+    }
 
   character = 0;
   if (S_ISDIR (finfo.st_mode))
@@ -675,29 +680,28 @@ stat_char (filename)
 
 #if defined (COLOR_SUPPORT)
 static int
-colored_stat_start (filename)
-     const char *filename;
+colored_stat_start (const char *filename)
 {
   _rl_set_normal_color ();
   return (_rl_print_color_indicator (filename));
 }
 
 static void
-colored_stat_end ()
+colored_stat_end (void)
 {
   _rl_prep_non_filename_text ();
   _rl_put_indicator (&_rl_color_indicator[C_CLR_TO_EOL]);
 }
 
 static int
-colored_prefix_start ()
+colored_prefix_start (void)
 {
   _rl_set_normal_color ();
   return (_rl_print_prefix_color ());
 }
 
 static void
-colored_prefix_end ()
+colored_prefix_end (void)
 {
   colored_stat_end ();		/* for now */
 }
@@ -712,8 +716,7 @@ colored_prefix_end ()
    for the previous slash and return the portion following that.  If
    there's no previous slash, we just return what we were passed. */
 static char *
-printable_part (pathname)
-      char *pathname;
+printable_part (char *pathname)
 {
   char *temp, *x;
 
@@ -747,8 +750,7 @@ printable_part (pathname)
 
 /* Compute width of STRING when displayed on screen by print_filename */
 static int
-fnwidth (string)
-     const char *string;
+fnwidth (const char *string)
 {
   int width, pos;
 #if defined (HANDLE_MULTIBYTE)
@@ -800,10 +802,7 @@ fnwidth (string)
 #define ELLIPSIS_LEN	3
 
 static int
-fnprint (to_print, prefix_bytes, real_pathname)
-     const char *to_print;
-     int prefix_bytes;
-     const char *real_pathname;
+fnprint (const char *to_print, int prefix_bytes, const char *real_pathname)
 {
   int printed_len, w;
   const char *s;
@@ -818,6 +817,8 @@ fnprint (to_print, prefix_bytes, real_pathname)
   print_len = strlen (to_print);
   end = to_print + print_len + 1;
   memset (&ps, 0, sizeof (mbstate_t));
+#else
+  print_len = strlen (to_print);
 #endif
 
   printed_len = common_prefix_len = 0;
@@ -929,9 +930,7 @@ fnprint (to_print, prefix_bytes, real_pathname)
    filenames.  Return the number of characters we output. */
 
 static int
-print_filename (to_print, full_pathname, prefix_bytes)
-     char *to_print, *full_pathname;
-     int prefix_bytes;
+print_filename (char *to_print, char *full_pathname, int prefix_bytes)
 {
   int printed_len, extension_char, slen, tlen;
   char *s, c, *new_full_pathname, *dn;
@@ -988,7 +987,6 @@ print_filename (to_print, full_pathname, prefix_bytes)
 	    slen--;
 	  else
 	    new_full_pathname[slen] = '/';
-	  new_full_pathname[slen] = '/';
 	  strcpy (new_full_pathname + slen + 1, to_print);
 
 #if defined (VISIBLE_STATS)
@@ -1049,10 +1047,7 @@ print_filename (to_print, full_pathname, prefix_bytes)
 }
 
 static char *
-rl_quote_filename (s, rtype, qcp)
-     char *s;
-     int rtype;
-     char *qcp;
+rl_quote_filename (char *s, int rtype, char *qcp)
 {
   char *r;
 
@@ -1080,8 +1075,7 @@ rl_quote_filename (s, rtype, qcp)
    the value of the delimiter character that caused a word break. */
 
 char
-_rl_find_completion_word (fp, dp)
-     int *fp, *dp;
+_rl_find_completion_word (int *fp, int *dp)
 {
   int scan, end, found_quote, delimiter, pass_next, isbrk;
   char quote_char, *brkchars;
@@ -1213,11 +1207,7 @@ _rl_find_completion_word (fp, dp)
 }
 
 static char **
-gen_completion_matches (text, start, end, our_func, found_quote, quote_char)
-     char *text;
-     int start, end;
-     rl_compentry_func_t *our_func;
-     int found_quote, quote_char;
+gen_completion_matches (char *text, int start, int end, rl_compentry_func_t *our_func, int found_quote, int quote_char)
 {
   char **matches;
 
@@ -1261,8 +1251,7 @@ gen_completion_matches (text, start, end, our_func, found_quote, quote_char)
 /* Filter out duplicates in MATCHES.  This frees up the strings in
    MATCHES. */
 static char **
-remove_duplicate_matches (matches)
-     char **matches;
+remove_duplicate_matches (char **matches)
 {
   char *lowest_common;
   int i, j, newlen;
@@ -1322,10 +1311,7 @@ remove_duplicate_matches (matches)
 /* Find the common prefix of the list of matches, and put it into
    matches[0]. */
 static int
-compute_lcd_of_matches (match_list, matches, text)
-     char **match_list;
-     int matches;
-     const char *text;
+compute_lcd_of_matches (char **match_list, int matches, const char *text)
 {
   register int i, c1, c2, si;
   int low;		/* Count of max-matched characters. */
@@ -1357,12 +1343,13 @@ compute_lcd_of_matches (match_list, matches, text)
 	  memset (&ps2, 0, sizeof (mbstate_t));
 	}
 #endif
-      if (_rl_completion_case_fold)
+      for (si = 0; (c1 = match_list[i][si]) && (c2 = match_list[i + 1][si]); si++)
 	{
-	  for (si = 0;
-	       (c1 = _rl_to_lower(match_list[i][si])) &&
-	       (c2 = _rl_to_lower(match_list[i + 1][si]));
-	       si++)
+	    if (_rl_completion_case_fold)
+	      {
+	        c1 = _rl_to_lower (c1);
+	        c2 = _rl_to_lower (c2);
+	      }
 #if defined (HANDLE_MULTIBYTE)
 	    if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
 	      {
@@ -1374,33 +1361,15 @@ compute_lcd_of_matches (match_list, matches, text)
 		      break;
 		    continue;
 		  }
-		wc1 = towlower (wc1);
-		wc2 = towlower (wc2);
+		if (_rl_completion_case_fold)
+		  {
+		    wc1 = towlower (wc1);
+		   wc2 = towlower (wc2);
+		  }
 		if (wc1 != wc2)
 		  break;
 		else if (v1 > 1)
 		  si += v1 - 1;
-	      }
-	    else
-#endif
-	    if (c1 != c2)
-	      break;
-	}
-      else
-	{
-	  for (si = 0;
-	       (c1 = match_list[i][si]) &&
-	       (c2 = match_list[i + 1][si]);
-	       si++)
-#if defined (HANDLE_MULTIBYTE)
-	    if (MB_CUR_MAX > 1 && rl_byte_oriented == 0)
-	      {
-		mbstate_t ps_back;
-		ps_back = ps1;
-		if (!_rl_compare_chars (match_list[i], si, &ps1, match_list[i+1], si, &ps2))
-		  break;
-		else if ((v = _rl_get_char_len (&match_list[i][si], &ps_back)) > 1)
-		  si += v - 1;
 	      }
 	    else
 #endif
@@ -1451,7 +1420,8 @@ compute_lcd_of_matches (match_list, matches, text)
 	    }
 
 	  /* sort the list to get consistent answers. */
-	  qsort (match_list+1, matches, sizeof(char *), (QSFUNC *)_rl_qsort_string_compare);
+	  if (rl_sort_completion_matches)
+	    qsort (match_list+1, matches, sizeof(char *), (QSFUNC *)_rl_qsort_string_compare);
 
 	  si = strlen (text);
 	  lx = (si <= low) ? si : low;	/* check shorter of text and matches */
@@ -1481,9 +1451,7 @@ compute_lcd_of_matches (match_list, matches, text)
 }
 
 static int
-postprocess_matches (matchesp, matching_filenames)
-     char ***matchesp;
-     int matching_filenames;
+postprocess_matches (char ***matchesp, int matching_filenames)
 {
   char *t, **matches, **temp_matches;
   int nmatch, i;
@@ -1537,7 +1505,7 @@ postprocess_matches (matchesp, matching_filenames)
 }
 
 static int
-complete_get_screenwidth ()
+complete_get_screenwidth (void)
 {
   int cols;
   char *envcols;
@@ -1558,9 +1526,7 @@ complete_get_screenwidth ()
    of strings, in argv format, LEN is the number of strings in MATCHES,
    and MAX is the length of the longest string in MATCHES. */
 void
-rl_display_match_list (matches, len, max)
-     char **matches;
-     int len, max;
+rl_display_match_list (char **matches, int len, int max)
 {
   int count, limit, printed_len, lines, cols;
   int i, j, k, l, common_length, sind;
@@ -1717,8 +1683,7 @@ rl_display_match_list (matches, len, max)
    and ask the user if he wants to see the list if there are more matches
    than RL_COMPLETION_QUERY_ITEMS. */
 static void
-display_matches (matches)
-     char **matches;
+display_matches (char **matches)
 {
   int len, max, i;
   char *temp;
@@ -1784,11 +1749,9 @@ display_matches (matches)
   rl_display_fixed = 1;
 }
 
+/* qc == pointer to quoting character, if any */
 static char *
-make_quoted_replacement (match, mtype, qc)
-     char *match;
-     int mtype;
-     char *qc;	/* Pointer to quoting character, if any */
+make_quoted_replacement (char *match, int mtype, char *qc)
 {
   int should_quote, do_replace;
   char *replacement;
@@ -1830,10 +1793,7 @@ make_quoted_replacement (match, mtype, qc)
 }
 
 static void
-insert_match (match, start, mtype, qc)
-     char *match;
-     int start, mtype;
-     char *qc;
+insert_match (char *match, int start, int mtype, char *qc)
 {
   char *replacement, *r;
   char oqc;
@@ -1890,9 +1850,7 @@ insert_match (match, start, mtype, qc)
    value of _rl_complete_mark_symlink_dirs, but may be modified by an
    application's completion function). */
 static int
-append_to_match (text, delimiter, quote_char, nontrivial_match)
-     char *text;
-     int delimiter, quote_char, nontrivial_match;
+append_to_match (char *text, int delimiter, int quote_char, int nontrivial_match)
 {
   char temp_string[4], *filename, *fn;
   int temp_string_index, s;
@@ -1959,10 +1917,7 @@ append_to_match (text, delimiter, quote_char, nontrivial_match)
 }
 
 static void
-insert_all_matches (matches, point, qc)
-     char **matches;
-     int point;
-     char *qc;
+insert_all_matches (char **matches, int point, char *qc)
 {
   int i;
   char *rp;
@@ -1998,8 +1953,7 @@ insert_all_matches (matches, point, qc)
 }
 
 void
-_rl_free_match_list (matches)
-     char **matches;
+_rl_free_match_list (char **matches)
 {
   register int i;
 
@@ -2009,6 +1963,26 @@ _rl_free_match_list (matches)
   for (i = 0; matches[i]; i++)
     xfree (matches[i]);
   xfree (matches);
+}
+
+/* Compare a possibly-quoted filename TEXT from the line buffer and a possible
+   MATCH that is the product of filename completion, which acts on the dequoted
+   text. */
+static int
+compare_match (char *text, const char *match)
+{
+  char *temp;
+  int r;
+
+  if (rl_filename_completion_desired && rl_filename_quoting_desired && 
+      rl_completion_found_quote && rl_filename_dequoting_function)
+    {
+      temp = (*rl_filename_dequoting_function) (text, rl_completion_quote_character);
+      r = strcmp (temp, match);
+      free (temp);
+      return r;
+    }      
+  return (strcmp (text, match));
 }
 
 /* Complete the word at or before point.
@@ -2021,19 +1995,18 @@ _rl_free_match_list (matches)
    `@' means to do standard completion, and list all possible completions if
    there is more than one and partial completion is not possible. */
 int
-rl_complete_internal (what_to_do)
-     int what_to_do;
+rl_complete_internal (int what_to_do)
 {
   char **matches;
   rl_compentry_func_t *our_func;
   int start, end, delimiter, found_quote, i, nontrivial_lcd;
   char *text, *saved_line_buffer;
   char quote_char;
-#if 1
-  int tlen, mlen;
-#endif
+  int tlen, mlen, saved_last_completion_failed;
 
   RL_SETSTATE(RL_STATE_COMPLETING);
+
+  saved_last_completion_failed = last_completion_failed;
 
   set_completion_defaults (what_to_do);
 
@@ -2058,7 +2031,7 @@ rl_complete_internal (what_to_do)
   matches = gen_completion_matches (text, start, end, our_func, found_quote, quote_char);
   /* nontrivial_lcd is set if the common prefix adds something to the word
      being completed. */
-  nontrivial_lcd = matches && strcmp (text, matches[0]) != 0;
+  nontrivial_lcd = matches && compare_match (text, matches[0]) != 0;
   if (what_to_do == '!' || what_to_do == '@')
     tlen = strlen (text);
   xfree (text);
@@ -2068,6 +2041,7 @@ rl_complete_internal (what_to_do)
       rl_ding ();
       FREE (saved_line_buffer);
       completion_changed_buffer = 0;
+      last_completion_failed = 1;
       RL_UNSETSTATE(RL_STATE_COMPLETING);
       _rl_reset_completion_state ();
       return (0);
@@ -2083,10 +2057,14 @@ rl_complete_internal (what_to_do)
       rl_ding ();
       FREE (saved_line_buffer);
       completion_changed_buffer = 0;
+      last_completion_failed = 1;
       RL_UNSETSTATE(RL_STATE_COMPLETING);
       _rl_reset_completion_state ();
       return (0);
     }
+
+  if (matches && matches[0] && *matches[0])
+    last_completion_failed = 0;
 
   switch (what_to_do)
     {
@@ -2143,6 +2121,15 @@ rl_complete_internal (what_to_do)
       break;
 
     case '?':
+      /* Let's try to insert a single match here if the last completion failed
+	 but this attempt returned a single match. */
+      if (saved_last_completion_failed && matches[0] && *matches[0] && matches[1] == 0)
+	{
+	  insert_match (matches[0], start, matches[1] ? MULT_MATCH : SINGLE_MATCH, &quote_char);
+	  append_to_match (matches[0], delimiter, quote_char, nontrivial_lcd);
+	  break;
+	}
+      
       if (rl_completion_display_matches_hook == 0)
 	{
 	  _rl_sigcleanup = _rl_complete_sigcleanup;
@@ -2206,9 +2193,7 @@ rl_complete_internal (what_to_do)
      when there are no more matches.
  */
 char **
-rl_completion_matches (text, entry_function)
-     const char *text;
-     rl_compentry_func_t *entry_function;
+rl_completion_matches (const char *text, rl_compentry_func_t *entry_function)
 {
   register int i;
 
@@ -2276,9 +2261,7 @@ rl_completion_matches (text, entry_function)
    TEXT contains a partial username preceded by a random
    character (usually `~').  */
 char *
-rl_username_completion_function (text, state)
-     const char *text;
-     int state;
+rl_username_completion_function (const char *text, int state)
 {
 #if defined (__WIN32__) || defined (__OPENNT)
   return (char *)NULL;
@@ -2340,11 +2323,7 @@ rl_username_completion_function (text, state)
    _rl_completion_case_map is set, make `-' and `_' equivalent.  CONVFN is
    the possibly-converted directory entry; FILENAME is what the user typed. */
 static int
-complete_fncmp (convfn, convlen, filename, filename_len)
-     const char *convfn;
-     int convlen;
-     const char *filename;
-     int filename_len;
+complete_fncmp (const char *convfn, int convlen, const char *filename, int filename_len)
 {
   register char *s1, *s2;
   int d, len;
@@ -2472,9 +2451,7 @@ complete_fncmp (convfn, convlen, filename, filename_len)
    because of all the pathnames that must be followed when looking up the
    completion for a command. */
 char *
-rl_filename_completion_function (text, state)
-     const char *text;
-     int state;
+rl_filename_completion_function (const char *text, int state)
 {
   static DIR *directory = (DIR *)NULL;
   static char *filename = (char *)NULL;
@@ -2702,8 +2679,7 @@ rl_filename_completion_function (text, state)
    hit the end of the match list, we restore the original unmatched text,
    ring the bell, and reset the counter to zero. */
 int
-rl_old_menu_complete (count, invoking_key)
-     int count, invoking_key;
+rl_old_menu_complete (int count, int invoking_key)
 {
   rl_compentry_func_t *our_func;
   int matching_filenames, found_quote;
@@ -2817,16 +2793,24 @@ rl_old_menu_complete (count, invoking_key)
     {
       insert_match (matches[match_list_index], orig_start, SINGLE_MATCH, &quote_char);
       append_to_match (matches[match_list_index], delimiter, quote_char,
-		       strcmp (orig_text, matches[match_list_index]));
+		       compare_match (orig_text, matches[match_list_index]));
     }
 
   completion_changed_buffer = 1;
   return (0);
 }
 
+/* The current version of menu completion.
+   The differences between this function and the original are:
+
+1. It honors the maximum number of completions variable (completion-query-items)
+2. It appends to the word as usual if there is only one match
+3. It displays the common prefix if there is one, and makes it the first menu
+   choice if the menu-complete-display-prefix option is enabled
+*/
+ 
 int
-rl_menu_complete (count, ignore)
-     int count, ignore;
+rl_menu_complete (int count, int ignore)
 {
   rl_compentry_func_t *our_func;
   int matching_filenames, found_quote;
@@ -2883,7 +2867,7 @@ rl_menu_complete (count, ignore)
       matches = gen_completion_matches (orig_text, orig_start, orig_end,
 					our_func, found_quote, quote_char);
 
-      nontrivial_lcd = matches && strcmp (orig_text, matches[0]) != 0;
+      nontrivial_lcd = matches && compare_match (orig_text, matches[0]) != 0;
 
       /* If we are matching filenames, the attempted completion function will
 	 have set rl_filename_completion_desired to a non-zero value.  The basic
@@ -2990,7 +2974,7 @@ rl_menu_complete (count, ignore)
     {
       insert_match (matches[match_list_index], orig_start, SINGLE_MATCH, &quote_char);
       append_to_match (matches[match_list_index], delimiter, quote_char,
-		       strcmp (orig_text, matches[match_list_index]));
+		       compare_match (orig_text, matches[match_list_index]));
     }
 
   completion_changed_buffer = 1;
@@ -2998,8 +2982,7 @@ rl_menu_complete (count, ignore)
 }
 
 int
-rl_backward_menu_complete (count, key)
-     int count, key;
+rl_backward_menu_complete (int count, int key)
 {
   /* Positive arguments to backward-menu-complete translate into negative
      arguments for menu-complete, and vice versa. */
