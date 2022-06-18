@@ -64,8 +64,8 @@ crepository = /repo=lcl_root:[bash.cxx_repository]
 cnames = /name=(as_i,shor)$(crepository)
 clist = /list
 cprefix = /pref=all
-cnowarn1 = questcompare1,unknownmacro,intconcastsgn,intconstsign,falloffend
-cnowarn2 = boolexprconst,knrfunc,embedcomment,nestedcomment,uninit2
+cnowarn1 = unknownmacro,intconcastsgn,intconstsign,falloffend
+cnowarn2 = boolexprconst,knrfunc,embedcomment,nestedcomment
 cnowarn = $(cnowarn1),$(cnowarn2)
 cwarn1 = defunct,obsolescent,questcode,unusedtop
 cwarn = /warnings=(enable=($(cwarn1)),disable=($(cnowarn)))
@@ -82,7 +82,7 @@ cinc = $(cinc2)
 # configure does not have tests for these macros; So they must be manually set.
 #
 cdefs = /define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,HAVE_REGEX_H=1,\
-HAVE_REGCOMP=1,HAVE_REGEXEC=1)/fl=ieee/ieee=denorm
+HAVE_REGCOMP=1,HAVE_REGEXEC=1,"fork"="vfork")/fl=ieee/ieee=denorm
 cflags = $(cnames)/debu$(clist)$(cprefix)$(cwarn)$(cinc)$(cdefs)
 cflagsx = $(cnames)/debu$(clist)$(cwarn)$(cinc2)
 
@@ -304,7 +304,7 @@ DEFSRC =  $(srcdir)/alias.def $(srcdir)/bind.def $(srcdir)/break.def \
 # This macro defines the .def files for builtins which require changes for
 # OpenVMS.
 #
-VMSDEFSRC = lcl_root:[.builtins]exec.def
+VMSDEFSRC = 
 
 
 #		  "common"=[.builtins]common.obj,\
@@ -446,7 +446,6 @@ bash_objs = alias.obj,\
             version.obj,\
             y_tab.obj,\
 	    xmalloc.obj,\
-	    vms_fakefork.obj,\
             vms_get_foreign_cmd.obj,\
             vms_fname_to_unix.obj,\
 	    vms_mailstat.obj,\
@@ -484,7 +483,7 @@ parser_h = parser.h command.h input.h
 
 pcomplete_h = pcomplete.h hashlib.h
 
-trap_h = lcl_root:trap.h bashtypes.h
+trap_h = trap.h bashtypes.h
 
 variables_h = variables.h array.h assoc.h hashlib.h conftypes.h
 
@@ -518,7 +517,7 @@ readline_rltty_h = [.lib.readline]rltty.h [.lib.readline]rlwinsize.h \
 	$(termios_h)
 
 readline_tcap_h = [.lib.readline]tcap.h $(readline_rltty_h)
-execute_cmd_h = lcl_root:execute_cmd.h
+execute_cmd_h = execute_cmd.h
 
 gnv_shell_c_first = gnv$shell.c_first []vms_pwd_hack.h
 rl_gnv_shell_c_first = [.lib.readline]gnv$shell.c_first []vms_pwd_hack.h
@@ -1017,11 +1016,6 @@ lcl_root[.lib]readline.DIR :
 libreadline.olb : libreadline($(libreadline_objs))
     @ write sys$output "libreadline is up to date"
 
-lcl_root:[.lib.readline]signals.c : src_root:[.lib.readline]signals.c \
-		    vms_root:[.lib.readline]signals.tpu
-                    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-                    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
 # floss.h included, but not supplied?
 [.lib.readline]bind.obj : [.lib.readline]bind.c lcl_root[.lib]readline.DIR \
 		[.include]posixstat.h $(readline_rldefs_h) \
@@ -1253,7 +1247,7 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
 .endif
 
-[.lib.readline]signals.obj : lcl_root:[.lib.readline]signals.c $(config_h) \
+[.lib.readline]signals.obj : [.lib.readline]signals.c $(config_h) \
 		lcl_root[.lib]readline.DIR \
 		$(readline_rldefs_h) $(readline_readline_h) \
 		$(readline_history_h) $(readline_rlprivate_h)
@@ -1548,11 +1542,6 @@ gettextp_h = gettextP.h
 
 lcl_root:[]builtins.DIR :
 	$create/directory/prot=o:rwed lcl_root:[.builtins]
-
-lcl_root:[.builtins]exec.def : src_root:[.builtins]exec.def \
-	[.builtins]exec.tpu lcl_root:[]builtins.DIR
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
 
 libbuiltins.olb : libbuiltins($(libbuiltins_objs))
     @ write sys$output "libbuiltins is up to date"
@@ -1930,12 +1919,7 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
    $(CC)$(CFLAGS)/OBJ=exec.obj exec.c
    $set def prj_root:[-]
 
-lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def \
-		[.builtins]exit.tpu lcl_root:[]builtins.DIR
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-[.builtins]exit.c : lcl_root:[.builtins]exit.def, [.builtins]mkbuiltins.exe
+[.builtins]exit.c : [.builtins]exit.def, [.builtins]mkbuiltins.exe
 
 [.builtins]exit.obj : [.builtins]exit.c, $(config_h) bashtypes.h \
 		$(bashintl_h) $(shell_h) $(jobs_h) [.builtins]common.h \
@@ -2440,16 +2424,7 @@ eval.obj : eval.c $(config_h) $(bashansi_h) $(bashintl_h) $(shell_h) flags.h \
 		$(trap_h) [.builtins]common.h input.h $(execute_cmd_h) \
 		bashhist.h
 
-lcl_root:execute_cmd.h : src_root:execute_cmd.h execute_cmd_h.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-            /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-
-lcl_root:execute_cmd.c : src_root:execute_cmd.c execute_cmd.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-execute_cmd.obj : lcl_root:execute_cmd.c $(config_h) \
+execute_cmd.obj : execute_cmd.c $(config_h) \
 		[.include]chartypes.h bashtypes.h \
 		[.include]filecntl.h [.include]posixstat.h \
 		[.include]posixtime.h $(bashansi_h) \
@@ -2459,7 +2434,7 @@ execute_cmd.obj : lcl_root:execute_cmd.c $(config_h) \
 		redir.h $(trap_h) pathexp.h $(hashcmd_h) test.h \
 		[.builtins]common.h [.builtins]builtext.h \
 		[.lib.glob]strmatch.h [.lib.tilde]tilde.h \
-		input.h $(alias_h) bashhist.h vms_fakefork.h
+		input.h $(alias_h) bashhist.h
    $define/user glob prj_root:[.lib.glob]
    $define/user tilde prj_root:[.lib.tilde]
    $define/user decc$system_include prj_root:[]
@@ -2529,16 +2504,12 @@ input.obj : input.c $(config_h) bashtypes.h [.include]filecntl.h \
 		[.include]posixstat.h $(bashansi_h) $(bashintl_h) \
 		$(general_h) input.h error.h externs.h quit.h
 
-lcl_root:nojobs.c : src_root:nojobs.c []nojobs.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-nojobs.obj : lcl_root:nojobs.c $(config_h) bashtypes.h $(trap_h) \
+nojobs.obj : nojobs.c $(config_h) bashtypes.h $(trap_h) \
 		[.include]posixtime.h \
 		[.include]filecntl.h input.h [.include]shtty.h \
 		$(bashansi_h) $(bashintl_h) $(shell_h) $(jobs_h) \
 		$(execute_cmd_h) flags.h [.builtins]builtext.h \
-		[.builtins]common.h vms_fakefork.h $(termios_h)
+		[.builtins]common.h $(termios_h)
 
 list.obj : list.c $(config_h) $(shell_h)
 
@@ -2615,11 +2586,7 @@ print_cmd.obj : lcl_root:print_cmd.c $(config_h) $(bashansi_h) $(bashintl_h) \
 	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,\
 	MODULE_PRINT_CMD=1,HAVE_STRING_H=1,HAVE_VARARGS_H=1)
 
-lcl_root:redir.c : src_root:redir.c redir.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-redir.obj : lcl_root:redir.c $(config_h) bashtypes.h [.include]filecntl.h \
+redir.obj : redir.c $(config_h) bashtypes.h [.include]filecntl.h \
 		[.include]posixstat.h $(bashansi_h) $(bashintl_h) \
 		[.include]memalloc.h $(shell_h) flags.h \
 		$(execute_cmd_h) redir.h input.h
@@ -2634,7 +2601,7 @@ shell.obj : shell.c $(config_h) bashtypes.h [.include]posixstat.h \
 		findcmd.h [.lib.malloc]shmalloc.h bashhist.h \
 		$(readline_history_h) bashline.h \
 		[.lib.tilde]tilde.h [.lib.glob]strmatch.h \
-		$(gnv_shell_c_first) vms_main_wrapper.c
+		$(gnv_shell_c_first)
 .ifdef __VAX__
    $type/noheader lcl_root:[]gnv$shell.c_first, src_root:[]shell.c \
 	/output=lcl_root:shell.c
@@ -2676,11 +2643,7 @@ stringlib.obj : stringlib.c $(config_h) bashtypes.h $(bashansi_h) \
 gnv$subst.c_first : gnv_subst.c_first
     $type $(MMS$SOURCE)/output=$(MMS$TARGET)
 
-lcl_root:subst.c : src_root:subst.c subst.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-subst.obj : lcl_root:subst.c gnv$subst.c_first $(config_h) bashtypes.h \
+subst.obj : subst.c gnv$subst.c_first $(config_h) bashtypes.h \
 		[.include]chartypes.h \
 		$(bashansi_h) [.include]posixstat.h $(bashintl_h) \
 		$(shell_h) $(parser_h) flags.h $(jobs_h) $(execute_cmd_h) \
@@ -2743,23 +2706,11 @@ test.obj : test.c $(config_h) gnv$test.c_first \
 	/OBJ=test.obj test.c
 .endif
 
-lcl_root:trap.c : src_root:trap.c trap.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-lcl_root:trap.h : src_root:trap.h trap_h.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-trap.obj : lcl_root:trap.c $(config_h) bashtypes.h $(bashansi_h) $(bashintl_h) \
+trap.obj : trap.c $(config_h) bashtypes.h $(bashansi_h) $(bashintl_h) \
 		$(trap_h) $(shell_h) flags.h input.h $(jobs_h) signames.h \
 		$(builtins_h) [.builtins]common.h [.builtins]builtext.h
 
-lcl_root:unwind_prot.c : src_root:unwind_prot.c unwind_prot.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-unwind_prot.obj : lcl_root:unwind_prot.c $(config_h) bashtypes.h $(bashansi_h) \
+unwind_prot.obj : unwind_prot.c $(config_h) bashtypes.h $(bashansi_h) \
 		command.h $(general_h) unwind_prot.h quit.h sig.h \
 		error.h
 
@@ -2790,10 +2741,6 @@ y_tab.obj : lcl_root:y_tab.c $(config_h) bashtypes.h $(bashansi.h)\
 		[.include]maxpath.h
 
 vms_get_foreign_cmd.obj : vms_get_foreign_cmd.c
-
-vms_fakefork.obj : vms_fakefork.c vms_fakefork.h $(config_h) $(xmalloc_h) \
-		command.h hashlib.h $(general_h) $(variables_h) error.h \
-		subst.h bashjmp.h make_cmd.h dispose_cmd.h [.builtins]common.h
 
 vms_term.obj : vms_term.c vms_term.h
 

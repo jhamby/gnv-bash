@@ -20,8 +20,3 @@
 
 /* Put a wrapper around the getpwuid() function to get the correct shell */
 #include "vms_pwd_hack.h"
-
-/* Put a wrapper around the main() function to fixup the image name in */
-/* argv[0] */
-#include "vms_main_wrapper.c"
-
