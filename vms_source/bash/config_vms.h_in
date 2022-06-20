@@ -39,8 +39,14 @@
 #define HAVE_TERMIOS_H 1
 #endif
 
+/* defined in config-bot.h */
 #ifdef TERMIOS_MISSING
 #undef TERMIOS_MISSING
+#endif
+
+/* defined in config-top.h */
+#ifdef USE_MKDTEMP
+#undef USE_MKDTEMP
 #endif
 
 /* Common definitions from the UNIX Makefile */

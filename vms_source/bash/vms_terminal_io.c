@@ -60,14 +60,12 @@
 
 #include "vms_lstat_hack.h"
 #include "vms_getcwd_hack.h"
-char * vms_to_unix(const char * vms_spec);
 
 #define __NEW_STARLET 1
 #include <stropts.h>
 #include "vms_terminal_io.h"
 #include <efndef.h>
 #include <iodef.h>
-#include <ssdef.h>
 /* #include <inttypes.h> */
 /* #include <libdef.h> */
 #include <libclidef.h>
@@ -78,10 +76,7 @@ char * vms_to_unix(const char * vms_spec);
 #endif
 #include <stdarg.h>
 #include <fcntl.h>
-#include <fscndef.h>
-#include <iledef.h>
 #include <iosbdef.h>
-#include <lnmdef.h>
 #include <lib$routines.h>
 #include <starlet.h>
 
@@ -208,34 +203,6 @@ void dump_pointer_f(const void * ptr, const char * str, int psize) {
 
 #endif
 
-#if 0
-struct stat lstat_probe_st;
-
-char * lstat_probe(const char * str) {
-int status;
-
-    status = lstat(str, &lstat_probe_st);
-    if (status < 0) {
-        perror("lstat_probe");
-    }
-    return &lstat_probe_st;
-}
-
-char getpwd_probe_mem[8192];
-
-char * getpwd_probe(const char * str) {
-char * cwd;
-
-    cwd = decc_getcwd(getpwd_probe_mem, 8192, 1);
-    if (cwd == NULL) {
-        perror("getpwd_probe");
-    } else {
-        puts(cwd);
-    }
-    return cwd;
-}
-#endif
-
  /* Internal routines */
 
 /* fd lookup routine.  We need our special data with some file descriptors */
@@ -349,21 +316,6 @@ int vms_fstat(int fd, struct stat * st_buf) {
     return fstat(fd, st_buf);
 }
 
-#if 0
-/* Debug free */
-int decc$free(void *);
-
-void vms_free(void * foo) {
-int free_stat;
-
-    errno = 0;
-    free_stat = decc$free(foo);
-    if (free_stat != 0) {
-        perror("free");
-    }
-}
-#endif
-
 DIR * decc$opendir(const char * name);
 
 DIR * vms_opendir(const char * name) {
@@ -420,12 +372,7 @@ DIR * vms_fdopendir(int fd) {
             if (info->vmscwd != NULL) {
                 int len;
                 char * unix_path;
-                unix_path = vms_to_unix(info->vmscwd);
-                strcpy(dir_path, unix_path);
-/* debug */
-                dump_pointer_f(unix_path, "vms_fdopendir ",
-                               strlen(unix_path)+1);
-                free(unix_path);
+                strcpy(dir_path, info->vmscwd);
 
                 len = strlen(dir_path);
                 if (dir_path[len -1] != '/')
@@ -457,276 +404,6 @@ DIR * vms_fdopendir(int fd) {
     free(dir_path);
     errno = ENOTDIR;
     return NULL;
-}
-
-/* The VMS CRTL will sometimes access violate when:
-   1. The current working directory is a search list.
-   2. A subdirectory at the start of the search list is not in all
-      directories of the search list.
-   Since fchdir() caches the default directory, if the directory only exists
-   at the start of the search list, cache the start of the search list
-   instead of the search list.
- */
-char * vms_crtl_searchlist_getcwd_hack(void) {
-
-    const $DESCRIPTOR(table_desc, "LNM$FILE_DEV");
-    unsigned int attr = LNM$M_CASE_BLIND;
-    struct dsc$descriptor_s path_desc;
-    int status;
-    unsigned int field_flags;
-    struct _ile2 fs_list[5];
-    char * volume;
-    char * name;
-    int name_len;
-    char * ext;
-    char * original_cwd;
-    /* const int show up in debugger, macros do not */
-    const int FS_FULL = 0;
-    const int FS_DEV = 1;
-    const int FS_ROOT = 2;
-    const int FS_DIR = 3;
-    const int FS_END = 4;
-
-    /* Get the current working directory in VMS format */
-    original_cwd = decc_getcwd(NULL, MAX_DIR_PATH + 1, 1);
-
-/* debug */
-    dump_pointer_m(original_cwd, "v_c_searchlist ", (MAX_DIR_PATH + 1));
-
-    path_desc.dsc$a_pointer = original_cwd;
-    path_desc.dsc$w_length = strlen(original_cwd);
-    path_desc.dsc$b_dtype = DSC$K_DTYPE_T;
-    path_desc.dsc$b_class = DSC$K_CLASS_S;
-
-    /* Don't actually need to initialize anything buf itmcode */
-    /* I just do not like uninitialized input values */
-
-    /* Sanity check, this must be the same length as input */
-    fs_list[FS_FULL].ile2$w_code = FSCN$_FILESPEC;
-    fs_list[FS_FULL].ile2$w_length = 0;
-    fs_list[FS_FULL].ile2$ps_bufaddr = NULL;
-
-    /* Only device and dir should be present */
-    fs_list[FS_DEV].ile2$w_code = FSCN$_DEVICE;
-    fs_list[FS_DEV].ile2$w_length = 0;
-    fs_list[FS_DEV].ile2$ps_bufaddr = NULL;
-
-    /* we need any root and directory */
-    fs_list[FS_ROOT].ile2$w_code = FSCN$_ROOT;
-    fs_list[FS_ROOT].ile2$w_length = 0;
-    fs_list[FS_ROOT].ile2$ps_bufaddr = NULL;
-
-    fs_list[FS_DIR].ile2$w_code = FSCN$_DIRECTORY;
-    fs_list[FS_DIR].ile2$w_length = 0;
-    fs_list[FS_DIR].ile2$ps_bufaddr = NULL;
-
-    /* End the list */
-    fs_list[FS_END].ile2$w_code = 0;
-    fs_list[FS_END].ile2$w_length = 0;
-    fs_list[FS_END].ile2$ps_bufaddr = NULL;
-
-    status = SYS$FILESCAN(
-        (struct dsc$descriptor_s *)&path_desc,
-        fs_list, &field_flags, NULL, NULL);
-
-    if ($VMS_STATUS_SUCCESS(status) &&
-        (fs_list[FS_FULL].ile2$w_length == path_desc.dsc$w_length) &&
-        (fs_list[FS_DEV].ile2$w_length != 0)) {
-
-        /* Check if device is a search list */
-        {
-            struct dsc$descriptor_s dev_desc;
-            struct _ile3 item_list[3];
-            int max_index;
-            unsigned short max_index_len;
-            int status;
-            int dir_len;
-
-            item_list[0].ile3$w_length = 4;
-            item_list[0].ile3$w_code = LNM$_MAX_INDEX;
-            item_list[0].ile3$ps_bufaddr = &max_index;
-            item_list[0].ile3$ps_retlen_addr = &max_index_len;
-
-            item_list[1].ile3$w_length = 0;
-            item_list[1].ile3$w_code = 0;
-
-            dev_desc.dsc$w_length = fs_list[FS_DEV].ile2$w_length - 1;
-            dev_desc.dsc$a_pointer = fs_list[FS_DEV].ile2$ps_bufaddr;
-            dev_desc.dsc$b_dtype = DSC$K_DTYPE_T;
-            dev_desc.dsc$b_class = DSC$K_CLASS_S;
-
-            status = SYS$TRNLNM(&attr, (struct dsc$descriptor_s *)&table_desc,
-				&dev_desc, 0, item_list);
-            if ($VMS_STATUS_SUCCESS(status) && (max_index > 0)) {
-
-                int cur_index;
-                char *new_dir_path;
-                new_dir_path = malloc(MAX_DIR_PATH + 1);
-                if (new_dir_path == NULL) {
-                    return NULL;
-                }
-/* debug */
-                dump_pointer_m(new_dir_path, "v_c_searchlist ",
-                               (MAX_DIR_PATH + 1));
-
-                cur_index = max_index;
-                /* Loop through search list to see if the dir exists
-                 * We only do one level deep iteration, not multiple
-                 * levels which could be possible.
-                 */
-                while (cur_index >= 0) {
-
-                    /* dir exist at this device, but not earlier */
-                    int new_path_len;
-                    int dir_exists;
-                    unsigned short new_dev_len;
-                    int fs_dir_len;
-
-                    dir_exists = 0;
-                    item_list[0].ile3$w_length = 4;
-                    item_list[0].ile3$w_code = LNM$_INDEX;
-                    item_list[0].ile3$ps_bufaddr = &cur_index;
-                    item_list[0].ile3$ps_retlen_addr = 0;
-
-                    item_list[1].ile3$w_length = MAX_DIR_PATH;
-                    item_list[1].ile3$w_code = LNM$_STRING;
-                    item_list[1].ile3$ps_bufaddr = new_dir_path;
-                    item_list[1].ile3$ps_retlen_addr = &new_dev_len;
-
-                    item_list[2].ile3$w_length = 0;
-                    item_list[2].ile3$w_code = 0;
-
-                    fs_dir_len = fs_list[FS_ROOT].ile2$w_length +
-                        fs_list[FS_DIR].ile2$w_length;
-                    status = SYS$TRNLNM(&attr,
-					(struct dsc$descriptor_s *)&table_desc,
-					&dev_desc, 0, item_list);
-                    if ($VMS_STATUS_SUCCESS(status) && (new_dev_len != 0) &&
-                        ((new_dev_len + fs_dir_len) < MAX_DIR_PATH)) {
-                        struct stat st_buf;
-                        int st_result;
-                        int cur_len;
-
-                        new_dir_path[new_dev_len] = 0;
-                        cur_len = new_dev_len;
-                        if (fs_list[FS_ROOT].ile2$w_length != 0) {
-                            strncat(new_dir_path,
-                                fs_list[FS_ROOT].ile2$ps_bufaddr,
-                                fs_list[FS_ROOT].ile2$w_length);
-                            cur_len += fs_list[FS_ROOT].ile2$w_length;
-                            new_dir_path[cur_len] = 0;
-                        }
-
-                        /* This should always be > 0 */
-                        if (fs_list[FS_DIR].ile2$w_length != 0) {
-                            strncat(new_dir_path,
-                                fs_list[FS_DIR].ile2$ps_bufaddr,
-                                fs_list[FS_DIR].ile2$w_length);
-                            cur_len += fs_list[FS_DIR].ile2$w_length;
-                            new_dir_path[cur_len] = 0;
-                        }
-
-                        st_result = vmsmode_stat(new_dir_path, &st_buf);
-                        if (st_result == 0) {
-                            dir_exists = 1;
-                        }
-                    }
-
-                    if (dir_exists && (cur_index == max_index)) {
-                        /* It exists at the end of the search list
-                         * assume good.
-                         */
-                        break;
-                    }
-
-                    /* If we get here, the directory was missing from
-                     * somewhere later in the search list, so if it is here
-                     * it is the one that we want to use.
-                     */
-                    if (dir_exists) {
-                        char * old_dir;
-
-                        /* Swap the directory pointers */
-                        old_dir = original_cwd;
-                        original_cwd = new_dir_path;
-                        new_dir_path = old_dir;
-
-                        /* Adjust the actual cwd */
-                        vmsmode_chdir(original_cwd);
-                        break;
-                    }
-                    cur_index--;
-                } /* End whiie */
-
-                /* Either we did not find the directory
-                 * or the directory is in all search paths
-                 */
-/* debug */
-                dump_pointer_f(new_dir_path, "v_c_searchlist ",
-                               strlen(new_dir_path)+1);
-
-                free(new_dir_path);
-
-            } /* End of device is a logical name */
-        } /* sys$filescan succeeded - should never fail for a current dir */
-    }
-    return original_cwd;
-}
-
-
-/* Need a fchdir */
-int vms_fchdir(int fd) {
-    struct vms_info_st * info;
-    info = vms_lookup_fd(fd);
-    if (info == NULL) {
-        errno = EIO;
-        return -1;
-    }
-
-    /* First need to go to saved wd */
-    if (info->vmscwd != NULL) {
-        int err;
-        err = vmsmode_chdir(info->vmscwd);
-    }
-    /* Then to the desired directory */
-    if (info->path != NULL) {
-        if (!((info->path[0] == '.') && info->path[1] == 0)) {
-            int err;
-            err = chdir(info->path);
-            if (err == 0) {
-                /* Need to replace the saved path */
-
-/* debug */
-                dump_pointer_f(info->vmscwd, "vms_fchdir ",
-                               strlen(info->vmscwd)+1);
-
-                free(info->vmscwd);
-                info->vmscwd = vms_crtl_searchlist_getcwd_hack();
-                if (info->vmscwd == NULL) {
-                    return -1;
-                }
-/* debug */
-                dump_pointer_f(info->path, "vms_fchdir ",
-                               strlen(info->path)+1);
-
-                free(info->path);
-                info->path = strdup(".");
-                if (info->path == NULL) {
-                    free(info->vmscwd);
-                    info->vmscwd = NULL;
-                    errno = ENOMEM;
-                    return -1;
-                }
-/* debug */
-                dump_pointer_m(info->path, "vms_fchdir/strdup ", 2);
-            }
-            return err;
-        } else {
-            return 0;
-        }
-    }
-    errno = ENOTDIR;
-    return -1;
 }
 
 /* Helper for a replacement popen function

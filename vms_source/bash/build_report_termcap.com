@@ -17,4 +17,4 @@ $cc report_termcap.c
 $!
 $link report_termcap, vms_term
 $!
-$report_termcap :== $lcl_root:[bash-4^.2]report_termcap.exe
+$report_termcap :== $lcl_root:[bash]report_termcap.exe

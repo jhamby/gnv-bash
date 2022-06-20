@@ -120,8 +120,6 @@ EVE = EDIT/TPU/SECT=EVE$SECTION/NODISP
    $ source = f$parse("$(MMS$SOURCE)",,,"NAME")
    $ source_u = f$edit(source, "UPCASE")
    $ mkbuiltins "-D" ./builtins/ 'source'.DEF
-   $! if f$getsyi("ARCH_TYPE") .ne. 1 then set process/parse_style=extended
-   $! if f$getsyi("ARCH_TYPE") .ne. 1 then rename 'source'.C 'source_u'.C
    $ set def prj_root:[-]
 
 # Lists of source files for submodules
@@ -134,7 +132,6 @@ libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
 		"setlinebuf"=[.lib.sh]setlinebuf.obj,\
                 "strchrnul"=[.lib.sh]strchrnul.obj,\
 		"strcasecmp"=[.lib.sh]strcasecmp.obj,\
-		"strdup"=[.lib.sh]strdup.obj,\
                 "strerror"=[.lib.sh]strerror.obj,\
 		"strtod"=[.lib.sh]strtod.obj,\
                 "strtol"=[.lib.sh]strtol.obj,\
@@ -169,7 +166,6 @@ libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
 		"fmtumax"=[.lib.sh]fmtumax.obj,\
                 "netconn"=[.lib.sh]netconn.obj,\
 		"mktime"=[.lib.sh]mktime.obj,\
-		"strftime"=[.lib.sh]strftime.obj,\
                 "memset"=[.lib.sh]memset.obj,\
                 "mbschr"=[.lib.sh]mbschr.obj,\
 		"zcatfd"=[.lib.sh]zcatfd.obj,\
@@ -599,7 +595,7 @@ config_vms.h : config_vms.h_in
 #        && mv newversion.h version.h
 
 # Generate a version file, read
-version.h : $(config_h) patchlevel.h bash.mms
+version.h : $(config_h) patchlevel.h
    $ @version_h.com
 
 # The following are used by the Bash test suite: printenv, recho, xcase, and
@@ -737,7 +733,7 @@ version.obj : version.c version.h gnv$version.c_first vms_eco_level.h
 lcl_root:[.lib]regex.DIR :
 	$create/directory/prot=o:rwed lcl_root:[.lib.regex]
 
-[.lib.regex]regex.obj : vms_root:[.lib.regex]regex.c, lcl_root:[.lib]regex.DIR,\
+[.lib.regex]regex.obj : vms_root:[.lib.regex]regex.c, \
                         $(config_h)
    $define/user decc$system_include prj_root:[.lib.regex], prj_root:[bash]
    $define/user decc$user_include prj_root:[.lib.regex], prj_root:[.include]
@@ -750,22 +746,21 @@ lcl_root:[.lib]sh.DIR :
 libsh.olb : libsh($(libsh_objs))
     @ write sys$output "libsh is up to date"
 
-[.lib.sh]casemod.obj : [.lib.sh]casemod.c, lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]casemod.obj : [.lib.sh]casemod.c, $(config_h) \
 	$(bashansi_h) $(bashintl_h) bashtypes.h [.lib.glob]strmatch.h
 
-[.lib.sh]clktck.obj : [.lib.sh]clktck.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]clktck.obj : [.lib.sh]clktck.c $(config_h) \
 	bashtypes.h
 
-[.lib.sh]clock.obj : [.lib.sh]clock.c lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]clock.obj : [.lib.sh]clock.c $(config_h)
 
-[.lib.sh]dprintf.obj : [.lib.sh]dprintf.c lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]dprintf.obj : [.lib.sh]dprintf.c $(config_h)
 
 # moved to vms_lstat_hack.h
-#[.lib.sh]gnv$eaccess.c_first : [.lib.sh]gnv_eaccess.c_first \
-#	lcl_root:[.lib]sh.DIR
+#[.lib.sh]gnv$eaccess.c_first : [.lib.sh]gnv_eaccess.c_first
 #    $type $(MMS$SOURCE)/output=$(MMS$TARGET)
 
-[.lib.sh]eaccess.obj : [.lib.sh]eaccess.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]eaccess.obj : [.lib.sh]eaccess.c $(config_h) \
 	bashtypes.h $(bashansi_h) [.include]posixstat.h
    $define/user decc$system_include prj_root:[]
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
@@ -774,62 +769,67 @@ libsh.olb : libsh($(libsh_objs))
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
 
 [.lib.sh]fmtullong.obj : [.lib.sh]fmtullong.c, [.lib.sh]fmtulong.c, \
-	lcl_root:[.lib]sh.DIR, $(config_h), $(bashansi_h), $(bashintl_h)
+	$(config_h), $(bashansi_h), $(bashintl_h)
 
-[.lib.sh]fmtulong.obj : [.lib.sh]fmtulong.c lcl_root:[.lib]sh.DIR $(config_h), \
+[.lib.sh]fmtulong.obj : [.lib.sh]fmtulong.c $(config_h), \
 	$(bashansi_h), $(bashintl_h)
 
 [.lib.sh]fmtumax.obj : [.lib.sh]fmtumax.c, [.lib.sh]fmtulong.c, $(config_h), \
-	lcl_root:[.lib]sh.DIR $(bashansi_h), $(bashintl_h)
+	$(bashansi_h), $(bashintl_h)
 
 [.lib.sh]fnxform.obj : [.lib.sh]fnxform.c $(config_h) bashtypes.h \
-	lcl_root:[.lib]sh.DIR $(bashansi_h) $(bashintl_h)
+	$(bashansi_h) $(bashintl_h)
 
-[.lib.sh]fpurge.obj : [.lib.sh]fpurge.c, lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]fpurge.obj : [.lib.sh]fpurge.c, $(config_h)
 
-[.lib.sh]getcwd.obj : [.lib.sh]getcwd.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]getcwd.obj : [.lib.sh]getcwd.c $(config_h) \
 	bashtypes.h $(bashansi_h) [.include]posixstat.h
 
-[.lib.sh]getenv.obj : [.lib.sh]getenv.c, lcl_root:[.lib]sh.DIR $(config_h), \
+[.lib.sh]getenv.obj : [.lib.sh]getenv.c, $(config_h), \
 	$(bashansi_h)
 
-[.lib.sh]inet_aton.obj : [.lib.sh]inet_aton.c, lcl_root:[.lib]sh.DIR \
+[.lib.sh]inet_aton.obj : [.lib.sh]inet_aton.c, \
 	$(config_h), $(bashansi_h)
 
-[.lib.sh]input_avail.obj : [.lib.sh]input_avail.c lcl_root:[.lib]sh.DIR \
+lcl_root:[.lib.sh]input_avail.c : src_root:[.lib.sh]input_avail.c \
+	[.lib.sh]input_avail_c.tpu
+    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
+	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
+
+[.lib.sh]input_avail.obj : lcl_root:[.lib.sh]input_avail.c \
 	$(config_h)
 
-[.lib.sh]itos.ogj : [.lib.sh]itos.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]itos.ogj : [.lib.sh]itos.c $(config_h) \
 	$(bashansi_h) $(shell_h)
 
-[.lib.sh]mailstat.obj : [.lib.sh]mailstat.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]mailstat.obj : [.lib.sh]mailstat.c $(config_h) \
 	bashtypes.h $(bashansi_h) [.include]posixstat.h
 
-[.lib.sh]makepath.obj : [.lib.sh]makepath.c lcl_root:[.lib]sh.DIR \
+[.lib.sh]makepath.obj : [.lib.sh]makepath.c \
 	$(config_h) $(bashansi_h) $(shell_h) [.lib.tilde]tilde.h
 
-[.lib.sh]mbscasecmp.obj : [.lib.sh]mbscasecmp.c lcl_root:[.lib]sh.DIR \
+[.lib.sh]mbscasecmp.obj : [.lib.sh]mbscasecmp.c \
 	$(config_h)
 
-[.lib.sh]mbschr.obj : [.lib.sh]mbschr.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]mbschr.obj : [.lib.sh]mbschr.c $(config_h) \
 	$(bashansi_h) [.include]shmbutil.h
 
-[.lib.sh]mbscmp.obj : [.lib.sh]mbscmp.c lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]mbscmp.obj : [.lib.sh]mbscmp.c $(config_h)
 
-#[.lib.sh]memset.obj : [.lib.sh]memset.c lcl_root:[.lib]sh.DIR
+#[.lib.sh]memset.obj : [.lib.sh]memset.c
 
-[.lib.sh]mktime.obj : [.lib.sh]mktime.c lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]mktime.obj : [.lib.sh]mktime.c $(config_h)
 
-[.lib.sh]netconn.obj : [.lib.sh]netconn.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]netconn.obj : [.lib.sh]netconn.c $(config_h) \
 	bashtypes.h
 
-[.lib.sh]netopen.obj : [.lib.sh]netopen.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]netopen.obj : [.lib.sh]netopen.c $(config_h) \
 	$(bashansi_h) $(bashintl_h) $(xmalloc_h)
 
-[.lib.sh]gnv$oslib.c_first : gnv_lib_sh_oslib.c_first lcl_root:[.lib]sh.DIR
+[.lib.sh]gnv$oslib.c_first : gnv_lib_sh_oslib.c_first
 		$type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
-[.lib.sh]oslib.obj : [.lib.sh]oslib.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]oslib.obj : [.lib.sh]oslib.c $(config_h) \
 		bashtypes.h $(bashansi_h) $(shell_h) [.include]posixstat.h \
 		[.lib.sh]gnv$oslib.c_first
    $define/user decc$system_include prj_root:[],prj_root:[.include]
@@ -839,115 +839,115 @@ libsh.olb : libsh($(libsh_objs))
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
    /first_include=[.lib.sh]gnv$oslib.c_first $(MMS$SOURCE)
 
-[.lib.sh]pathcanon.obj : [.lib.sh]pathcanon.c lcl_root:[.lib]sh.DIR \
+[.lib.sh]pathcanon.obj : [.lib.sh]pathcanon.c \
 		$(config_h) bashtypes.h $(bashansi_h) $(shell_h)
 
-[.lib.sh]pathphys.obj : [.lib.sh]pathphys.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]pathphys.obj : [.lib.sh]pathphys.c $(config_h) \
 		bashtypes.h $(bashansi_h) $(shell_h) [.include]posixstat.h
 
-[.lib.sh]rename.obj : [.lib.sh]rename.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]rename.obj : [.lib.sh]rename.c $(config_h) \
 		bashtypes.h [.include]posixstat.h
 
-[.lib.sh]setlinebuf.obj : [.lib.sh]setlinebuf.c lcl_root:[.lib]sh.DIR \
+[.lib.sh]setlinebuf.obj : [.lib.sh]setlinebuf.c \
 		$(config_h) $(xmalloc_h)
 
-[.lib.sh]shmatch.obj : [.lib.sh]shmatch.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]shmatch.obj : [.lib.sh]shmatch.c $(config_h) \
 		$(bashansi_h) regex.h $(shell_h) $(variables_h) lcl_root:externs.h
 
-[.lib.sh]shmbchar.obj : [.lib.sh]shmbchar.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]shmbchar.obj : [.lib.sh]shmbchar.c $(config_h) \
 		[.include]shmbutil.h [.include]shmbchar.h
 
-[.lib.sh]shquote.obj : [.lib.sh]shquote.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]shquote.obj : [.lib.sh]shquote.c $(config_h) \
 		syntax.h $(xmalloc_h)
 
-[.lib.sh]shtty.obj : [.lib.sh]shtty.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]shtty.obj : [.lib.sh]shtty.c $(config_h) \
 		[.include]shtty.h $(termios_h)
 
-[.lib.sh]snprintf.obj : [.lib.sh]snprintf.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]snprintf.obj : [.lib.sh]snprintf.c $(config_h) \
 		bashtypes.h $(bashansi_h) [.include]chartypes.h \
 		[.include]shmbutil.h $(shell_h) $(xmalloc_h)
 
-[.lib.sh]spell.obj : [.lib.sh]spell.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]spell.obj : [.lib.sh]spell.c $(config_h) \
 		bashtypes.h $(bashansi_h) [.include]posixstat.h
 
-[.lib.sh]strcasecmp.obj : [.lib.sh]strcasecmp.c lcl_root:[.lib]sh.DIR \
+[.lib.sh]strcasecmp.obj : [.lib.sh]strcasecmp.c \
 		$(config_h) $(bashansi_h) [.include]chartypes.h
 
-[.lib.sh]strcasestr.obj : [.lib.sh]strcasestr.c lcl_root:[.lib]sh.DIR \
+[.lib.sh]strcasestr.obj : [.lib.sh]strcasestr.c \
 		$(config_h) $(bashansi_h) [.include]chartypes.h
 
-[.lib.sh]strchrnul.obj : [.lib.sh]strchrnul.c lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]strchrnul.obj : [.lib.sh]strchrnul.c $(config_h)
 
-[.lib.sh]strerror.obj : [.lib.sh]strerror.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]strerror.obj : [.lib.sh]strerror.c $(config_h) \
 		$(bashansi_h) $(shell_h)
 
-[.lib.sh]strftime.obj : [.lib.sh]strftime.c lcl_root:[.lib]sh.DIR $(config_h)
+#[.lib.sh]strftime.obj : [.lib.sh]strftime.c $(config_h)
 
-[.lib.sh]stringlist.obj : [.lib.sh]stringlist.c lcl_root:[.lib]sh.DIR \
+[.lib.sh]stringlist.obj : [.lib.sh]stringlist.c \
 		$(config_h) $(bashansi_h) $(shell_h)
 
-[.lib.sh]stringvec.obj : [.lib.sh]stringvec.c lcl_root:[.lib]sh.DIR \
+[.lib.sh]stringvec.obj : [.lib.sh]stringvec.c \
 		$(config_h) bashtypes.h [.include]chartypes.h $(shell_h)
 
-[.lib.sh]strnlen.obj : [.lib.sh]strnlen.c lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]strnlen.obj : [.lib.sh]strnlen.c $(config_h)
 
-[.lib.sh]strpbrk.obj : [.lib.sh]strpbrk.c lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]strpbrk.obj : [.lib.sh]strpbrk.c $(config_h)
 
-[.lib.sh]strstr.obj : [.lib.sh]strstr.c lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]strstr.obj : [.lib.sh]strstr.c $(config_h)
 
-[.lib.sh]strtod.obj : [.lib.sh]strtod.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]strtod.obj : [.lib.sh]strtod.c $(config_h) \
 		$(bashansi_h) [.include]chartypes.h
 
 strtol_c = [.lib.sh]strtol.c, $(config_h), $(bashansi_h) [.include]chartypes.h
 
-[.lib.sh]strtol.obj : $(strtol_c) lcl_root:[.lib]sh.DIR
+[.lib.sh]strtol.obj : $(strtol_c)
 
-[.lib.sh]strtoll.obj : [.lib.sh]strtoll.c $(strtol_c) lcl_root:[.lib]sh.DIR
+[.lib.sh]strtoll.obj : [.lib.sh]strtoll.c $(strtol_c)
 
-[.lib.sh]strtoul.obj : [.lib.sh]strtoul.c $(strtol_c) lcl_root:[.lib]sh.DIR
+[.lib.sh]strtoul.obj : [.lib.sh]strtoul.c $(strtol_c)
 
-[.lib.sh]strtoull.obj : [.lib.sh]strtolull.c $(strtol_c) lcl_root:[.lib]sh.DIR
+[.lib.sh]strtoull.obj : [.lib.sh]strtoull.c $(strtol_c)
 
-[.lib.sh]strtrans.obj : [.lib.sh]strtrans.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]strtrans.obj : [.lib.sh]strtrans.c $(config_h) \
 		$(bashansi_h) $(shell_h)
 
-[.lib.sh]times.obj : [.lib.sh]times.c $(config_h) lcl_root:[.lib]sh.DIR
+[.lib.sh]times.obj : [.lib.sh]times.c $(config_h)
 
-[.lib.sh]timeval.obj : [.lib.sh]timeval.c $(config_h) lcl_root:[.lib]sh.DIR
+[.lib.sh]timeval.obj : [.lib.sh]timeval.c $(config_h)
 
-[.lib.sh]tmpfile.obj : [.lib.sh]tmpfile.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]tmpfile.obj : [.lib.sh]tmpfile.c $(config_h) \
 		bashtypes.h $(shell_h) [.include]posixstat.h
 
-[.lib.sh]uconvert.obj : [.lib.sh]uconvert.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]uconvert.obj : [.lib.sh]uconvert.c $(config_h) \
 		bashtypes.h [.include]chartypes.h $(shell_h) $(builtins_h)
 
-[.lib.sh]ufuncs.obj : [.lib.sh]ufuncs.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]ufuncs.obj : [.lib.sh]ufuncs.c $(config_h) \
 		bashtypes.h
 
-[.lib.sh]unicode.obj : [.lib.sh]unicode.c lcl_root:[.lib]sh.DIR
+[.lib.sh]unicode.obj : [.lib.sh]unicode.c
 
-[.lib.sh]vprint.obj : [.lib.sh]vprint.c lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]vprint.obj : [.lib.sh]vprint.c $(config_h)
 
-[.lib.sh]wcsdup.obj : [.lib.sh]wcsdup.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]wcsdup.obj : [.lib.sh]wcsdup.c $(config_h) \
 		$(bashansi_h) $(xmalloc_h)
 
-[.lib.sh]wcswidth.obj : [.lib.sh]wcswidth.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]wcswidth.obj : [.lib.sh]wcswidth.c $(config_h) \
 		$(bashansi_h)
 
-[.lib.sh]winsize.obj : [.lib.sh]winsize.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]winsize.obj : [.lib.sh]winsize.c $(config_h) \
 		bashtypes.h
 
-[.lib.sh]zcatfd.obj : [.lib.sh]zcatfd.c lcl_root:[.lib]sh.DIR $(config_h)
+[.lib.sh]zcatfd.obj : [.lib.sh]zcatfd.c $(config_h)
 
-[.lib.sh]zgetline.obj : [.lib.sh]zgetline.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]zgetline.obj : [.lib.sh]zgetline.c $(config_h) \
 		$(xmalloc_h)
 
-[.lib.sh]zmapfd.obj : [.lib.sh]zmapfd.c lcl_root:[.lib]sh.DIR $(config_h) \
+[.lib.sh]zmapfd.obj : [.lib.sh]zmapfd.c $(config_h) \
 		$(bashansi_h) command.h $(general_h)
 
-[.lib.sh]zread.obj : [.lib.sh]zread.c $(config_h) lcl_root:[.lib]sh.DIR
+[.lib.sh]zread.obj : [.lib.sh]zread.c $(config_h)
 
-[.lib.sh]zwrite.obj : [.lib.sh]zwrite.c $(config_h) lcl_root:[.lib]sh.DIR
+[.lib.sh]zwrite.obj : [.lib.sh]zwrite.c $(config_h)
 
 
 # libreadline
@@ -961,31 +961,27 @@ libreadline.olb : libreadline($(libreadline_objs))
     @ write sys$output "libreadline is up to date"
 
 # floss.h included, but not supplied?
-[.lib.readline]bind.obj : [.lib.readline]bind.c lcl_root[.lib]readline.DIR \
+[.lib.readline]bind.obj : [.lib.readline]bind.c \
 		[.include]posixstat.h $(readline_rldefs_h) \
 		$(readline_readline_h) \
 		$(readline_history_h) $(readline_rlprivate_h) \
 		$(readline_rlshell_h) $(xmalloc_h)
 
 [.lib.readline]callback.obj : [.lib.readline]callback.c \
-		lcl_root[.lib]readline.DIR \
 		$(config_h) , [.lib.readline]rlconf.h, $(readline_rldefs_h) \
 		$(readline_readline_h), $(readline_rlprivate_h) \
 		$(xmalloc_h)
 
 [.lib.readline]compat.obj : [.lib.readline]compat.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.lib.readline]rlstdc.h [.lib.readline]rltypedefs.h
 
 [.lib.readline]complete.obj : [.lib.readline]complete.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h [.include]posixdir.h \
 		[.include]posixstat.h \
 		$(readline_rldefs_h) $(readline_rldmbutil_h) \
 		$(readline_readline_h) $(xmalloc_h) $(readline_rlprivate_h)
 
 [.lib.readline]display.obj : [.lib.readline]display.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]posixstat.h [.include]ansi_stdlib.h \
 		$(readline_rldefs_h) $(readline_rldmbutil_h) \
 		$(readline_tcap_h) \
@@ -1000,48 +996,40 @@ emacs_keymap_c = [.lib.readline]emacs_keymap.c $(readline_readline_h)
 vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
 
 
-[.lib.readline]emacs_keymap.obj : $(emacs_keymap_c) lcl_root[.lib]readline.DIR
+[.lib.readline]emacs_keymap.obj : $(emacs_keymap_c)
 
 [.lib.readline]funmap.obj : [.lib.readline]funmap.c, \
-		lcl_root[.lib]readline.DIR \
 		$(config_h) [.include]ansi_stdlib.h \
 		[.lib.readline]rlconf.h $(readline_readline_h) $(xmalloc_h)
 
 
 [.lib.readline]histexpand.obj : [.lib.readline]histexpand.c \
-		lcl_root[.lib]readline.DIR \
 		$(config_h) [.include]ansi_stdlib.h $(readline_rldmbutil_h) \
 		$(readline_history_h) \
 		[.lib.readline]histlib.h \
 		$(readline_rlshell_h) $(xmalloc_h)
 
 [.lib.readline]histfile.obj : [.lib.readline]histfile.c \
-		lcl_root[.lib]readline.DIR \
 		$(config_h) [.include]posixstat.h [.include]ansi_stdlib.h \
 		$(readline_history_h) [.lib.readline]histlib.h \
 		$(readline_rlshell_h) $(xmalloc_h)
 
 [.lib.readline]history.obj : [.lib.readline]history.c, $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h, $(readline_history_h) \
 		[.lib.readline]histlib.h $(xmalloc_h)
 
 [.lib.readline]histsearch.obj : [.lib.readline]histsearch.c \
-		lcl_root[.lib]readline.DIR \
 		$(config_h) [.include]ansi_stdlib.h \
 		$(readline_history_h) [.lib.readline]histlib.h
 
 [.lib.readline]histsearch.obj : [.lib.readline]histsearch.c \
-		lcl_root[.lib]readline.DIR \
 		$(config_h) [.include]ansi_stdlib.h \
 		$(readline_history_h) [.lib.readline]histlib.h
 
-[.lib.readline]gnv$input.c_first : gnv_readline_input.c_first \
-		lcl_root[.lib]readline.DIR
+[.lib.readline]gnv$input.c_first : gnv_readline_input.c_first
 		$type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
 [.lib.readline]input.obj : [.lib.readline]input.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h [.include]posixselect.h \
 		$(readline_rldefs_h) $(readline_rlmbutil_h) \
 		$(readline_readline_h) $(readline_rlprivate_h) \
@@ -1054,58 +1042,49 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
    /first_include=gnv$input.c_first $(MMS$SOURCE)
 
 [.lib.readline]isearch.obj : [.lib.readline]isearch.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(readline_rldefs_h) \
 		$(readline_rldmbutil_h) $(readline_readline_h) \
 		$(readline_history_h) \
 		$(readline_rlprivate_h) $(xmalloc_h)
 
 [.lib.readline]keymaps.obj : [.lib.readline]keymaps.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(readline_readline_h) \
 		[.lib.readline]rlconf.h $(emacs_keymap_c) \
 		$(vi_keymap_c) $(xmalloc_h)
 
 [.lib.readline]kill.obj : [.lib.readline]kill.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(readline_rldefs_h) \
 		$(readline_readline_h) $(readline_history_h) \
 		$(readline_rlprivate_h) $(xmalloc_h)
 
 [.lib.readline]macro.obj : [.lib.readline]macro.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(readline_rldefs_h) \
 		$(readline_readline_h) $(readline_history_h) \
 		$(readline_rlprivate_h) $(xmalloc_h)
 
 [.lib.readline]mbutil.obj : [.lib.readline]mbutil.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]posixjmp.h [.include]ansi_stdlib.h \
 		$(readline_rldefs_h) $(readline_rldmbutil_h) \
 		$(readline_readline_h) \
 		$(readline_rlprivate_h) $(xmalloc_h)
 
 [.lib.readline]misc.obj : [.lib.readline]misc.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(readline_rldefs_h) \
 		$(readline_rldmbutil_h) $(readline_readline_h) \
 		$(readline_history_h) $(readline_rlprivate_h) \
 		$(readline_rlshell_h) $(xmalloc_h)
 
 [.lib.readline]nls.obj : [.lib.readline]nls.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(readline_rldefs_h) \
 		$(readline_readline_h) $(readline_rlshell_h) \
 		$(readline_rlprivate_h)
 
 # floss.h included, but not supplied?
 [.lib.readline]parens.obj : [.lib.readline]parens.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.lib.readline]rlconf.h [.include]posixselect.h \
 		$(readline_readline_h) $(readline_rlprivate_h)
 
 [.lib.readline]readline.obj : [.lib.readline]readline.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]posixstat.h [.include]posixjmp.h \
 		[.include]ansi_stdlib.h $(readline_rldefs_h) \
 		$(readline_rldmbutil_h) \
@@ -1122,7 +1101,6 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
 	/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
 
 [.lib.readline]rltty.obj : [.lib.readline]rltty.c  $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		$(readline_rldefs_h) $(readline_readline_h) \
 		$(readline_rlprivate_h)
    $define/user readline prj_root:[.lib.readline]
@@ -1136,33 +1114,27 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
 	/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
 
 [.lib.readline]savestring.obj : [.lib.readline]savestring.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		$(xmalloc_h)
 
 [.lib.readline]search.obj : [.lib.readline]search.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(readline_rldefs_h) \
 		$(readline_rldmbutil_h) $(readline_readline_h) \
 		$(readline_history_h) \
 		$(readline_rlprivate_h) $(xmalloc_h)
 
-[.lib.readline]gnv$shell.c_first : [.lib.readline]gnv_shell.c_first \
-		lcl_root[.lib]readline.DIR
+[.lib.readline]gnv$shell.c_first : [.lib.readline]gnv_shell.c_first
 		$type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
 [.lib.readline]shell.obj : [.lib.readline]shell.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h [.lib.readline]rlstdc.h \
 		$(readline_rlshell_h) $(xmalloc_h) \
 		$(rl_gnv_shell_c_first)
 
 [.lib.readline]signals.obj : [.lib.readline]signals.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		$(readline_rldefs_h) $(readline_readline_h) \
 		$(readline_history_h) $(readline_rlprivate_h)
 
 [.lib.readline]terminal.obj : [.lib.readline]terminal.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]posixstat.h [.include]ansi_stdlib.h \
 		$(readline_rldefs_h) $(readline_rltty_h) \
 		$(readline_tcap_h) \
@@ -1170,48 +1142,40 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
 		$(readline_rlprivate_h) $(readline_rlshell_h) $(xmalloc_h)
 
 [.lib.readline]text.obj : [.lib.readline]text.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(readline_rldefs_h) \
 		$(readline_rldmbutil_h) $(readline_readline_h) \
 		$(readline_history_h) $(readline_rlprivate_h) \
 		$(shell_h) $(xmalloc_h)
 
-[.lib.readline]gnv$tilde.c_first : [.lib.readline]gnv_tilde.c_first \
-		lcl_root[.lib]readline.DIR
+[.lib.readline]gnv$tilde.c_first : [.lib.readline]gnv_tilde.c_first
 		$type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
 [.lib.readline]tilde.obj : [.lib.readline]tilde.c [.lib.tilde]tilde.h \
-		lcl_root[.lib]readline.DIR \
 		$(config_h) [.include]ansi_stdlib.h $(xmalloc_h) \
 		$(rl_gnv_tilde_c_first)
 
 [.lib.readline]undo.obj : [.lib.readline]undo.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(readline_rldefs_h) \
 		$(readline_readline_h) $(readline_history_h) \
 		$(readline_rlprivate_h) $(xmalloc_h)
 
 [.lib.readline]util.obj : [.lib.readline]util.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]posixjmp.h [.include]ansi_stdlib.h \
 		$(readline_rldefs_h) $(readline_rldmbutil_h) \
 		$(readline_readline_h) $(readline_rlprivate_h) $(xmalloc_h)
 
-[.lib.readline]vi_keymap.obj : $(vi_keymap_c) lcl_root[.lib]readline.DIR
+[.lib.readline]vi_keymap.obj : $(vi_keymap_c)
 
 [.lib.readline]vi_mode.obj : [.lib.readline]vi_mode.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.lib.readline]rlconf.h [.include]ansi_stdlib.h \
 		$(readline_rldefs_h) $(readline_rldmbutil_h) \
 		$(readline_readline_h) $(readline_history_h) \
 		$(readline_rlprivate_h) $(xmalloc_h)
 
 [.lib.readline]xfree.obj : [.lib.readline]xfree.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(xmalloc_h)
 
 [.lib.readline]xmalloc.obj : [.lib.readline]xmalloc.c $(config_h) \
-		lcl_root[.lib]readline.DIR \
 		[.include]ansi_stdlib.h $(xmalloc_h)
 
 # libtermcap
@@ -1219,15 +1183,12 @@ lcl_root[.lib]termcap.DIR :
 	$create/directory/prot=o:rwed lcl_root:[.lib.termcap]
 
 [.lib.termcap]termcap.c : [.lib.termcap]termcap.c $(config_h) \
-		lcl_root[.lib]termcap.DIR \
 		[.lib.termcap]ltcap.h
 
 [.lib.termcap]tparam.c : [.lib.termcap]tparam.c $(config_h) \
-		lcl_root[.lib]termcap.DIR \
 		[.lib.termcap]ltcap.h
 
-[.lib.termcap]version.c : [.lib.termcap]version.c \
-		lcl_root[.lib]termcap.DIR
+[.lib.termcap]version.c : [.lib.termcap]version.c
 
 # libglob
 lcl_root:[.lib]glob.DIR :
@@ -1237,39 +1198,32 @@ libglob.olb : libglob($(libglob_objs))
     @ write sys$output "libglob is up to date"
 
 [.lib.glob]glob.obj : [.lib.glob]glob.c $(config_h) \
-		lcl_root:[.lib]glob.DIR \
 		bashtypes.h $(bashansi_h) [.include]posixdir.h \
 		[.include]posixstat.h [.include]shmbutil.h \
 		$(xmalloc_h) $(shell_h) \
 		[.lib.glob]glob.h [.lib.glob]glob_loop.c [.lib.glob]strmatch.h
 
 [.lib.glob]gmisc.obj : [.lib.glob]gmisc.c $(config_h) bashtypes.h \
-		lcl_root:[.lib]glob.DIR \
 		$(bashansi_h) [.include]shmbutil.h
 
 [.lib.glob]smatch.obj : [.lib.glob]smatch.c $(config_h) [.lib.glob]strmatch.h \
-		lcl_root:[.lib]glob.DIR \
 		$(bashansi_h) [.include]shmbutil.h $(xmalloc_h) \
 		[.lib.glob]collsyms.h [.lib.glob]sm_loop.c
 
 [.lib.glob]strmatch.obj : [.lib.glob]strmatch.c $(config_h) \
-		lcl_root:[.lib]glob.DIR \
 		[.lib.glob]strmatch.h
 
 [.lib.glob]xmbsrtowcs.obj : [.lib.glob]xmbsrtowcs.c $(config_h) \
-		lcl_root:[.lib]glob.DIR \
 		$(bashansi_h) [.include]shmbutil.h
 
 #libtilde
 lcl_root:[.lib]tilde.DIR :
 	$create/directory/prot=o:rwed lcl_root:[.lib.tilde]
 
-[.lib.tilde]gnv$tilde.c_first : [.lib.tilde]gnv_tilde.c_first \
-		lcl_root[.lib]readline.DIR
+[.lib.tilde]gnv$tilde.c_first : [.lib.tilde]gnv_tilde.c_first
 		$type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
 [.lib.tilde]tilde.obj : [.lib.tilde]tilde.c $(config_h) \
-		lcl_root:[.lib]tilde.DIR \
 		[.include]ansi_stdlib.h \
 		[.lib.tilde]tilde.h $(xmalloc_h) \
 		$(tl_gnv_tilde_c_first)
@@ -1281,22 +1235,18 @@ lcl_root:[.lib]intl.DIR :
 libintl.olb : libintl($(libintl_objs))
     @ write sys$output "libintl is up to date"
 
-[.lib.intl]libgnuintl.h : [.lib.intl]$(libgnuintl_h_in) \
-		lcl_root:[.lib]intl.DIR
+[.lib.intl]libgnuintl.h : [.lib.intl]$(libgnuintl_h_in)
     @ type [.lib.intl]$(libgnuintl_h_in) /output=[.lib.intl]libgnuintl.h
 
 gettextp_h = gettextP.h
 
 [.lib.intl]bindtextdom.obj : [.lib.intl]bindtextdom.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]libgnuintl.h [.lib.intl]$(gettextp_h)
 
 [.lib.intl]dcgettext.obj : [.lib.intl]dcgettext.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]libgnuintl.h [.lib.intl]gettextP.h
 
-[.lib.intl]gnv$dcigettext.c_first : [.lib.intl]gnv_dcigettext.c_first \
-		lcl_root:[.lib]intl.DIR
+[.lib.intl]gnv$dcigettext.c_first : [.lib.intl]gnv_dcigettext.c_first
 		$type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
 lcl_root:[.lib.intl]dcigettext.c : src_root:[.lib.intl]dcigettext.c \
@@ -1305,7 +1255,6 @@ lcl_root:[.lib.intl]dcigettext.c : src_root:[.lib.intl]dcigettext.c \
 	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
 
 [.lib.intl]dcigettext.obj : lcl_root:[.lib.intl]dcigettext.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]gettextP.h [.lib.intl]plural-exp.h \
 		[.lib.intl]hash-string.h [.lib.intl]libgnuintl.h \
 		[.lib.intl]eval-plural.h, [.lib.intl]gnv$dcigettext.c_first
@@ -1319,43 +1268,33 @@ lcl_root:[.lib.intl]dcigettext.c : src_root:[.lib.intl]dcigettext.c \
 	/first_include=[.lib.intl]gnv$dcigettext.c_first $(MMS$SOURCE)
 
 [.lib.intl]dcngettext.obj : [.lib.intl]dcngettext.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]libgnuintl.h [.lib.intl]gettextP.h
 
 [.lib.intl]dgettext.obj : [.lib.intl]dgettext.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]libgnuintl.h [.lib.intl]gettextP.h
 
 [.lib.intl]dngettext.obj : [.lib.intl]dngettext.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]libgnuintl.h [.lib.intl]gettextP.h
 
 [.lib.intl]explodename.obj : [.lib.intl]explodename.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]loadinfo.h
 
 [.lib.intl]finddomain.obj : [.lib.intl]finddomain.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]libgnuintl.h [.lib.intl]gettextP.h
 
 [.lib.intl]gettext.obj : [.lib.intl]gettext.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]libgnuintl.h [.lib.intl]gettextP.h
 
 [.lib.intl]intl-compat.obj : [.lib.intl]intl-compat.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]gettextP.h
 
 [.lib.intl]l10nflist.obj : [.lib.intl]l10nflist.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]loadinfo.h
 
-[.lib.intl]gnv$loadmsgcat.c_first : [.lib.intl]gnv_loadmsgcat.c_first \
-		lcl_root:[.lib]intl.DIR
+[.lib.intl]gnv$loadmsgcat.c_first : [.lib.intl]gnv_loadmsgcat.c_first
 		$type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
 [.lib.intl]loadmsgcat.obj : [.lib.intl]loadmsgcat.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]gmo.h [.lib.intl]gettextP.h \
 		[.lib.intl]hash-string.h [.lib.intl]plural-exp.h \
 		[.lib.intl]gnv$loadmsgcat.c_first
@@ -1367,43 +1306,32 @@ lcl_root:[.lib.intl]dcigettext.c : src_root:[.lib.intl]dcigettext.c \
    /first_include=[.lib.intl]gnv$loadmsgcat.c_first $(MMS$SOURCE)
 
 [.lib.intl]localcharset.obj : [.lib.intl]localcharset.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]localcharset.h [.lib.intl]relocatable.h
 
 [.lib.intl]localealias.obj : [.lib.intl]localealias.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]gettextP.h [.lib.intl]relocatable.h
 
-[.lib.intl]localename.obj : [.lib.intl]localename.c $(config_h) \
-		lcl_root:[.lib]intl.DIR
+[.lib.intl]localename.obj : [.lib.intl]localename.c $(config_h)
 
 [.lib.intl]log.obj : [.lib.intl]log.c $(config_h) \
-		lcl_root:[.lib]intl.DIR
 
 [.lib.intl]ngettext.obj : [.lib.intl]ngettext.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]libgnuintl.h [.lib.intl]gettextP.h
 
-[.lib.intl]os2compat.obj : [.lib.intl]os2compat.c $(config_h) \
-		lcl_root:[.lib]intl.DIR
+[.lib.intl]os2compat.obj : [.lib.intl]os2compat.c $(config_h)
 
 [.lib.intl]osdep.obj : [.lib.intl]osdep.c [.lib.intl]os2compat.c $(config_h) \
-		lcl_root:[.lib]intl.DIR
 
 [.lib.intl]plural-exp.obj : [.lib.intl]plural-exp.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]plural-exp.h
 
 [.lib.intl]plural.obj : [.lib.intl]plural.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]plural-exp.h
 
 [.lib.intl]relocatable.obj : [.lib.intl]relocatable.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]relocatable.h $(xmalloc_h)
 
 [.lib.intl]textdomain.obj : [.lib.intl]textdomain.c $(config_h) \
-		lcl_root:[.lib]intl.DIR \
 		[.lib.intl]libgnuintl.h [.lib.intl]gettextP.h
 
 #libbuiltins
@@ -1416,7 +1344,6 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
 
 
 [.builtins]bashgetopt.obj : [.builtins]bashgetopt.c, $(config_h) $(shell_h),\
-	lcl_root:[]builtins.DIR \
 	$(bashansi_h) [.builtins]common.h
    $set def prj_root:[.builtins]
    $define/user decc$user_include prj_root:[]
@@ -1428,7 +1355,6 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
    $set def prj_root:[-]
 
 [.builtins]builtins.obj : [.builtins]builtins.c $(builtins_h), \
-	lcl_root:[]builtins.DIR \
 	[.builtins]builtext.h
    $set def prj_root:[.builtins]
    $define/user decc$user_include prj_root:[]
@@ -1455,7 +1381,6 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
    $ type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
 [.builtins]common.obj : [.builtins]common.c, $(config_h) bashtypes.h \
-		lcl_root:[]builtins.DIR \
 		[.include]posixstat.h $(bashansi_h) $(bashintl_h) $(shell_h) \
 		[.include]maxpath.h flags.h $(jobs_h) $(builtins_h) input.h \
 		$(execute_cmd_h) unwind_prot.h $(trap_h) \
@@ -1474,12 +1399,10 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
 	/OBJ=common.obj common.c
    $set def prj_root:[-]
 
-[.builtins]gnv$evalfile.c_first : [.builtins]gnv_evalfile.c_first \
-	lcl_root:[]builtins.DIR
+[.builtins]gnv$evalfile.c_first : [.builtins]gnv_evalfile.c_first
     $type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
 [.builtins]evalfile.obj : [.builtins]evalfile.c $(config_h) \
-		lcl_root:[]builtins.DIR \
 		bashtypes.h [.include]posixstat.h [.include]filecntl.h \
 		$(bashansi_h) $(bashintl_h) $(shell_h) $(jobs_h) \
 		$(builtins_h) flags.h input.h $(execute_cmd_h) $(trap_h) \
@@ -1495,7 +1418,6 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
    $set def prj_root:[-]
 
 [.builtins]evalstring.obj : [.builtins]evalstring.c $(config_h) \
-		lcl_root:[]builtins.DIR \
 		[.include]filecntl.h $(bashansi_h) $(shell_h) \
 		$(jobs_h) $(builtins_h) flags.h input.h $(execute_cmd_h) \
 		redir.h $(trap_h) $(bashintl_h) $(y_tab_h) bashhist.h \
@@ -1510,7 +1432,6 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
    $set def prj_root:[-]
 
 [.builtins]getopt.obj : [.builtins]getopt.c, $(config_h) [.include]memalloc.h \
-		lcl_root:[]builtins.DIR \
 		$(bashintl_h)  $(shell_h) [.builtins]getopt.h
    $set def prj_root:[.builtins]
    $define/user decc$user_include prj_root:[]
@@ -1522,7 +1443,6 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
    $set def prj_root:[-]
 
 [.builtins]psize.obj : [.builtins]psize.c, $(config_h) bashtypes.h \
-	lcl_root:[]builtins.DIR \
 	command.h $(general_h) lcl_root:sig.h
 
 [.builtins]psize.exe : [.builtins]psize.obj
@@ -1923,8 +1843,7 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 
 [.builtins]printf.c : [.builtins]printf.def [.builtins]mkbuiltins.exe
 
-[.builtins]gnv$printf.c_first : [.builtins]gnv_printf.c_first \
-	lcl_root:[]builtins.DIR
+[.builtins]gnv$printf.c_first : [.builtins]gnv_printf.c_first
     $type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
 [.builtins]printf.obj : [.builtins]printf.c $(config_h) bashtypes.h \
@@ -2303,7 +2222,11 @@ input.obj : input.c $(config_h) bashtypes.h [.include]filecntl.h \
 		[.include]posixstat.h $(bashansi_h) $(bashintl_h) \
 		$(general_h) input.h lcl_root:error.h lcl_root:externs.h quit.h
 
-nojobs.obj : nojobs.c $(config_h) bashtypes.h $(trap_h) \
+lcl_root:nojobs.c : src_root:nojobs.c nojobs_c.tpu
+    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
+	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
+
+nojobs.obj : lcl_root:nojobs.c $(config_h) bashtypes.h $(trap_h) \
 		[.include]posixtime.h \
 		[.include]filecntl.h input.h [.include]shtty.h \
 		$(bashansi_h) $(bashintl_h) $(shell_h) $(jobs_h) \

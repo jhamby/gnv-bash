@@ -18,4 +18,4 @@ $cc report_terminal_io.c
 $!
 $link report_terminal_io, vms_terminal_io
 $!
-$report_terminal_io :== $lcl_root:[bash-4^.2]report_terminal_io.exe
+$report_terminal_io :== $lcl_root:[bash]report_terminal_io.exe
