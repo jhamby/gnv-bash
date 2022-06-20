@@ -1717,6 +1717,21 @@ $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
 $!
+$!
+$!      Allowed extensions
+$!------------------------------
+$	if key2 .eqs. "__EXTENSIONS__" .or. -
+	   key2 .eqs. "_ALL_SOURCE" .or. -
+	   key2 .eqs. "_GNU_SOURCE" .or. -
+	   key2 .eqs. "_POSIX_PTHREAD_SEMANTICS" .or. -
+	   key2 .eqs. "_TANDEM_SOURCE"
+$	then
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
 $!	Unknown - See if CONFIGURE can give a clue for this
 $!----------------------------------------------------------
 $	pflag = 0

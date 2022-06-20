@@ -1,0 +1,56 @@
+! File exit_def.tpu
+!
+! Copyright 2022, Jake Hamby
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+! Change return type of exit_or_logout() since it doesn't return.
+!
+VMS_INSERT_BEFORE('static int exit_or_logout', '#ifdef __VMS');
+COPY_TEXT('static void exit_or_logout PARAMS((WORD_LIST *));');
+SPLIT_LINE;
+COPY_TEXT('#pragma assert func_attrs(exit_or_logout) noreturn');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('static int exit_or_logout', '#endif /* __VMS */');
+
+VMS_INSERT_BEFORE('return (exit_or_logout (list));', '#ifdef __VMS');
+COPY_TEXT('  exit_or_logout (list);');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('return (exit_or_logout (list));', '#endif /* __VMS */');
+
+VMS_INSERT_BEFORE('return (exit_or_logout (list));', '#ifdef __VMS');
+COPY_TEXT('  exit_or_logout (list);');
+SPLIT_LINE;
+COPY_TEXT('#else');
+SPLIT_LINE;
+VMS_INSERT_AFTER('return (exit_or_logout (list));', '#endif /* __VMS */');
+
+srch_pattern := 'static int' + LINE_END + LINE_BEGIN +
+                'exit_or_logout (list)' + LINE_END + LINE_BEGIN;
+find_range := SEARCH_QUIETLY(srch_pattern, FORWARD, EXACT);
+IF find_range <> 0
+THEN
+   VMS_INSERT_BEFORE(srch_pattern, '#ifdef __VMS');
+   COPY_TEXT('static void');
+   SPLIT_LINE;
+   COPY_TEXT('#else');
+   SPLIT_LINE;
+   VMS_INSERT_AFTER('static int', '#endif /* __VMS */');
+   SPLIT_LINE;
+ENDIF;

@@ -145,10 +145,6 @@
 # define attribute_hidden
 #endif /* not _LIBC */
 
-#if __GNUC__ < 3 + (__GNUC_MINOR__ < 1)
-# define __attribute__(arg)
-#endif
-
 typedef __re_idx_t Idx;
 #ifdef _REGEX_LARGE_OFFSETS
 # define IDX_MAX (SIZE_MAX - 2)
