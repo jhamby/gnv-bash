@@ -77,15 +77,17 @@ void vms_set_crtl_values(void) {
 
     set ("DECC$EXEC_FILEATTR_INHERITANCE", 2);  // DECC$UNIX_LEVEL 30 sets to 1
 
-     /* Pipe feature settings are no longer needed with virtual memory pipe
-        code. Programs that use pipe need to be converted to use the
-        virtual memory pipe code, which effectively removes the hangs and
-        left over temporary files.
-
-        Comment left here to prevent regressions, as the larger pipe size
-        actually hurts memory usage with the new algorithm.
+     /* Set the pipe buffer size and quota to 65535 bytes to increase the
+        buffer size before the write side blocks. The buffer quota can be
+        set much higher than the buffer size, but at the risk of crashing
+        the process by consuming all of its bytlm quota (which may be as
+        low as 128000 bytes). The combination of a 65535-byte quota and
+        increasing the users' bytlm to 400000 bytes or higher should offer
+        reasonably high throughput at minimal latency.
      */
-    /* do_not_set ("DECC$PIPE_BUFFER_SIZE", 65535); */
+
+    set ("DECC$PIPE_BUFFER_SIZE", 65535);
+    set ("DECC$PIPE_BUFFER_QUOTA", 65535);
 
     // decc$set_reentrancy(C$C_MULTITHREAD);    // not required for bash
 

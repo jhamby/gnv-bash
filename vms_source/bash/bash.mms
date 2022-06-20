@@ -2,7 +2,7 @@
 #
 # $Id: bash.mms,v 1.5 2013/06/18 04:22:47 wb8tyw Exp $
 #
-# Quick and dirty Make file for building Bash 4.2 on VMS
+# Quick and dirty Make file for building Bash 5.1 on VMS
 #
 # This build procedure requires the following concealed rooted
 # logical names to be set up.
@@ -23,6 +23,7 @@
 # 04-Apr-2013  E. Robertson - Modifications to accommodate new
 #			      tpu files for Bash bug fixes.
 # 02-Jun-2013  J. Malmberg - Build on VAX/VMS 7.3 platform.
+# 18-Jun-2022  J. Hamby    - Bash 5.1, removing VAX and subshell hacks.
 #
 ##############################################################################
 
@@ -50,16 +51,10 @@
 # On Alpha/I64, the warnings would be fixed with /first_include file.
 # DEC C 6.4 for VAX does not have that option.
 #
-# Do not ever use /VAXC or set the standard to compatible with VAX C
-# on new code that you care about.  Basically it suppressess warnings
-# that may be important.
-#
-#
 # Much of the code in the 1.4.8 GNV port had a bug where config.h is not
 # the first header file included.
 #
 #===================================================================
-# Watch out long lines on VAX, so need to shorten
 crepository = /repo=lcl_root:[bash.cxx_repository]
 cnames = /name=(as_i,shor)$(crepository)
 clist = /list
@@ -67,13 +62,11 @@ cprefix = /pref=all
 cnowarn1 = unknownmacro,intconcastsgn,intconstsign,falloffend
 cnowarn2 = boolexprconst,knrfunc,embedcomment,nestedcomment
 cnowarn = $(cnowarn1),$(cnowarn2)
-cwarn1 = defunct,obsolescent,questcode,unusedtop
+cwarn1 = defunct,obsolescent,questcode
 cwarn = /warnings=(enable=($(cwarn1)),disable=($(cnowarn)))
 #cinc1 = prj_root:[],prj_root:[.include],prj_root:[.lib.intl],prj_root:[.lib.sh]
 cinc2 = /nested=none
 cinc = $(cinc2)
-#cdefs = /define=(_USE_STD_STAT=1,_POSIX_EXIT=1,\
-#	HAVE_STRING_H=1,HAVE_STDLIB_H=1,HAVE_CONFIG_H=1,SHELL=1)
 #
 # Force the status of the HAVE_REGEX_H, HAVE_REGCOMP, and HAVE_REGEXEC macros on
 # VMS so that HAVE_POSIX_REGEXP is indirectly forced which will in turn set the
@@ -133,8 +126,6 @@ EVE = EDIT/TPU/SECT=EVE$SECTION/NODISP
 
 # Lists of source files for submodules
 #=========================================
-#                strftime=[.lib.sh]strftime.obj,\
-#
 
 libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
                 "getcwd"=[.lib.sh]getcwd.obj,\
@@ -143,6 +134,7 @@ libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
 		"setlinebuf"=[.lib.sh]setlinebuf.obj,\
                 "strchrnul"=[.lib.sh]strchrnul.obj,\
 		"strcasecmp"=[.lib.sh]strcasecmp.obj,\
+		"strdup"=[.lib.sh]strdup.obj,\
                 "strerror"=[.lib.sh]strerror.obj,\
 		"strtod"=[.lib.sh]strtod.obj,\
                 "strtol"=[.lib.sh]strtol.obj,\
@@ -150,8 +142,8 @@ libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
                 "vprint"=[.lib.sh]vprint.obj,\
 		"itos"=[.lib.sh]itos.obj,\
                 "rename"=[.lib.sh]rename.obj,\
-		"sread"=[.lib.sh]zread.obj,\
-                "swrite"=[.lib.sh]zwrite.obj,\
+		"zread"=[.lib.sh]zread.obj,\
+                "zwrite"=[.lib.sh]zwrite.obj,\
 		"shtty"=[.lib.sh]shtty.obj,\
                 "inet_aton"=[.lib.sh]inet_aton.obj,\
 		"netopen"=[.lib.sh]netopen.obj,\
@@ -172,13 +164,15 @@ libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
                 "mailstat"=[.lib.sh]mailstat.obj,\
 		"fmtulong"=[.lib.sh]fmtulong.obj,\
                 "fmtullong"=[.lib.sh]fmtullong.obj,\
-		"strtoull"=[.lib.sh]strtoll.obj,\
+		"strtoll"=[.lib.sh]strtoll.obj,\
                 "strtoull"=[.lib.sh]strtoull.obj,\
 		"fmtumax"=[.lib.sh]fmtumax.obj,\
                 "netconn"=[.lib.sh]netconn.obj,\
 		"mktime"=[.lib.sh]mktime.obj,\
+		"strftime"=[.lib.sh]strftime.obj,\
+                "memset"=[.lib.sh]memset.obj,\
                 "mbschr"=[.lib.sh]mbschr.obj,\
-		"scatfd"=[.lib.sh]zcatfd.obj,\
+		"zcatfd"=[.lib.sh]zcatfd.obj,\
                 "shmatch"=[.lib.sh]shmatch.obj,\
 		"strnlen"=[.lib.sh]strnlen.obj,\
                 "winsize"=[.lib.sh]winsize.obj,\
@@ -198,15 +192,11 @@ libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
                 "unicode"=[.lib.sh]unicode.obj,\
 		"wcswidth"=[.lib.sh]wcswidth.obj,\
 		"wcsnwidth"=[.lib.sh]wcsnwidth.obj,\
-                "shmbchar"=[.lib.sh]shmbchar.obj
+                "shmbchar"=[.lib.sh]shmbchar.obj,\
+                "utf8"=[.lib.sh]utf8.obj,\
+                "random"=[.lib.sh]random.obj,\
+                "gettimeofday"=[.lib.sh]gettimeofday.obj
 
-#		"memset"=[.lib.sh]memset.obj,\
-#                   keymaps=[.lib.readline]keymaps.obj,\
-#		   vi_keymap=[.lib.readline]vi_keymap.obj,\
-#
-#
-#                   shell=[.lib.readline]shell.obj,\
-#
 libreadline_objs = "bind"=[.lib.readline]bind.obj,\
                    "callback"=[.lib.readline]callback.obj,\
                    "colors"=[.lib.readline]colors.obj,\
@@ -450,8 +440,7 @@ bash_objs = alias.obj,\
             vms_fname_to_unix.obj,\
 	    vms_mailstat.obj,\
 	    vms_terminal_io.obj,\
-	    vms_term.obj,\
-	    vms_vm_pipe.obj
+	    vms_term.obj
 
 # Nested header files
 #========================
@@ -585,25 +574,11 @@ lcl_root:[.lib.sh.sys]param.h : vms_sys_param.h
 	$create/dir lcl_root:[.lib.sh.sys]/prot=o:rwed
 	$copy vms_sys_param.h lcl_root:[.lib.sh.sys]param.h
 
-.ifdef __VAX__
-config_h_in = config.h$5nin
-y_tab_obj = y_tab.obj
-y_tab_c_in = y.tab$5nc
-y_tab_h_in = y.tab$5nh
-y_tab_h = y_tab.h
-libgnuintl_h_in = libgnuintl.h$5nin
-.else
 config_h_in = config^.h.in
 y_tab_obj = y.tab.obj
 y_tab_c_in = y.tab.c
 y_tab_h = y.tab.h
 libgnuintl_h_in = libgnuintl.h.in
-.endif
-
-.ifdef __VAX__
-$(y_tab_h) : $(y_tab_h_in)
-   $ type $(y_tab_h_in)/out=$(y_tab_h)
-.endif
 
 config.h : $(config_h_in) config_vms.h config_h.com \
 	lcl_root:[.sys]param.h lcl_root:[.builtins.sys]param.h
@@ -698,7 +673,8 @@ mksignames.exe : mksignames.obj, buildsignames.obj
 mksyntax.exe : mksyntax.obj
     $ link mksyntax.obj
 
-mksyntax.obj : mksyntax.c $(bashansi_h) syntax.h bashtypes.h $(config_h)
+mksyntax.obj : mksyntax.c $(bashansi_h) syntax.h bashtypes.h $(config_h) \
+	[.include]chartypes.h
 
 syntax.c : mksyntax.exe
     $ mksyntax :== $lcl_root:[]mksyntax.exe
@@ -734,14 +710,14 @@ buildversion.obj : version.h conftypes.h patchlevel.h version.c
 
 
 
-# TODO - linux uses 4096, with VM pipes, we should be able to also
-#        support that.  Needs some testing.
+# Regular VMS pipes can write up to 65535 bytes before blocking,
+# when we set DECC$PIPE_BUFFER_QUOTA and DECC$PIPE_BUFFER_SIZE.
 pipesize.h :
    $ open/write psh pipesize.h
    $ write psh "/* File: pipesize.h generated by bash.mms"
    $ write psh " * by ''f$user()' at ''f$cvtime(,"ABSOLUTE")"
    $ write psh " */"
-   $ write psh "#define PIPESIZE 4096"
+   $ write psh "#define PIPESIZE 65535"
    $ close psh
 
 #Bashversions
@@ -750,22 +726,12 @@ gnv$version.c_first : gnv_version.c_first
     $copy $(MMS$SOURCE) $(MMS$TARGET)
 
 version.obj : version.c version.h gnv$version.c_first vms_eco_level.h
-.ifdef __VAX__
-   $type/noheader lcl_root:[]gnv$version.c_first, src_root:[]version.c \
-	/output=lcl_root:version.c
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.else
    $define/user decc$system_include prj_root:[]
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
    /first_include=gnv$version.c_first $(MMS$SOURCE)
-.endif
 
 # GNU Regular Expression Support
 lcl_root:[.lib]regex.DIR :
@@ -801,22 +767,11 @@ libsh.olb : libsh($(libsh_objs))
 
 [.lib.sh]eaccess.obj : [.lib.sh]eaccess.c lcl_root:[.lib]sh.DIR $(config_h) \
 	bashtypes.h $(bashansi_h) [.include]posixstat.h
-.ifdef __VAX__
-   $!$type/noheader lcl_root:[.lib.sh]gnv$eaccess.c_first,\
-   $!	src_root:[.lib.sh]eaccess.c \
-   $!	/output=lcl_root:[.lib.sh]eaccess.c
    $define/user decc$system_include prj_root:[]
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.else
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.endif
 
 [.lib.sh]fmtullong.obj : [.lib.sh]fmtullong.c, [.lib.sh]fmtulong.c, \
 	lcl_root:[.lib]sh.DIR, $(config_h), $(bashansi_h), $(bashintl_h)
@@ -877,23 +832,12 @@ libsh.olb : libsh($(libsh_objs))
 [.lib.sh]oslib.obj : [.lib.sh]oslib.c lcl_root:[.lib]sh.DIR $(config_h) \
 		bashtypes.h $(bashansi_h) $(shell_h) [.include]posixstat.h \
 		[.lib.sh]gnv$oslib.c_first
-.ifdef __VAX__
-   $type/noheader lcl_root:[.lib.sh]gnv$oslib.c_first, \
-	src_root:[.lib.sh]oslib.c \
-	/out=lcl_root:[.lib.sh]oslib.c
-   $define/user decc$system_include prj_root:[],prj_root:[.include]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.else
    $define/user decc$system_include prj_root:[],prj_root:[.include]
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
    /first_include=[.lib.sh]gnv$oslib.c_first $(MMS$SOURCE)
-.endif
 
 [.lib.sh]pathcanon.obj : [.lib.sh]pathcanon.c lcl_root:[.lib]sh.DIR \
 		$(config_h) bashtypes.h $(bashansi_h) $(shell_h)
@@ -1052,10 +996,6 @@ libreadline.olb : libreadline($(libreadline_objs))
 #   $define/user tilde prj_root:[.lib.tilde]
 #   $define/user decc$user_include prj_root:[.lib.readline]
 
-#   $(CC)$(cflagsx)/define=(MODULE_DISPLAY=1,_USE_STD_STAT=1,_POSIX_EXIT=1,\
-#	HAVE_STRING_H=1,HAVE_STDLIB_H=1,HAVE_CONFIG_H=1,SHELL=1)\
-#	/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-
 emacs_keymap_c = [.lib.readline]emacs_keymap.c $(readline_readline_h)
 vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
 
@@ -1107,21 +1047,11 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
 		$(readline_readline_h) $(readline_rlprivate_h) \
 		$(readline_rlshell_h) $(xmalloc_h) \
 		[.lib.readline]gnv$input.c_first
-.ifdef __VAX__
-   $type/noheader lcl_root:[.lib.readline]gnv$input.c_first, \
-	src_root:[.lib.readline]input.c \
-	/output=lcl_root:[.lib.readline]input.c
-   $define/user readline prj_root:[.lib.readline]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[.lib.readline]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.else
    $define/user readline prj_root:[.lib.readline]
    $define/user decc$system_include prj_root:[]
    $define/user decc$user_include prj_root:[.lib.readline]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
    /first_include=gnv$input.c_first $(MMS$SOURCE)
-.endif
 
 [.lib.readline]isearch.obj : [.lib.readline]isearch.c $(config_h) \
 		lcl_root[.lib]readline.DIR \
@@ -1187,15 +1117,9 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
    $define/user decc$system_include prj_root:[]
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
-.ifdef __VAX__
-   $(CC)$(cflagsx)/def=(MODULE_READLINE=1,_POSIX_EXIT=1,\
-	HAVE_STRING_H=1,HAVE_STDLIB_H=1,HAVE_CONFIG_H=1,SHELL=1)\
-	/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.else
    $(CC)$(cflagsx)/define=(MODULE_READLINE=1,_USE_STD_STAT=1,_POSIX_EXIT=1,\
-	HAVE_STRING_H=1,HAVE_STDLIB_H=1,HAVE_CONFIG_H=1,SHELL=1)\
+	HAVE_CONFIG_H=1,SHELL=1)\
 	/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.endif
 
 [.lib.readline]rltty.obj : [.lib.readline]rltty.c  $(config_h) \
 		lcl_root[.lib]readline.DIR \
@@ -1207,15 +1131,9 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
    $define/user decc$system_include prj_root:[]
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
-.ifdef __VAX__
-   $(CC)$(cflagsx)/def=(MODULE_RLTTY=1,_POSIX_EXIT=1,\
-	HAVE_STRING_H=1,HAVE_STDLIB_H=1,HAVE_CONFIG_H=1,SHELL=1)\
-	/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.else
    $(CC)$(cflagsx)/define=(MODULE_RLTTY=1,_USE_STD_STAT=1,_POSIX_EXIT=1,\
-	HAVE_STRING_H=1,HAVE_STDLIB_H=1,HAVE_CONFIG_H=1,SHELL=1)\
+	HAVE_CONFIG_H=1,SHELL=1)\
 	/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.endif
 
 [.lib.readline]savestring.obj : [.lib.readline]savestring.c $(config_h) \
 		lcl_root[.lib]readline.DIR \
@@ -1237,15 +1155,6 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
 		[.include]ansi_stdlib.h [.lib.readline]rlstdc.h \
 		$(readline_rlshell_h) $(xmalloc_h) \
 		$(rl_gnv_shell_c_first)
-.ifdef __VAX__
-   $type/noheader lcl_root:[.lib.readline]gnv$shell.c_first, \
-	src_root:[.lib.readline]shell.c \
-	/output=lcl_root:[.lib.readline]shell.c
-   $define/user readline prj_root:[.lib.readline]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[.lib.readline]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.endif
 
 [.lib.readline]signals.obj : [.lib.readline]signals.c $(config_h) \
 		lcl_root[.lib]readline.DIR \
@@ -1275,15 +1184,6 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
 		lcl_root[.lib]readline.DIR \
 		$(config_h) [.include]ansi_stdlib.h $(xmalloc_h) \
 		$(rl_gnv_tilde_c_first)
-.ifdef __VAX__
-   $type/noheader lcl_root:[.lib.readline]gnv$tilde.c_first, \
-	src_root:[.lib.readline]tilde.c \
-	/output=lcl_root:[.lib.readline]tilde.c
-   $define/user readline prj_root:[.lib.readline]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[.lib.readline]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.endif
 
 [.lib.readline]undo.obj : [.lib.readline]undo.c $(config_h) \
 		lcl_root[.lib]readline.DIR \
@@ -1373,15 +1273,6 @@ lcl_root:[.lib]tilde.DIR :
 		[.include]ansi_stdlib.h \
 		[.lib.tilde]tilde.h $(xmalloc_h) \
 		$(tl_gnv_tilde_c_first)
-.ifdef __VAX__
-   $type/noheader lcl_root:[.lib.tilde]gnv$tilde.c_first, \
-	src_root:[.lib.tilde]tilde.c \
-	/output=lcl_root:[.lib.tilde]tilde.c
-   $define/user readline prj_root:[.lib.readline]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[.lib.readline]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.endif
 
 #libintl
 lcl_root:[.lib]intl.DIR :
@@ -1394,15 +1285,7 @@ libintl.olb : libintl($(libintl_objs))
 		lcl_root:[.lib]intl.DIR
     @ type [.lib.intl]$(libgnuintl_h_in) /output=[.lib.intl]libgnuintl.h
 
-.ifdef __VAX__
-gettextp_h = gettextp.h
-
-[.lib.intl]gettextp.h : [.lib.intl]gettext$p.$h
-    $ type [.lib.intl]gettext$p.$h /out=[.lib.intl]gettextp.h
-
-.else
 gettextp_h = gettextP.h
-.endif
 
 [.lib.intl]bindtextdom.obj : [.lib.intl]bindtextdom.c $(config_h) \
 		lcl_root:[.lib]intl.DIR \
@@ -1421,23 +1304,12 @@ gettextp_h = gettextP.h
 		[.lib.intl]gettextP.h [.lib.intl]plural-exp.h \
 		[.lib.intl]hash-string.h [.lib.intl]libgnuintl.h \
 		[.lib.intl]eval-plural.h, [.lib.intl]gnv$dcigettext.c_first
-.ifdef __VAX__
-   $type/noheader src_root:[.lib.intl]dcigettext.c,\
-	lcl_root:[.lib.intl]gnv$dcigettext.c_first \
-	/output=lcl_root:[.lib.intl]dcigettext.c
-   $define/user decc$system_include prj_root:[],prj_root:[.include]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.else
    $define/user decc$system_include prj_root:[],prj_root:[.include]
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
    /first_include=[.lib.intl]gnv$dcigettext.c_first $(MMS$SOURCE)
-.endif
 
 [.lib.intl]dcngettext.obj : [.lib.intl]dcngettext.c $(config_h) \
 		lcl_root:[.lib]intl.DIR \
@@ -1480,23 +1352,12 @@ gettextp_h = gettextP.h
 		[.lib.intl]gmo.h [.lib.intl]gettextP.h \
 		[.lib.intl]hash-string.h [.lib.intl]plural-exp.h \
 		[.lib.intl]gnv$loadmsgcat.c_first
-.ifdef __VAX__
-   $type/noheader src_root:[.lib.intl]loadmsgcat.c,\
-	lcl_root:[.lib.intl]gnv$loadmsgcat.c_first \
-	/out=lcl_root:[.lib.intl]loadmsgcat.c
-   $define/user decc$system_include prj_root:[],prj_root:[.include]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.else
    $define/user decc$system_include prj_root:[],prj_root:[.include]
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
    /first_include=[.lib.intl]gnv$loadmsgcat.c_first $(MMS$SOURCE)
-.endif
 
 [.lib.intl]localcharset.obj : [.lib.intl]localcharset.c $(config_h) \
 		lcl_root:[.lib]intl.DIR \
@@ -1568,24 +1429,12 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
    $(CC)$(CFLAGS)/OBJ=builtins.obj builtins.c
    $set def prj_root:[-]
 
-.ifdef __VAX__
-[.builtins]builtins.c : [.builtins]builtins.c_vax
-   $ type [.builtins]builtins.c_vax / out=[.builtins]builtins.c
-.else
 [.builtins]builtins.c : [.builtins]builtext.h
     @ $continue
-.endif
 
 #  ./$(MKBUILTINS) -externfile builtext.h -structfile builtins.c \
 #     -noproduction $(DIRECTDEFINE) $(HELPDIRDEFINE) $(HELPSTRINGS) $(DEFSRC)
 
-.ifdef __VAX__
-#Hack because we can not yet run the mkbuiltins.exe on VAX, the
-#command line is too long, so use a pre-built builtext.h_vax
-[.builtins]builtext.h : [.builtins]mkbuiltins.exe $(VMSDEFSRC) \
-	lcl_root:[]builtins.DIR [.builtins]builtext.h_vax
-    @ type [.builtins]builtext.h_vax/out=$(MMS$TARGET)
-.else
 [.builtins]builtext.h : [.builtins]mkbuiltins.exe $(VMSDEFSRC) \
 	lcl_root:[]builtins.DIR
    @ mkbuiltins :== $prj_root:[]mkbuiltins.exe
@@ -1593,7 +1442,6 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
    $ mkbuiltins -externfile builtext.h -structfile builtins.c \
 	-noproduction "-D" . $(DEFSRC)
    $ set def prj_root:[-]
-.endif
 
 [.builtins]gnv$common.c_first : [.builtins]gnv_common.c_first \
 	lcl_root:[]builtins.DIR
@@ -1608,28 +1456,15 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
 		[.builtins]builtext.h [.lib.tilde]tilde.h bashhist.h \
 		[.builtins]gnv$common.c_first
    $set def prj_root:[.builtins]
-.ifdef __VAX__
-   $type/noheader lcl_root:[]gnv$common.c_first,src_root:[]common.c \
-	/output=lcl_root:common.c
    $define/user decc$user_include prj_root:[]
    $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
    $(CC)$(cflagsx)/define=\
-	(_POSIX_EXIT=1, HAVE_VFPRINTF)\
-	/OBJ=common.obj common.c
-.else
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
-   $define/user readline prj_root:[-.lib.readline]
-   $define/user glob prj_root:[-.lib.glob]
-   $define/user tilde prj_root:[-.lib.tilde]
-   $(CC)$(cflagsx)/define=\
-	(_USE_STD_STAT=1,_POSIX_EXIT=1, HAVE_VFPRINTF)\
+	(_USE_STD_STAT=1,_POSIX_EXIT=1)\
 	/first_include=gnv$common.c_first \
 	/OBJ=common.obj common.c
-.endif
    $set def prj_root:[-]
 
 [.builtins]gnv$evalfile.c_first : [.builtins]gnv_evalfile.c_first \
@@ -1643,16 +1478,6 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
 		$(builtins_h) flags.h input.h $(execute_cmd_h) $(trap_h) \
 		bashhist.h [.builtins]common.h, [.builtins]gnv$evalfile.c_first
    $set def prj_root:[.builtins]
-.ifdef __VAX__
-   $type/noheader lcl_root:[]gnv$evalfile.c_first, src_root:[]evalfile.c \
-	/output=lcl_root:[]evalfile.c
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
-   $define/user readline prj_root:[-.lib.readline]
-   $define/user glob prj_root:[-.lib.glob]
-   $define/user tilde prj_root:[-.lib.tilde]
-   $(CC)$(CFLAGS)/OBJ=evalfile.obj evalfile.c
-.else
    $define/user decc$user_include prj_root:[]
    $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
@@ -1660,7 +1485,6 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
    $define/user tilde prj_root:[-.lib.tilde]
    $(CC)$(CFLAGS)/OBJ=evalfile.obj evalfile.c \
 	/first_include=gnv$evalfile.c_first
-.endif
    $set def prj_root:[-]
 
 lcl_root:[.builtins]evalstring.c : src_root:[.builtins]evalstring.c \
@@ -1699,6 +1523,8 @@ lcl_root:[.builtins]evalstring.c : src_root:[.builtins]evalstring.c \
 	lcl_root:[]builtins.DIR \
 	command.h $(general_h) sig.h
 
+[.builtins]psize.exe : [.builtins]psize.obj
+
 # Build the builtins
 
 [.builtins]mkbuiltins.exe : [.builtins]mkbuiltins.obj
@@ -1718,7 +1544,7 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
    $(CC)$(cflagsx) \
 	/OBJ=mkbuiltins.obj mkbuiltins.c \
 	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,\
-	MODULE_MKBUILTINS=1,HAVE_STRING_H=1,HAVE_STDLIB_H=1)
+	MODULE_MKBUILTINS=1)
    $set def prj_root:[-]
 
 [.builtins]alias.c : [.builtins]alias.def, [.builtins]mkbuiltins.exe
@@ -2102,16 +1928,6 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 		[.builtins]bashgetopt.h [.builtins]common.h \
 		[.builtins]gnv$printf.c_first
    $set def prj_root:[.builtins]
-.ifdef __VAX__
-   $type/noheader lcl_root:[]gnv$printf.c_first, src_root:[]printf.c \
-	/output=lcl_root:[]printf.c
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
-   $define/user readline prj_root:[-.lib.readline]
-   $define/user glob prj_root:[-.lib.glob]
-   $define/user tilde prj_root:[-.lib.tilde]
-   $(CC)$(CFLAGS)/OBJ=printf.obj printf.c
-.else
    $define/user decc$user_include prj_root:[]
    $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
@@ -2119,7 +1935,6 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
    $define/user tilde prj_root:[-.lib.tilde]
    $(CC)$(CFLAGS)/OBJ=printf.obj printf.c \
 	/first_include=gnv$printf.c_first
-.endif
    $set def prj_root:[-]
 
 [.builtins]pushd.c : [.builtins]pushd.def [.builtins]mkbuiltins.exe
@@ -2314,22 +2129,6 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 [.builtins]gnv$ulimit.c_first : [.builtins]gnv_ulimit.c_first
     $type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
-.ifdef __VAX__
-[.builtins]ulimit.obj : [.builtins]ulimit.c, $(config_h) bashtypes.h \
-		$(bashintl_h) $(shell_h) [.builtins]common.h \
-		[.builtins]bashgetopt.h pipesize.h \
-		[.builtins]gnv$ulimit.c_first
-   $set def prj_root:[.builtins]
-   $type/noheader lcl_root:[]gnv$ulimit.c_first, lcl_root:[]ulimit.c \
-	/output=lcl_root:ulimit.c1
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
-   $define/user readline prj_root:[-.lib.readline]
-   $define/user glob prj_root:[-.lib.glob]
-   $define/user tilde prj_root:[-.lib.tilde]
-   $(CC)$(CFLAGS)/OBJ=ulimit.obj ulimit.c1
-   $set def prj_root:[-]
-.else
 [.builtins]ulimit.obj : [.builtins]ulimit.c, $(config_h) bashtypes.h \
 		$(bashintl_h) $(shell_h) [.builtins]common.h \
 		[.builtins]bashgetopt.h pipesize.h \
@@ -2343,7 +2142,6 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
    $(CC)$(CFLAGS)/OBJ=ulimit.obj ulimit.c \
 	/first_include=gnv$ulimit.c_first
    $set def prj_root:[-]
-.endif
 
 [.builtins]umask.c : [.builtins]umask.def [.builtins]mkbuiltins.exe
 
@@ -2393,7 +2191,7 @@ bashhist.obj : bashhist.c, $(config_h) bashtypes.h $(bashansi_h) \
 		[.lib.glob]glob.h [.lib.glob]strmatch.h bashline.h
 
 bashline.obj : bashline.c $(config_h) bashtypes.h \
-		[.include]posixstat.h \
+		[.include]posixstat.h [.builtins]builtext.h \
 		[.include]chartypes.h $(bashansi_h) $(bashintl_h) \
 		$(shell_h) input.h $(builtins_h) \
 		bashhist.h bashline.h $(execute_cmd_h) findcmd.h pathexp.h \
@@ -2417,7 +2215,7 @@ error.obj : error.c $(config_h) bashtypes.h $(bashansi_h) $(bashintl_h) \
    $define/user decc$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/define=\
-	(DEBUG,_USE_STD_STAT=1,_POSIX_EXIT=1, HAVE_VFPRINTF)\
+	(DEBUG,_USE_STD_STAT=1,_POSIX_EXIT=1)\
 	/obj=$(MMS$TARGET) $(MMS$SOURCE)
 
 eval.obj : eval.c $(config_h) $(bashansi_h) $(bashintl_h) $(shell_h) flags.h \
@@ -2442,8 +2240,7 @@ execute_cmd.obj : execute_cmd.c $(config_h) \
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/OBJ=$(MMS$TARGET) $(MMS$SOURCE) \
 	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_REGEX_H=1,\
-HAVE_REGCOMP=1,HAVE_REGEXEC=1, MODULE_EXECUTE_CMD=1,HAVE_STRING_H=1,\
-HAVE_STDLIB_H=1)
+HAVE_REGCOMP=1,HAVE_REGEXEC=1, MODULE_EXECUTE_CMD=1)
 
 expr.obj : expr.c $(config_h) $(bashansi_h) [.include]chartypes.h \
 		$(bashintl_h)  $(shell_h)
@@ -2461,19 +2258,6 @@ findcmd.obj : lcl_root:findcmd.c $(config_h) \
 		[.include]filecntl.h [.include]posixstat.h $(bashansi_h) \
 		[.include]memalloc.h $(shell_h) flags.h hashlib.h \
 		pathexp.h $(hashcmd_h) findcmd.h
-.ifdef __VAX__
-   $!type/noheader lcl_root:gnv$findcmd.c_first,\
-   $!	src_root:findcmd.c \
-   $!	/output=lcl_root:findcmd.c
-   $define/user readline prj_root:[.lib.readline]
-   $define/user glob prj_root:[.lib.glob]
-   $define/user tilde prj_root:[.lib.tilde]
-   $define/user decc$system_include prj_root:[],prj_root:[.include]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.else
    $define/user readline prj_root:[.lib.readline]
    $define/user glob prj_root:[.lib.glob]
    $define/user tilde prj_root:[.lib.tilde]
@@ -2483,7 +2267,6 @@ findcmd.obj : lcl_root:findcmd.c $(config_h) \
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
 	$(MMS$SOURCE)
-.endif
 
 flags.obj : flags.c $(config_h) $(shell_h) flags.h bashhist.h
 
@@ -2523,9 +2306,6 @@ mailcheck.obj : mailcheck.c $(config_h) bashtypes.h [.include]posixstat.h \
 		[.include]posixtime.h $(bashansi_h) $(bashintl_h) $(shell_h) \
 		$(execute_cmd_h) mailcheck.h [.lib.tilde]tilde.h \
 		gnv$mailcheck.c_first
-.ifdef __VAX__
-   $type/noheader lcl_root:[]gnv$mailcheck.c_first, src_root:[]mailcheck.c \
-	/output=lcl_root:mailcheck.c
    $define/user readline prj_root:[.lib.readline]
    $define/user tilde prj_root:[.lib.tilde]
    $define/user glob prj_root:[.lib.glob]
@@ -2534,21 +2314,9 @@ mailcheck.obj : mailcheck.c $(config_h) bashtypes.h [.include]posixstat.h \
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(cflagsx)/define=\
-	(_POSIX_EXIT=1, HAVE_VFPRINTF)\
-	/OBJ=mailcheck.obj mailcheck.c
-.else
-   $define/user readline prj_root:[.lib.readline]
-   $define/user tilde prj_root:[.lib.tilde]
-   $define/user glob prj_root:[.lib.glob]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(cflagsx)/define=\
-	(_USE_STD_STAT=1,_POSIX_EXIT=1, HAVE_VFPRINTF)\
+	(_USE_STD_STAT=1,_POSIX_EXIT=1) \
 	/first_include=gnv$mailcheck.c_first \
 	/OBJ=mailcheck.obj mailcheck.c
-.endif
 
 make_cmd.obj : make_cmd.c $(config_h) bashtypes.h [.include]filecntl.h \
 		$(bashansi_h) $(bashintl_h) $(parser_h) syntax.h \
@@ -2570,11 +2338,7 @@ pcomplete.obj : pcomplete.c $(config_h) bashtypes.h [.include]posixstat.h \
 
 pcomplib.obj : pcomplib.c $(config_h) $(bashintl_h) $(shell_h) $(pcomplete_h)
 
-lcl_root:print_cmd.c : src_root:print_cmd.c print_cmd.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-print_cmd.obj : lcl_root:print_cmd.c $(config_h) $(bashansi_h) $(bashintl_h) \
+print_cmd.obj : print_cmd.c $(config_h) $(bashansi_h) $(bashintl_h) \
 		$(shell_h) flags.h $(y_tab_h) [.include]shmbutil.h \
 		[.builtins]common.h
    $define/user glob prj_root:[.lib.glob]
@@ -2584,7 +2348,7 @@ print_cmd.obj : lcl_root:print_cmd.c $(config_h) $(bashansi_h) $(bashintl_h) \
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/OBJ=$(MMS$TARGET) $(MMS$SOURCE) \
 	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,\
-	MODULE_PRINT_CMD=1,HAVE_STRING_H=1,HAVE_VARARGS_H=1)
+	MODULE_PRINT_CMD=1)
 
 redir.obj : redir.c $(config_h) bashtypes.h [.include]filecntl.h \
 		[.include]posixstat.h $(bashansi_h) $(bashintl_h) \
@@ -2602,9 +2366,6 @@ shell.obj : shell.c $(config_h) bashtypes.h [.include]posixstat.h \
 		$(readline_history_h) bashline.h \
 		[.lib.tilde]tilde.h [.lib.glob]strmatch.h \
 		$(gnv_shell_c_first)
-.ifdef __VAX__
-   $type/noheader lcl_root:[]gnv$shell.c_first, src_root:[]shell.c \
-	/output=lcl_root:shell.c
    $define/user readline prj_root:[.lib.readline]
    $define/user tilde prj_root:[.lib.tilde]
    $define/user glob prj_root:[.lib.glob]
@@ -2613,21 +2374,9 @@ shell.obj : shell.c $(config_h) bashtypes.h [.include]posixstat.h \
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(cflagsx)/define=\
-	(_POSIX_EXIT=1, HAVE_VFPRINTF)\
-	/OBJ=shell.obj shell.c
-.else
-   $define/user readline prj_root:[.lib.readline]
-   $define/user tilde prj_root:[.lib.tilde]
-   $define/user glob prj_root:[.lib.glob]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(cflagsx)/define=\
-	(_USE_STD_STAT=1,_POSIX_EXIT=1, HAVE_VFPRINTF)\
+	(_USE_STD_STAT=1,_POSIX_EXIT=1) \
 	/first_include=gnv$shell.c_first \
 	/OBJ=shell.obj shell.c
-.endif
 
 sig.obj : sig.c $(config_h) bashtypes.h $(bashintl_h) $(shell_h) $(jobs_h) \
 		siglist.h sig.h $(trap_h) [.builtins]common.h \
@@ -2652,18 +2401,6 @@ subst.obj : subst.c gnv$subst.c_first $(config_h) bashtypes.h \
 		[.builtins]getopt.h [.builtins]common.h \
 		[.builtins]builtext.h [.lib.tilde]tilde.h \
 		[.lib.glob]strmatch.h
-.ifdef __VAX__
-   $type/noheader lcl_root:gnv$subst.c_first,\
-	src_root:subst.c \
-	/output=lcl_root:subst.c
-   $define/user tilde prj_root:[.lib.tilde]
-   $define/user glob prj_root:[.lib.glob]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
-.else
    $define/user tilde prj_root:[.lib.tilde]
    $define/user glob prj_root:[.lib.glob]
    $define/user decc$system_include prj_root:[]
@@ -2672,7 +2409,6 @@ subst.obj : subst.c gnv$subst.c_first $(config_h) bashtypes.h \
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
    /first_include=gnv$subst.c_first $(MMS$SOURCE)
-.endif
 
 syntax.obj : syntax.c $(config_h) syntax.h
 
@@ -2683,18 +2419,6 @@ test.obj : test.c $(config_h) gnv$test.c_first \
 		bashtypes.h [.include]posixstat.h \
 		[.include]filecntl.h $(bashintl_h) $(shell_h) \
 		pathexp.h test.h [.builtins]common.h [.lib.glob]strmatch.h
-.ifdef __VAX__
-   $type/noheader lcl_root:[]gnv$test.c_first, lcl_root:[]test.c1 \
-	/output=lcl_root:test.c
-   $define/user readline prj_root:[.lib.readline]
-   $define/user tilde prj_root:[.lib.tilde]
-   $define/user glob prj_root:[.lib.glob]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) test.c1
-.else
    $define/user readline prj_root:[.lib.readline]
    $define/user tilde prj_root:[.lib.tilde]
    $define/user glob prj_root:[.lib.glob]
@@ -2704,7 +2428,6 @@ test.obj : test.c $(config_h) gnv$test.c_first \
 	prj_root:[.lib.glob]
    $(CC)$(cflags)/first_include=gnv$test.c_first \
 	/OBJ=test.obj test.c
-.endif
 
 trap.obj : trap.c $(config_h) bashtypes.h $(bashansi_h) $(bashintl_h) \
 		$(trap_h) $(shell_h) flags.h input.h $(jobs_h) signames.h \
@@ -2746,8 +2469,6 @@ vms_term.obj : vms_term.c vms_term.h
 
 vms_terminal_io.obj : vms_terminal_io.c vms_terminal_io.h
 
-vms_vm_pipe.obj : vms_vm_pipe.c
-
 decw_showdisplay.obj : decw_showdisplay.c
 
 #y.tab.obj : y.tab.c bashtypes.h $(bashansi_h) $(shell_h) flags.h \
@@ -2776,9 +2497,6 @@ gnv$bash.exe : $(bash_objs) \
 	   libintl.olb \
 	   [.lib.regex]regex.obj \
 	   libsh.olb temp_stub.obj
-.ifdef __VAX__
-   $(LINK)$(LFLAGS)/exec=$(MMS$TARGET) bash_vax.opt/opt
-.else
    $(LINK)$(LFLAGS)/exec=$(MMS$TARGET)/DSF=$(MMS$TARGET_NAME) \
 	/MAP=$(MMS$TARGET_NAME) \
 	 $(bash_objs),vms_crtl_init.obj,vms_crtl_values.obj,\
@@ -2791,7 +2509,6 @@ gnv$bash.exe : $(bash_objs) \
 	[]libbuiltins.olb/lib,\
 	[]libsh.olb/lib,\
 	[.lib.regex]regex.obj
-.endif
 
 bashdebug.exe : $(bash_objs), \
 	   [.builtins]builtins.obj,\
@@ -2803,9 +2520,6 @@ bashdebug.exe : $(bash_objs), \
            libglob.olb \
 	   libintl.olb \
 	   libsh.olb temp_stub.obj
-.ifdef __VAX__
-   $(LINK)$(LFLAGS)/debug/exec=$(MMS$TARGET) bash_vax.opt/opt
-.else
    $(LINK)$(LFLAGS)/debug/exec=$(MMS$TARGET)/DSF=$(MMS$TARGET_NAME) \
 	/MAP=$(MMS$TARGET_NAME) \
 	 $(bash_objs),vms_crtl_init.obj,vms_crtl_values.obj,\
@@ -2818,7 +2532,6 @@ bashdebug.exe : $(bash_objs), \
 	[]libbuiltins.olb/lib,\
 	[]libsh.olb/lib,\
 	[.lib.regex]regex.obj
-.endif
 
 # Always provide these two cleanup targets.
 # In this case DCL will do the cleanup.

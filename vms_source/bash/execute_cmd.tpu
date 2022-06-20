@@ -24,38 +24,6 @@ ws := SPAN(" 	");
 !
 ! VMS specific patches needed.
 !
-!
-! VAX needs an ODS-2 legal file
-!-------------------------------
-VMS_INSERT_BEFORE('#include <y.tab.h>', '#ifndef __VMS');
-VMS_INSERT_AFTER('#include <y.tab.h>', '#else');
-SPLIT_LINE;
-COPY_TEXT('#ifdef __VAX');
-SPLIT_LINE;
-COPY_TEXT('#include <y_tab.h>');
-SPLIT_LINE;
-COPY_TEXT('#else');
-SPLIT_LINE;
-COPY_TEXT('#include <y.tab.h>');
-SPLIT_LINE;
-COPY_TEXT('#endif');
-SPLIT_LINE;
-COPY_TEXT('#endif');
-SPLIT_LINE;
-
-!
-! Redefine pipe() to use VM pipes.
-!--------------------------------
-VMS_INSERT_BEFORE('#include "execute_cmd.h"', '#ifdef __VMS');
-COPY_TEXT('int vms_fifo_write_pipe(int * pipe_fd);');
-SPLIT_LINE;
-COPY_TEXT('#define pipe(__fds) vms_fifo_write_pipe(__fds)');
-SPLIT_LINE;
-COPY_TEXT('#endif /* __VMS */');
-SPLIT_LINE;
-SPLIT_LINE;
-
-!
 ! In STRINGCHAR macro, need to accept \r just like MSDOS
 !
 find_range := SEARCH_QUIETLY('#if !defined (MSDOS)', FORWARD, EXACT);

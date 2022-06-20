@@ -73,7 +73,7 @@ char * vms_to_unix(const char * vms_spec);
 #include <libclidef.h>
 #include <ttdef.h>
 /* #include <tt2def.h> */
-#if (__CRTL_VER >= 80200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000)
 #include <tt3def.h>
 #endif
 #include <stdarg.h>
@@ -91,17 +91,6 @@ char * vms_to_unix(const char * vms_spec);
  */
 #include <tt2def.h>
 
-#ifdef __VAX
-typedef union ttdef TTDEF;
-typedef union tt2def TT2DEF;
-#ifndef POLL_IN
-#define POLL_IN 1
-#endif
-#ifndef POLL_OUT
-#define POLL_OUT 2
-#endif
-#endif
-
 #define MAX_DIR_PATH 4096
 #define MAX_UNIX_DIR_PATH 8192
 
@@ -111,10 +100,6 @@ typedef union tt2def TT2DEF;
  * to actually do the I/O.  The first access of a tty file descriptor will
  * cause the VMS channel to be created and the structure of UNIX attributes
  * to be populated.
- */
-
-/* The poll and select routines were copied from the ones that I wrote for
- * the port of glib.
  */
 
 #pragma member_alignment save
@@ -151,7 +136,7 @@ struct term_char_st {
     unsigned short page_width;
     TTDEF ttdef;
     TT2DEF tt2def;
-#if (__CRTL_VER >= 80200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000)
     TT3DEF tt3def;
 #endif
 };
@@ -189,9 +174,6 @@ struct vms_info_st {
 /* Array to hold file descriptors that we are intercepting I/O for. */
 static struct vms_info_st * vms_info = NULL;
 static int vms_info_size = -1;
-
-/* Flag to indicate if we are expecting VMS behavior or UNIX behavior. */
-static int vms_terminal_mode = -1;
 
 #if 0
 void dump_pointer_m(const void * ptr, const char * str, int psize) {
@@ -475,72 +457,6 @@ DIR * vms_fdopendir(int fd) {
     free(dir_path);
     errno = ENOTDIR;
     return NULL;
-}
-
-int vmsmode_stat(const char * name, struct stat *st) {
-    int result;
-    int file_ux_only_mode;
-#if (__CRTL_VER >= 80300000)
-    int pcp_mode;
-    /* Save the PCP mode */
-    pcp_mode = decc$feature_get("DECC$POSIX_COMPLIANT_PATHNAMES",
-                                __FEATURE_MODE_CURVAL);
-    if (pcp_mode > 0) {
-        decc$feature_set("DECC$POSIX_COMPLIANT_PATHNAMES",
-                         __FEATURE_MODE_CURVAL, 0);
-    }
-#endif
-    file_ux_only_mode = decc$feature_get("DECC$FILENAME_UNIX_ONLY",
-                                         __FEATURE_MODE_CURVAL);
-    if (file_ux_only_mode > 0) {
-        decc$feature_set("DECC$FILENAME_UNIX_ONLY",
-                         __FEATURE_MODE_CURVAL, 0);
-    }
-    result = stat(name, st);
-    if (file_ux_only_mode > 0) {
-        decc$feature_set("DECC$FILENAME_UNIX_ONLY",
-                         __FEATURE_MODE_CURVAL, file_ux_only_mode);
-    }
-#if (__CRTL_VER >= 80300000)
-    if (pcp_mode > 0) {
-        decc$feature_set("DECC$POSIX_COMPLIANT_PATHNAMES",
-                         __FEATURE_MODE_CURVAL, pcp_mode);
-    }
-#endif
-    return result;
-}
-
-int vmsmode_chdir(const char * newdir) {
-    int result;
-    int file_ux_only_mode;
-#if (__CRTL_VER >= 80300000)
-    int pcp_mode;
-    /* Save the PCP mode */
-    pcp_mode = decc$feature_get("DECC$POSIX_COMPLIANT_PATHNAMES",
-                                __FEATURE_MODE_CURVAL);
-    if (pcp_mode > 0) {
-        decc$feature_set("DECC$POSIX_COMPLIANT_PATHNAMES",
-                         __FEATURE_MODE_CURVAL, 0);
-    }
-#endif
-    file_ux_only_mode = decc$feature_get("DECC$FILENAME_UNIX_ONLY",
-                                         __FEATURE_MODE_CURVAL);
-    if (file_ux_only_mode > 0) {
-        decc$feature_set("DECC$FILENAME_UNIX_ONLY",
-                         __FEATURE_MODE_CURVAL, 0);
-    }
-    result = decc$chdir(newdir);
-    if (file_ux_only_mode > 0) {
-        decc$feature_set("DECC$FILENAME_UNIX_ONLY",
-                         __FEATURE_MODE_CURVAL, file_ux_only_mode);
-    }
-#if (__CRTL_VER >= 80300000)
-    if (pcp_mode > 0) {
-        decc$feature_set("DECC$POSIX_COMPLIANT_PATHNAMES",
-                         __FEATURE_MODE_CURVAL, pcp_mode);
-    }
-#endif
-    return result;
 }
 
 /* The VMS CRTL will sometimes access violate when:
@@ -1208,211 +1124,6 @@ static int vms_channel_close(int fd) {
     return status;
 }
 
-#ifdef __VAX
-struct fake_pollfd {
-    int fd;
-    short events;
-    short revents;
-};
-typedef unsigned int fake_nfds_t;
-#define pollfd fake_pollfd
-#define nfds_t fake_nfds_t
-#endif
-
-
-struct vms_pollfd_st {
-    struct pollfd *fd_desc_ptr;
-    unsigned short channel;
-    unsigned short pad;
-    int fd;
-};
-
-static int vms_poll_terminal(const struct vms_pollfd_st *term_array, int ti)
-{
-int i;
-int ret_stat;
-int count;
-int status;
-#pragma member_alignment save
-#pragma nomember_alignment longword
-
-struct typeahead_st {
-    unsigned short numchars;
-    unsigned char firstchar;
-    unsigned char reserved0;
-    unsigned long reserved1;
-} typeahead;
-#pragma member_alignment restore
-struct term_mode_iosb_st mode_iosb;
-
-    ret_stat = 0;
-
-    /* Loop through the terminal channels */
-    for (i = 0; i < ti; i++) {
-	term_array[i].fd_desc_ptr->revents = 0;
-
-	/* assume output is always available */
-	term_array[i].fd_desc_ptr->revents =
-		term_array[i].fd_desc_ptr->events & POLL_OUT;
-
-	/* Poll input status */
-	if (term_array[i].fd_desc_ptr->events & POLL_IN)
-	{
-	    status = SYS$QIOW
-			   (EFN$C_ENF,
-			    term_array[i].channel,
-			    IO$_SENSEMODE | IO$M_TYPEAHDCNT,
-			    (struct _iosb*)&mode_iosb,
-			    NULL,
-			    0,
-			    &typeahead, 8, 0, 0, 0, 0);
-	    if ($VMS_STATUS_SUCCESS(status) &&
-		$VMS_STATUS_SUCCESS(mode_iosb.status)) {
-		if (typeahead.numchars != 0) {
-		    term_array[i].fd_desc_ptr->revents =
-			term_array[i].fd_desc_ptr->events & POLL_IN;
-		}
-	    }
-	    else {
-		/* Something really wrong */
-		ret_stat = -1;
-		errno = EIO;
-		break;
-	    }
-	}
-	/* Increment the return status */
-	if (term_array[i].fd_desc_ptr->revents != 0)
-	    ret_stat++;
-    }
-
-    return ret_stat;
-}
-
-static int vms_poll_pipe(const struct vms_pollfd_st * pipe_array, int pi)
-{
-int i;
-int ret_stat;
-int status;
-#pragma member_alignment save
-#pragma nomember_alignment longword
-struct mbx_gmif_iosb_st {
-    unsigned short sts;
-    unsigned short num_msg;
-    unsigned long num_bytes;
-} mbx_iosb;
-#pragma member_alignment restore
-
-    ret_stat = 0;
-
-    /* Loop through the pipes */
-    for (i = 0; i < pi; i++) {
-	pipe_array[i].fd_desc_ptr->revents = 0;
-
-	/* Check the mailbox status */
-	if (pipe_array[i].fd_desc_ptr->events & (POLL_IN | POLL_OUT)) {
-	    status = SYS$QIOW
-			   (EFN$C_ENF,
-			    pipe_array[i].channel,
-			    IO$_SENSEMODE,
-			    (struct _iosb*)&mbx_iosb,
-			    NULL,
-			    0,
-			    0, 0, 0, 0, 0, 0);
-	    if ($VMS_STATUS_SUCCESS(status) &&
-		$VMS_STATUS_SUCCESS(mbx_iosb.sts)) {
-
-		/* Got some information */
-
-		if (mbx_iosb.num_msg != 0) {
-		    /* There is data to read */
-		    pipe_array[i].fd_desc_ptr->revents =
-			pipe_array[i].fd_desc_ptr->events & POLL_IN;
-		}
-		else {
-		    /* Pipe is empty, ok to write */
-		    pipe_array[i].fd_desc_ptr->revents =
-			pipe_array[i].fd_desc_ptr->events & POLL_OUT;
-		}
-	    }
-	    else {
-		/* Something really wrong */
-		ret_stat = -1;
-		errno = EIO;
-		break;
-	    }
-	}
-	/* Increment the return status */
-	if (pipe_array[i].fd_desc_ptr->revents != 0)
-	    ret_stat++;
-    }
-    return ret_stat;
-}
-
-static int vms_poll_x11_efn(const struct vms_pollfd_st * efn_array, int xi)
-{
-int i;
-int ret_stat;
-int status;
-unsigned int state;
-
-    ret_stat = 0;
-
-    /* Loop through the event flags */
-    for (i = 0; i < xi; i++) {
-	efn_array[i].fd_desc_ptr->revents = 0;
-
-	/* assume output is always available */
-	efn_array[i].fd_desc_ptr->revents =
-		efn_array[i].fd_desc_ptr->events & POLL_OUT;
-
-	/* Check the mailbox status */
-	if (efn_array[i].fd_desc_ptr->events & (POLL_IN | POLL_OUT)) {
-	    status = SYS$READEF(efn_array[i].fd_desc_ptr->fd, &state);
-	    if ($VMS_STATUS_SUCCESS(status)) {
-
-		/* Got some information */
-		if (status == SS$_WASSET) {
-		    /* There is data to read */
-		    efn_array[i].fd_desc_ptr->revents =
-			efn_array[i].fd_desc_ptr->events & POLL_IN;
-		}
-	    }
-	    else {
-		/* Something really wrong */
-		ret_stat = -1;
-		errno = EIO;
-		break;
-	    }
-	}
-	/* Increment the return status */
-	if (efn_array[i].fd_desc_ptr->revents != 0)
-	    ret_stat++;
-    }
-    return ret_stat;
-}
-
-
-/* We need to know if we are in UNIX mode or VMS mode */
-int get_vms_terminal_mode (void) {
-char * shell;
-
-    if (vms_terminal_mode != -1) {
-	return vms_terminal_mode;
-    }
-
-    shell = getenv("SHELL");
-    if (shell == NULL) {
-	vms_terminal_mode = 1;
-    }
-
-    if (strncmp("DCL", shell, 4) == 0) {
-	vms_terminal_mode = 1;
-    } else {
-	vms_terminal_mode = 0;
-    }
-    return vms_terminal_mode;
-}
-
 
 /* Implement guts of a unix like IOCTL for terminals */
 
@@ -1712,7 +1423,7 @@ int ret_stat = 0;
     }
 
 #ifdef __USE_BSD
-#if (__CRTL_VER >= 80200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000)
     if (termchar->tt3def.tt3$v_rts_flow) {
         my_attr->c_cflag |= CRTSCTS;	/* VMS 8.2 has CTRCTS flow control */
 	cflag_active = 1;
@@ -1787,7 +1498,7 @@ int ret_stat = 0;
     my_attr->c_cc[VEOL2] = 0;		/* Not used with VMS/Linux */
 #endif
     my_attr->c_cc[VERASE] = 127;	/* VMS default is DEL */
-#if (__CRTL_VER >= 80200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000)
     if (termchar->tt3def.tt3$v_bs) {
 	my_attr->c_cc[VERASE] = 8;	/* VMS 8.2 can set BS */
     }
@@ -2001,7 +1712,7 @@ struct term_mode_iosb_st set_mode_iosb;
 
 #ifdef __USE_BSD
 	/* VMS 8.2 has CTRCTS flow control */
-#if (__CRTL_VER >= 80200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000)
 	if ((my_attr->c_cflag & CRTSCTS) != 0) {
 	    termchar->tt3def.tt3$v_rts_flow = 1;
 	} else {
@@ -2095,7 +1806,7 @@ struct term_mode_iosb_st set_mode_iosb;
 /*    my_attr->c_cc[VEOL2] = 0; */	/* Not used with VMS/Linux */
 #endif
 /*    my_attr->c_cc[VERASE] = 127; */	/* VMS default is DEL */
-#if (__CRTL_VER >= 80200000) && !defined (__VAX)
+#if (__CRTL_VER >= 80200000)
     if (my_attr->c_cc[VERASE] == 8) {	/* VMS 8.2 can set BS */
     	termchar->tt3def.tt3$v_bs = 1;
     } else {
@@ -2276,60 +1987,6 @@ int result = 0;
 }
 
 
-  /******************************/
- /* stdio replacement routines */
-/******************************/
-/* This is a replacement for the CRTL fileno() routine.
- *
- * The first terminal access in ncurses is using the fileno() routine,
- * so we intercept it and open a VMS channel.  While it does not appear
- * needed, some sanity checks have been added to see if the device was
- * known before or a different device is connected.
- */
-int vms_terminal_fileno(FILE * stream) {
-    int fd;
-
-    fd = fileno(stream);
-
-    /* fileno() worked */
-    if (fd >= 0) {
-
-	/* For ncurses, we only care about terminals */
-	if (isatty(fd)) {
-            int result;
-	    unsigned short channel;
-
-	    /* Is this fd still the same terminal? */
-	    if ((vms_info != NULL) && (vms_info[fd].ref_cnt != 0)) {
-		char device_name[256];
-		char *retname;
-
-		retname = getname(fd, device_name, 1);
-		if (retname == NULL) {
-		    /* We can not get the VMS info at this time */
-		    return fd;
-		}
-
-		result = strcmp(device_name, vms_info[fd].device_name);
-		if (result == 0) {
-		    /* This is the same, we already have a VMS channel */
-		    return fd;
-		}
-
-		/* Force a cleanup of the old VMS information */
-		vms_info[fd].ref_cnt = 1;
-		result = vms_channel_close(fd);
-
-	    }
-
-	    /* Assign a VMS channel for this if needed */
-	    result = vms_channel_lookup(fd, &channel);
-	}
-    }
-    return fd;
-}
-
-
   /********************************/
  /* termios replacement routines */
 /********************************/
@@ -2422,524 +2079,6 @@ int vms_terminal_ioctl(int fd, int r, void * argp) {
 
     return result;
 }
-
-
-
-  /*******************************/
- /* socket replacement routines */
-/*******************************/
-int vms_terminal_select(int nfds, fd_set * readfds, fd_set * writefds,
-                        fd_set * exceptfds, struct timeval * timeout) {
-int ret_stat;
-int siif_index;
-int old_siif_value;
-int new_siif_value;
-int i;
-#ifndef __VAX /* Fix this later */
-const char * select_ignores_invalid_fd = "DECC$SELECT_IGNORES_INVALID_FD";
-
-    /* Get old ignore setting and enable new */
-    /* threaded applications need this setting enabled before this routine */
-    siif_index = decc$feature_get_index(select_ignores_invalid_fd);
-    if (siif_index >= 0)
-	old_siif_value = decc$feature_set_value(siif_index, 1, 1);
-#endif
-
-    if (nfds != 0) {
-    int i;
-    struct pollfd *poll_array;
-    struct vms_pollfd_st *term_array;
-    struct vms_pollfd_st *pipe_array;
-    struct vms_pollfd_st *xefn_array;
-    int ti;
-    int si;
-    int pi;
-    int xi;
-    int status;
-
-	/* Need structures to separate terminals and pipes */
-	poll_array = malloc(sizeof(struct pollfd) * (nfds + 1));
-	if (poll_array == NULL) {
-	    return -1;
-	}
-	term_array = malloc(sizeof(struct vms_pollfd_st) * (nfds + 1));
-	if (term_array == NULL) {
-	    free(poll_array);
-	    return -1;
-	}
-	pipe_array = malloc(sizeof(struct vms_pollfd_st) * (nfds + 1));
-	if (pipe_array == NULL) {
-	    free(term_array);
-	    free(poll_array);
-	    return -1;
-	}
-	xefn_array = malloc(sizeof(struct vms_pollfd_st) * (nfds + 1));
-	if (xefn_array == NULL) {
-	    free(pipe_array);
-	    free(term_array);
-	    free(poll_array);
-	    return -1;
-	}
-
-	/* Find all of the terminals and pipe fds  for polling */
-	for (i = 0, pi = 0, ti = 0, xi = 0; i <= nfds; i++) {
-
-	    /* Copy file descriptor arrays into a poll structure */
-	    poll_array[i].fd = i;
-	    poll_array[i].events = 0;
-	    poll_array[i].revents = 0;
-
-	    /* Now separate out the pipes and terminals */
-	    if (isapipe(i) == 1) {
-		pipe_array[pi].fd_desc_ptr = &poll_array[i];
-		pipe_array[pi].fd = i;
-		if (readfds != NULL) {
-		    if (FD_ISSET(i, readfds))
-			poll_array[i].events |= POLL_IN;
-		}
-		if (writefds != NULL) {
-		    if (FD_ISSET(i, writefds))
-			poll_array[i].events |= POLL_OUT;
-		}
-		/* Only care about something with read/write events */
-		if (poll_array[i].events != 0) {
-		    status = vms_channel_lookup(i, &pipe_array[pi].channel);
-		    if (status == 0)
-			pi++;
-		}
-	    }
-	    /* Not a pipe, see if a terminal */
-	    else if (isatty(i) == 1) {
-		term_array[ti].fd_desc_ptr = &poll_array[i];
-		term_array[ti].fd = i;
-		if (readfds != NULL) {
-		    if (FD_ISSET(i, readfds))
-			poll_array[i].events |= POLL_IN;
-		}
-		if (writefds != NULL) {
-		    if (FD_ISSET(i, writefds))
-			poll_array[i].events |= POLL_OUT;
-		}
-		/* Only care about something with read/write events */
-		if (poll_array[i].events != 0) {
-		    status = vms_channel_lookup
-			(i, &term_array[ti].channel);
-		    if (status == 0)
-			ti++;
-		}
-	    }
-	    else if (decc$get_sdc(i) != 0) {
-		    /* Not pipe or terminal, use built in select on this */
-		    si++;
-	    }
-	    /* What's left? X11 event flags */
-	    else {
-		xefn_array[xi].fd_desc_ptr = &poll_array[i];
-		if (readfds != NULL) {
-		    if (FD_ISSET(i, readfds))
-			poll_array[i].events |= POLL_IN;
-		}
-		if (writefds != NULL) {
-		    if (FD_ISSET(i, writefds))
-			poll_array[i].events |= POLL_OUT;
-		}
-		/* Only care about something with read/write events */
-		if (poll_array[i].events != 0) {
-		    xi++;
-		}
-	    }
-	}
-	if ((pi == 0) && (ti == 0) && (xi == 0)) {
-	    /* All sockets, let select do everything */
-	    ret_stat = select
-		    (nfds, readfds, writefds, exceptfds, timeout);
-	}
-	else {
-	time_t stimeleft; /* Seconds left */
-	int utimeleft; /* Microseconds left */
-	int ti_stat;
-	int pi_stat;
-	int si_stat;
-	int xi_stat;
-
-	    ti_stat = 0;
-	    pi_stat = 0;
-	    si_stat = 0;
-	    xi_stat = 0;
-	    if (timeout != NULL) {
-		stimeleft = timeout->tv_sec;
-		utimeleft = timeout->tv_usec;
-		if (stimeleft == (time_t)-1)
-		    utimeleft = 0;
-	    }
-	    else {
-		stimeleft = (time_t)-1;
-		utimeleft = 0;
-	    }
-	    ret_stat = 0;
-
-	     /* Terminals and or pipes and or sockets  */
-	    /* Now we have to periodically poll everything with timeout */
-	    while (ret_stat == 0) {
-	    int sleeptime;
-	    struct timeval sleep_timeout;
-
-		if (ti != 0) {
-		    ti_stat = vms_poll_terminal(term_array, ti);
-		}
-		if (pi != 0) {
-		    pi_stat = vms_poll_pipe(pipe_array, pi);
-		}
-		if (xi != 0) {
-		    xi_stat = vms_poll_x11_efn(xefn_array, xi);
-		}
-
-		sleep_timeout.tv_sec = 0;
-		if (ti_stat != 0 || pi_stat != 0) {
-		    sleeptime = 0;
-		    sleep_timeout.tv_usec = 0;
-		}
-		else {
-		    sleeptime = 100 * 1000;
-		    sleep_timeout.tv_sec = 0;
-		    sleep_timeout.tv_usec = sleeptime;
-		    if ((stimeleft == 0) && (utimeleft <sleeptime)) {
-			sleeptime = utimeleft;
-			sleep_timeout.tv_usec = utimeleft;
-		    }
-		}
-		if (si == 0) {
-		    /* sleep for shorter of 100 Ms or timeout and retry */
-		    if (sleeptime > 0)
-			usleep(sleeptime);
-		}
-		else {
-		    si_stat = select
-			       (nfds,
-				readfds,
-				writefds,
-				exceptfds, &sleep_timeout);
-		}
-		 /* one last poll of terminals and pipes */
-		if ((sleeptime > 0) || (si_stat > 0)) {
-		    if ((ti != 0) && (ti_stat == 0)) {
-			ti_stat = vms_poll_terminal(term_array, ti);
-		    }
-		    if ((pi != 0) && (pi_stat == 0)) {
-			pi_stat = vms_poll_pipe(pipe_array, pi);
-		    }
-		    if ((xi != 0) && (xi_stat == 0)) {
-			xi_stat = vms_poll_x11_efn(xefn_array, xi);
-		    }
-		}
-
-		/* how much time is left? */
-		if (utimeleft > 0) {
-		    utimeleft -= sleeptime;
-		    if ((utimeleft <= 0) && (stimeleft != (time_t)-1) &&
-			(stimeleft != 0)) {
-			stimeleft--;
-			utimeleft = 1000 * 1000; /* 1 second */
-		    }
-		    else {
-			stimeleft = 0;
-			utimeleft = 0;
-		    }
-		}
-
-		/* Gather up any results */
-		if ((ti_stat == -1) || (pi_stat == -1) || (si_stat == -1) ||
-		    (xi_stat == -1)) {
-		    ret_stat = -1;
-		}
-		else {
-		    ret_stat = ti_stat + pi_stat + si_stat + xi_stat;
-		}
-
-		/* Copy the pipe and terminal information */
-		if ((ti_stat > 0) || (pi_stat > 0) || (xi_stat > 0)) {
-		int j;
-		    for (j = 0; j < nfds; j++) {
-			if (poll_array[j].events != 0) {
-			    if (readfds != NULL) {
-				if (poll_array[j].revents & POLL_IN)
-				    FD_SET(poll_array[j].fd, readfds);
-				else
-				    FD_CLR(poll_array[j].fd, readfds);
-			    }
-			    if (writefds != NULL) {
-				if (poll_array[j].revents & POLL_OUT)
-				    FD_SET(poll_array[j].fd, writefds);
-				else
-				    FD_CLR(poll_array[j].fd, writefds);
-			    }
-			}
-		    }
-		}
-		/* Timed out? */
-		if ((stimeleft == 0) && (utimeleft == 0)) {
-		    break;
-		}
-	    }
-	}
-	while (pi > 0) {
-	    pi--;
-	    vms_channel_close(pipe_array[ti].fd);
-	}
-	free(poll_array);
-	while (ti > 0) {
-	    ti--;
-	    vms_channel_close(term_array[ti].fd);
-	}
-	free(term_array);
-	free(pipe_array);
-	free(xefn_array);
-    }
-    else {
-
-       ret_stat = select(nfds, readfds, writefds, exceptfds, timeout);
-    }
-
-    /* Restore old setting */
-#ifndef __VAX
-    if (siif_index >= 0)
-	new_siif_value = decc$feature_set_value(siif_index, 1, old_siif_value);
-#endif
-
-    return ret_stat;
-}
-
-
-
-  /*****************************/
- /* poll replacement routines */
-/*****************************/
-#ifndef __VAX
-int vms_terminal_poll(struct pollfd fd_array[], nfds_t nfds, int timeout)
-{
-int ret_stat;
-
-struct vms_pollfd_st *sock_array;
-struct pollfd *sfd_array;
-struct vms_pollfd_st *term_array;
-struct vms_pollfd_st *pipe_array;
-struct vms_pollfd_st *xefn_array;
-
-    /* Sort out the pipes, terminals from the array */
-    if ((nfds != 0) && (fd_array != NULL)) {
-    int i;
-    int pi;
-    int ti;
-    int si;
-    int xi;
-    int status;
-    int ti_stat;
-    int pi_stat;
-    int si_stat;
-    int xi_stat;
-
-	ti_stat = 0;
-	pi_stat = 0;
-	si_stat = 0;
-	xi_stat = 0;
-
-	/* Need 5 new arrays */
-	sock_array = malloc(sizeof(struct vms_pollfd_st) * nfds);
-	if (sock_array == NULL)
-	    return -1;
-	sfd_array = malloc(sizeof(struct pollfd) * nfds);
-	if (sfd_array == NULL) {
-	    free(sock_array);
-	    return -1;
-	}
-	term_array = malloc(sizeof(struct vms_pollfd_st) * nfds);
-	if (term_array == NULL) {
-	    free(sock_array);
-	    free(sfd_array);
-	    return -1;
-	}
-	pipe_array = malloc(sizeof(struct vms_pollfd_st) * nfds);
-	if (pipe_array == NULL) {
-	    free(term_array);
-	    free(sock_array);
-	    free(sfd_array);
-	    return -1;
-	}
-	xefn_array = malloc(sizeof(struct vms_pollfd_st) * nfds);
-	if (xefn_array == NULL) {
-	    free(pipe_array);
-	    free(term_array);
-	    free(sock_array);
-	    free(sfd_array);
-	    return -1;
-	}
-	memset(sock_array, 0, sizeof(struct vms_pollfd_st) * nfds);
-	memset(sfd_array, 0, sizeof(struct pollfd) * nfds);
-	memset(term_array, 0, sizeof(struct vms_pollfd_st) * nfds);
-	memset(pipe_array, 0, sizeof(struct vms_pollfd_st) * nfds);
-	memset(xefn_array, 0, sizeof(struct vms_pollfd_st) * nfds);
-
-	/* Now actually separate things out */
-	for (i = 0, pi = 0, si = 0, ti = 0, xi = 0; i < nfds; i++) {
-	    fd_array[i].revents = 0;
-
-	    /* Only care about devices that are waiting for something */
-	    if (fd_array[i].events != 0) {
-
-		/* First look for pipes */
-	        if (isapipe(fd_array[i].fd) == 1) {
-		    pipe_array[pi].fd_desc_ptr = NULL;
-		    if (fd_array[i].events & (POLL_IN | POLL_OUT)) {
-			pipe_array[pi].fd_desc_ptr = &fd_array[i];
-			status = vms_channel_lookup
-				(fd_array[i].fd, &pipe_array[pi].channel);
-			if (status == 0)
-			   pi++;
-		    }
-		}
-		/* Then look for terminals */
-		else if (isatty(fd_array[i].fd) == 1) {
-		    term_array[ti].fd_desc_ptr = NULL;
-		    if (fd_array[i].events & (POLL_IN | POLL_OUT)) {
-			term_array[ti].fd_desc_ptr = &fd_array[i];
-			status = vms_channel_lookup
-				(fd_array[i].fd, &term_array[ti].channel);
-			if (status == 0)
-			    ti++;
-		    }
-		}
-		/* Should be a socket */
-		else if (decc$get_sdc(fd_array[i].fd) != 0) {
-		    sfd_array[si] = fd_array[i];
-		    sock_array[si].fd_desc_ptr = &fd_array[i];
-		    si++;
-		}
-		/* If not a file descriptor or socket, X11 event flag */
-		else {
-		    xefn_array[xi].fd_desc_ptr = NULL;
-		    if (fd_array[i].events & (POLL_IN | POLL_OUT)) {
-			xefn_array[xi].fd_desc_ptr = &fd_array[i];
-			xi++;
-		    }
-		}
-	    }
-	}
-	if ((ti == 0) && (pi == 0) && (si == 0) && (xi == 0)) {
-	    /* Trivial case, all sockets */
-	    ret_stat = poll(fd_array, nfds, timeout);
-	}
-	else {
-	int timeleft;
-
-	    timeleft = timeout;
-	    ret_stat = 0;
-
-	    /* Terminals and or pipes and or sockets  */
-	    /* Now we have to periodically poll everything with timeout */
-	    while (ret_stat == 0)
-	    {
-	    int sleeptime;
-
-		if (ti != 0) {
-		    ti_stat = vms_poll_terminal(term_array, ti);
-		}
-		if (pi != 0) {
-		    pi_stat = vms_poll_pipe(pipe_array, pi);
-		}
-		if (xi != 0) {
-		    xi_stat = vms_poll_x11_efn(xefn_array, xi);
-		}
-
-		if ((ti_stat != 0) || (pi_stat != 0) || (xi_stat != 0))
-		    sleeptime = 0;
-		else {
-		    sleeptime = 100;
-		    if ((timeleft < sleeptime) && (timeleft > -1))
-			sleeptime = timeleft;
-		}
-
-		if (si == 0) {
-		    /* sleep for shorter of 100 Ms or timeout and retry */
-		    if (sleeptime > 0)
-			usleep(sleeptime * 1000);
-		}
-		else {
-		int j;
-
-		     /* select for shorter of 100 Ms or timeout and retry */
-		     si_stat = poll(sfd_array, si, sleeptime);
-		     if (si_stat != 0) {
-
-			/* Need to copy the results back to original array */
-			for (j = 0; j < si; j++)
-			{
-			    sock_array[j].fd_desc_ptr[0] = sfd_array[j];
-			}
-		     }
-		}
-		/* one last poll of terminals and pipes */
-		if ((sleeptime > 0) || (si_stat > 0)) {
-		    if ((ti != 0) && (ti_stat == 0)) {
-			ti_stat = vms_poll_terminal(term_array, ti);
-		    }
-		    if ((pi != 0) && (pi_stat == 0)) {
-			pi_stat = vms_poll_pipe(pipe_array, pi);
-		    }
-		    if ((xi != 0) && (xi_stat == 0)) {
-			xi_stat = vms_poll_x11_efn(xefn_array, xi);
-		    }
-		}
-		if (timeleft > 0) {
-		    timeleft -= sleeptime;
-		    if (timeleft < 0)
-			timeleft = 0;
-		}
-
-		/* Gather up any results */
-		if ((ti_stat == -1) || (pi_stat == -1) || (si_stat == -1) ||
-		    (xi_stat == -1)) {
-		    ret_stat = -1;
-		}
-		else {
-		    ret_stat = ti_stat + pi_stat + si_stat + xi_stat;
-		}
-
-		/* Out of time? */
-	        if (timeleft <= 0)
-		    break;
-	    }
-	}
-
-	/* Clean up channels */
-	free(xefn_array);
-	while (ti > 0) {
-	    ti--;
-	    if (term_array[ti].fd_desc_ptr != NULL) {
-		vms_channel_close(term_array[ti].fd);
-		term_array[ti].fd_desc_ptr = NULL;
-	    }
-	}
-	free(term_array);
-	while (pi > 0) {
-	    pi--;
-	    if (pipe_array[ti].fd_desc_ptr != NULL) {
-		vms_channel_close(pipe_array[ti].fd);
-		pipe_array[pi].fd_desc_ptr = NULL;
-	    }
-	}
-	free(pipe_array);
-	free(sock_array);
-	free(sfd_array);
-
-    }
-    else {
-	/* Why would this be called with an empty array? */
-	ret_stat = poll(fd_array, nfds, timeout);
-    }
-
-    return ret_stat;
-}
-#endif
 
 
   /*******************************/

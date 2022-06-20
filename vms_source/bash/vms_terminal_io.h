@@ -76,37 +76,6 @@ int vms_terminal_ioctl(int fd, int r, void * argp);
 #endif
 
   /*******************************/
- /* socket replacement routines */
-/*******************************/
-#ifdef VMS_NEED_SELECT
-#define select hide_select
-#include <socket.h>
-#undef select
-#define select vms_terminal_select
-#else
-#include <socket.h>
-#endif /* VMS_NEED_SELECT */
-int vms_terminal_select(int nfds, fd_set * readfds, fd_set * writefds,
-                        fd_set * exceptfds, struct timeval * timeout);
-
-  /*****************************/
- /* poll replacement routines */
-/*****************************/
-#ifdef VMS_NEED_POLL
-#define poll hide_poll
-#include <poll.h>
-#undef poll
-#define poll vms_terminal_poll
-#else
-#ifndef __VAX
-#include <poll.h>
-#endif
-#endif
-#ifndef __VAX
-int poll (struct pollfd fd_array[], nfds_t nfds, int timeout);
-#endif
-
-  /*******************************/
  /* unixio replacement routines */
 /*******************************/
 #ifdef VMS_NEED_READ_WRITE

@@ -326,6 +326,14 @@ $	    goto cfgh_in_loop1
 $	endif
 $   endif
 $!
+$!  Copy #include lines exactly
+$!-------------------------------
+$   if key1 .eqs. "#include"
+$   then
+$	write tf xline
+$	goto cfgh_in_loop1
+$   endif
+$!
 $!  Process "normal?" stuff
 $!---------------------------
 $   if key1 .eqs. "#undef"
@@ -780,6 +788,71 @@ $	    write tf "#define ''key2' 1"
 $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
+$!
+$! Enable bash features in config.h
+$!-----------------------------------
+$	if key2 .eqs. "ALIAS" .or. -
+	   key2 .eqs. "PUSHD_AND_POPD" .or. -
+	   key2 .eqs. "RESTRICTED_SHELL" .or. -
+	   key2 .eqs. "PROCESS_SUBSTITUTION" .or. -
+	   key2 .eqs. "PROMPT_STRING_DECODE" .or. -
+	   key2 .eqs. "SELECT_COMMAND" .or. -
+	   key2 .eqs. "HELP_BUILTIN"
+$	then
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+	if key2 .eqs. "ARRAY_VARS" .or. -
+	   key2 .eqs. "DPAREN_ARITHMETIC" .or. -
+	   key2 .eqs. "BRACE_EXPANSION" .or. -
+	   key2 .eqs. "DPAREN_ARITHMETIC" .or. -
+	   key2 .eqs. "COMMAND_TIMING" .or. -
+	   key2 .eqs. "DPAREN_ARITHMETIC" .or. -
+	   key2 .eqs. "EXTENDED_GLOB"
+$	then
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+	if key2 .eqs. "COND_COMMAND" .or. -
+	   key2 .eqs. "COND_REGEXP" .or. -
+	   key2 .eqs. "COPROCESS_SUPPORT" .or. -
+	   key2 .eqs. "ARITH_FOR_COMMAND" .or. -
+	   key2 .eqs. "NETWORK_REDIRECTIONS" .or. -
+	   key2 .eqs. "PROGRAMMABLE_COMPLETION" .or. -
+	   key2 .eqs. "DEBUGGER"
+$	then
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+	if key2 .eqs. "CASEMOD_ATTRS" .or. -
+	   key2 .eqs. "CASEMOD_EXPANSIONS" .or. -
+	   key2 .eqs. "GLOBASCII_DEFAULT" .or. -
+	   key2 .eqs. "FUNCTION_IMPORT" .or. -
+	   key2 .eqs. "MEMSCRAMBLE"
+$	then
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 1"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
+$	if key2 .eqs. "EXTGLOB_DEFAULT"
+$	then
+$	    write tf "#ifndef ''key2'"
+$	    write tf "#define ''key2' 0"
+$	    write tf "#endif"
+$	    goto cfgh_in_loop1
+$	endif
+$!
 $!
 $!	This is for a test that getcwd(0,0) works.
 $!	It does not on VMS.
