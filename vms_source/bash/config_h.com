@@ -808,6 +808,9 @@ $!
 	if key2 .eqs. "ARRAY_VARS" .or. -
 	   key2 .eqs. "DPAREN_ARITHMETIC" .or. -
 	   key2 .eqs. "BRACE_EXPANSION" .or. -
+	   key2 .eqs. "READLINE" .or. -
+	   key2 .eqs. "BANG_HISTORY" .or. -
+	   key2 .eqs. "HISTORY" .or. -
 	   key2 .eqs. "DPAREN_ARITHMETIC" .or. -
 	   key2 .eqs. "COMMAND_TIMING" .or. -
 	   key2 .eqs. "DPAREN_ARITHMETIC" .or. -
@@ -908,8 +911,6 @@ $!---------------------------------------
 $		headf = key2b
 $		if key2c .nes. "" then headf = headf + "_" + key2c
 $		if key2d .nes. "" then headf = headf + "_" + key2d
-$!
-$!		   (key2b .eqs. "READLINE")
 $!
 $!		Some special parsing
 $!------------------------------------------
