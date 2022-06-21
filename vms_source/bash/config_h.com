@@ -336,7 +336,7 @@ $   endif
 $!
 $!  Process "normal?" stuff
 $!---------------------------
-$   if key1 .eqs. "#undef"
+$   if key1 .eqs. "#undef" .or. key1 .eqs. "#define"
 $   then
 $	key2c = f$element(2, "_", key2)
 $	if (key2c .eqs. "_") .or. (key2c .eqs. "H") then key2c = ""
