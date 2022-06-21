@@ -268,23 +268,13 @@ libintl_objs = "bindtextdom"=[.lib.intl]bindtextdom.obj,\
 #              "os2compat"=[.lib.intl]os2compat.obj,\
 #
 
-srcdir = .
-
-DEFSRC =  $(srcdir)/alias.def $(srcdir)/bind.def $(srcdir)/break.def \
-	  $(srcdir)/builtin.def $(srcdir)/caller.def \
-	  $(srcdir)/cd.def $(srcdir)/colon.def \
-	  $(srcdir)/command.def $(srcdir)/declare.def $(srcdir)/echo.def \
-	  $(srcdir)/enable.def $(srcdir)/eval.def $(srcdir)/getopts.def \
-	  $(srcdir)/exec.def $(srcdir)/exit.def $(srcdir)/fc.def \
-	  $(srcdir)/fg_bg.def $(srcdir)/hash.def $(srcdir)/help.def \
-	  $(srcdir)/history.def $(srcdir)/jobs.def $(srcdir)/kill.def \
-	  $(srcdir)/let.def $(srcdir)/read.def $(srcdir)/return.def \
-	  $(srcdir)/set.def $(srcdir)/setattr.def $(srcdir)/shift.def \
-	  $(srcdir)/source.def $(srcdir)/suspend.def $(srcdir)/test.def \
-	  $(srcdir)/times.def $(srcdir)/trap.def $(srcdir)/type.def \
-	  $(srcdir)/ulimit.def $(srcdir)/umask.def $(srcdir)/wait.def \
-	  $(srcdir)/reserved.def $(srcdir)/pushd.def $(srcdir)/shopt.def \
-	  $(srcdir)/printf.def $(srcdir)/complete.def $(srcdir)/mapfile.def
+# NOTE: crunch this down so they all fit in the `mkbuiltins' command line.
+DEFSRC = alias.def bind.def break.def builtin.def caller.def cd.def colon.def \
+command.def declare.def echo.def enable.def eval.def getopts.def exec.def \
+exit.def fc.def fg_bg.def hash.def help.def history.def jobs.def kill.def \
+let.def read.def return.def set.def setattr.def shift.def source.def \
+suspend.def test.def times.def trap.def type.def ulimit.def umask.def wait.def \
+reserved.def pushd.def shopt.def printf.def complete.def mapfile.def
 
 #
 # This macro defines the .def files for builtins which require changes for

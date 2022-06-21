@@ -957,12 +957,10 @@ $		define/user sys$error nl:
 $		search/output=nl: 'dchfile' |'headf'|/exact
 $		if '$severity' .eq. 1
 $		then
-$		    if key64 then write tf "#ifndef __VAX"
 $		    write tf "#ifndef ''key2'"
 $		    write tf "#define ''key2' 1"
 $if p2 .nes. "" then write sys$output "''dchfile' - #define ''key2' 1"
 $		    write tf "#endif"
-$		    if key64 then write tf "#endif"
 $		    goto cfgh_in_loop1
 $		endif
 $!
@@ -1155,11 +1153,9 @@ $		endif
 $!
 $		if keysym .eqs. "LONGLONG"
 $		then
-$		    write tf "#ifndef __VAX"
 $		    write tf "#pragma message disable longlongtype"
 $		    write tf "#ifndef HAVE_LONGLONG"
 $		    write tf "#define HAVE_LONGLONG 1"
-$		    write tf "#endif"
 $		    write tf "#endif"
 $		    goto cfgh_in_loop1
 $		endif
@@ -1169,11 +1165,9 @@ $!-----------------------------------------------
 $		if (keysym .eqs. "LONG_LONG") .or. -
                    (keysym .eqs. "LONG_LONG_INT")
 $		then
-$		    write tf "#ifndef __VAX"
 $		    write tf "#pragma message disable longlongtype"
 $		    write tf "#ifndef HAVE_''keysym'"
 $		    write tf "#define HAVE_''keysym' 1"
-$		    write tf "#endif"
 $		    write tf "#endif"
 $		    goto cfgh_in_loop1
 $		endif
@@ -1182,11 +1176,9 @@ $!		May need to test compiler version
 $!-----------------------------------------------
 $		if keysym .eqs. "UNSIGNED_LONG_LONG"
 $		then
-$		    write tf "#ifndef __VAX"
 $		    write tf "#pragma message disable longlongtype"
 $		    write tf "#ifndef HAVE_UNSIGNED_LONG_LONG"
 $		    write tf "#define HAVE_UNSIGNED_LONG_LONG 1"
-$		    write tf "#endif"
 $		    write tf "#endif"
 $		    goto cfgh_in_loop1
 $		endif
@@ -1195,11 +1187,9 @@ $!		May need to test compiler version
 $!-----------------------------------------------
 $		if keysym .eqs. "UNSIGNED_LONG_LONG_INT"
 $		then
-$		    write tf "#ifndef __VAX"
 $		    write tf "#pragma message disable longlongtype"
 $		    write tf "#ifndef HAVE_UNSIGNED_LONG_LONG_INT"
 $		    write tf "#define HAVE_UNSIGNED_LONG_LONG_INT 1"
-$		    write tf "#endif"
 $		    write tf "#endif"
 $		    goto cfgh_in_loop1
 $		endif
@@ -1208,11 +1198,9 @@ $!		May need to test compiler version
 $!-----------------------------------------------
 $		if keysym .eqs. "LONG_DOUBLE"
 $		then
-$		    write tf "#ifndef __VAX"
 $		    write tf "#pragma message disable longlongtype"
 $		    write tf "#ifndef HAVE_LONG_DOUBLE"
 $		    write tf "#define HAVE_LONG_DOUBLE 1"
-$		    write tf "#endif"
 $		    write tf "#endif"
 $		    goto cfgh_in_loop1
 $		endif
@@ -1309,26 +1297,14 @@ $			search/out=nl: 'tfile1' -
 $			severity = '$severity'
 $		    endif
 $!
-$!		    VAX special handling routines
-$!---------------------------------------------
-$		    if (severity .ne. 1) .and. (arch_type .eq. 1)
-$		    then
-$			define/user sys$output nl:
-$			define/user sys$error nl:
-$			search/out=nl: 'tfile1' "DECC$''keysym'<SOH>"
-$			severity = '$severity'
-$		    endif
-$!
 $!		    Show the result of the search
 $!------------------------------------------------
 $		    if 'severity' .eq. 1
 $		    then
-$			if key64 then write tf "#ifndef __VAX"
 $			write tf "#ifndef ''key2'"
 $			write tf "#define ''key2' 1"
 $if p2 .nes. "" then write sys$output "''decc_shr' #define ''key2' 1"
 $			write tf "#endif"
-$			if key64 then write tf "#endif"
 $			goto cfgh_in_loop1
 $		    endif
 $		endif
@@ -1343,12 +1319,10 @@ $		search/out=nl: 'decc_rtldef' -
 $		severity = '$severity'
 $		if severity .eq. 1
 $		then
-$		    if key64 then write tf "#ifndef __VAX"
 $		    write tf "#ifndef ''key2'"
 $		    write tf "#define ''key2' 1"
 $if p2 .nes. "" then write sys$output "''decc_rtldef' #define ''key2' 1"
 $		    write tf "#endif"
-$		    if key64 then write tf "#endif"
 $		    goto cfgh_in_loop1
 $		endif
 $!
@@ -1376,11 +1350,7 @@ $	    endif
 $	    if key2b .eqs. "INTMAX" .and. key2_h .eqs. "_T"
 $	    then
 $		write tf "#ifndef ''key2a'_INTMAX_T"
-$		write tf "#ifdef __VAX"
-$		write tf "#define ''key2a'_INTMAX_T (4)"
-$		write tf "#else"
 $		write tf "#define ''key2a'_INTMAX_T (8)"
-$		write tf "#endif"
 $		write tf "#endif"
 $		goto cfgh_in_loop1
 $	    endif
@@ -1435,9 +1405,7 @@ $		    write tf "#define ''key2a'_LONG (4)"
 $		    write tf "#endif"
 $		else
 $		    write tf "#ifndef ''key2a'_LONG_LONG"
-$		    write tf "#ifndef __VAX"
 $		    write tf "#define ''key2a'_LONG_LONG (8)"
-$		    write tf "#endif"
 $		    write tf "#endif"
 $		endif
 $		goto cfgh_in_loop1
@@ -1470,11 +1438,7 @@ $	    endif
 $	    if key2b .eqs. "INTMAX" .and. key2_h .eqs. "_T"
 $	    then
 $		write tf "#ifndef ''key2a'_INTMAX_T"
-$		write tf "#ifdef __VAX"
-$		write tf "#define ''key2a'_INTMAX_T (32)"
-$		write tf "#else"
 $		write tf "#define ''key2a'_INTMAX_T (64)"
-$		write tf "#endif"
 $		write tf "#endif"
 $		goto cfgh_in_loop1
 $	    endif
@@ -1552,9 +1516,7 @@ $		    write tf "#define ''key2a'_LONG (32)"
 $		    write tf "#endif"
 $		else
 $		    write tf "#ifndef ''key2a'_LONG_LONG"
-$		    write tf "#ifndef __VAX"
 $		    write tf "#define ''key2a'_LONG_LONG (64)"
-$		    write tf "#endif"
 $		    write tf "#endif"
 $		endif
 $		goto cfgh_in_loop1
@@ -1951,15 +1913,13 @@ $write tf "**"
 $write tf -
  "**========================================================================*/"
 $write tf ""
-$write tf "#if (__CRTL_VER >= 70200000) && !defined (__VAX)"
+$write tf "#if (__CRTL_VER >= 70200000)"
 $write tf "#define _LARGEFILE 1"
 $write tf "#endif"
 $write tf ""
-$write tf "#ifndef __VAX"
 $write tf "#ifdef __CRTL_VER"
 $write tf "#if __CRTL_VER >= 80200000"
 $write tf "#define _USE_STD_STAT 1"
-$write tf "#endif"
 $write tf "#endif"
 $write tf "#endif"
 $write tf ""
