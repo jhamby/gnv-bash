@@ -49,6 +49,14 @@
 #undef USE_MKDTEMP
 #endif
 
+/* use fast unlocked inline file functions */
+#define __STDIO_UNLOCK_CHAR_IO 1
+#define __UNIX_PUTC 1
+
+/* defines a macro so that existing files always get UNIX file attributes */
+#define __UNIX_FOPEN 1
+
+
 /* Common definitions from the UNIX Makefile */
 #ifndef SHELL
 #define SHELL 1
@@ -63,19 +71,6 @@
 
 /* command.h needs pid.t in inlib.def, and nothing includes this */
 #include <unistd.h>
-
-/* mkfifo prototype needs mode_t */
-#include <types.h>
-
-/* Need to make a VMS specific FPURGE call */
-#define HAVE_FPURGE 1
-#define HAVE_DECL_FPURGE 0
-
-/* Need to make a VMS specific MKFIFO call */
-#define HAVE_MKFIFO 1
-int
-mkfifo(const char * path, mode_t mode);
-
 
 /* Missing from [.lib.sh]unicode.c */
 /* #include <langinfo.h> */

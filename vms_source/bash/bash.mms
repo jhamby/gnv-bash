@@ -57,7 +57,7 @@
 #===================================================================
 crepository = /repo=lcl_root:[bash.cxx_repository]
 cnames = /name=(as_i,shor)$(crepository)/fl=ieee/ieee=denorm
-clist = /list
+clist = /list/show=(incl,expans)
 cprefix = /pref=all
 cnowarn1 = unknownmacro,intconcastsgn,intconstsign,uninit2,questcompare2
 cnowarn2 = boolexprconst,knrfunc,embedcomment,nestedcomment,notconstqual,controlassign
@@ -780,7 +780,11 @@ libsh.olb : libsh($(libsh_objs))
 [.lib.sh]fnxform.obj : [.lib.sh]fnxform.c $(config_h) bashtypes.h \
 	$(bashansi_h) $(bashintl_h)
 
-[.lib.sh]fpurge.obj : [.lib.sh]fpurge.c, $(config_h)
+lcl_root:[.lib.sh]fpurge.c : src_root:[.lib.sh]fpurge.c [.lib.sh]fpurge_c.tpu
+    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
+	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
+
+[.lib.sh]fpurge.obj : lcl_root:[.lib.sh]fpurge.c, $(config_h)
 
 [.lib.sh]getcwd.obj : [.lib.sh]getcwd.c $(config_h) \
 	bashtypes.h $(bashansi_h) [.include]posixstat.h
@@ -2153,7 +2157,11 @@ eval.obj : eval.c $(config_h) $(bashansi_h) $(bashintl_h) $(shell_h) flags.h \
 		$(trap_h) [.builtins]common.h input.h $(execute_cmd_h) \
 		bashhist.h
 
-execute_cmd.obj : execute_cmd.c $(config_h) \
+lcl_root:execute_cmd.c : src_root:execute_cmd.c execute_cmd_c.tpu
+    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
+	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
+
+execute_cmd.obj : lcl_root:execute_cmd.c $(config_h) \
 		[.include]chartypes.h bashtypes.h \
 		[.include]filecntl.h [.include]posixstat.h \
 		[.include]posixtime.h $(bashansi_h) \
@@ -2415,9 +2423,6 @@ vms_crtl_values.obj : vms_crtl_values.c
 	$(CC)$(cflagsx) \
 	/object=$(MMS$TARGET) $(MMS$SOURCE)
 
-temp_stub.obj : temp_stub.c $(config_h)
-
-
 gnv$bash.exe : $(bash_objs) \
 	   [.builtins]builtins.obj,\
 	   [.builtins]common.obj,\
@@ -2428,11 +2433,10 @@ gnv$bash.exe : $(bash_objs) \
            libglob.olb \
 	   libintl.olb \
 	   [.lib.regex]regex.obj \
-	   libsh.olb temp_stub.obj
+	   libsh.olb
    $(LINK)$(LFLAGS)/exec=$(MMS$TARGET)/DSF=$(MMS$TARGET_NAME) \
 	/MAP=$(MMS$TARGET_NAME) \
 	 $(bash_objs),vms_crtl_init.obj,vms_crtl_values.obj,\
-	temp_stub.obj,\
 	[.builtins]builtins.obj,\
 	[.builtins]common.obj,\
         []libglob.olb/lib, \
@@ -2451,11 +2455,10 @@ bashdebug.exe : $(bash_objs), \
            libreadline.olb \
            libglob.olb \
 	   libintl.olb \
-	   libsh.olb temp_stub.obj
+	   libsh.olb
    $(LINK)$(LFLAGS)/debug/exec=$(MMS$TARGET)/DSF=$(MMS$TARGET_NAME) \
 	/MAP=$(MMS$TARGET_NAME) \
 	 $(bash_objs),vms_crtl_init.obj,vms_crtl_values.obj,\
-	temp_stub.obj,\
 	[.builtins]builtins.obj,\
 	[.builtins]common.obj,\
         []libglob.olb/lib, \

@@ -1,0 +1,36 @@
+! File fpurge_c.tpu
+!
+! Copyright 2022, Jake Hamby
+!
+! Permission to use, copy, modify, and/or distribute this software for any
+! purpose with or without fee is hereby granted, provided that the above
+! copyright notice and this permission notice appear in all copies.
+!
+! THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+! WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+! MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+! ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+! WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+! ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+! OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+!
+!============================================================================
+!
+!
+! Add correct definition of FILE* struct for OpenVMS.
+!
+find_range := SEARCH_QUIETLY('#if defined _IOERR', FORWARD, EXACT);
+POSITION(END_OF(find_range));
+
+srch_pattern := '# else' + LINE_END + LINE_BEGIN + '#  define fp_ fp';
+VMS_INSERT_BEFORE(srch_pattern, '# elif defined __VMS');
+COPY_TEXT('#  define fp_ (*fp)');
+SPLIT_LINE;
+
+find_range := SEARCH_QUIETLY('# elif defined _IOERR', FORWARD, EXACT);
+POSITION(END_OF(find_range));
+
+VMS_REPLACE('fp', 'fp_');
+VMS_REPLACE('fp', 'fp_');
+VMS_REPLACE('fp', 'fp_');
+VMS_REPLACE('fp', 'fp_');
