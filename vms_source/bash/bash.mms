@@ -57,7 +57,7 @@
 #===================================================================
 crepository = /repo=lcl_root:[bash.cxx_repository]
 cnames = /name=(as_i,shor)$(crepository)/fl=ieee/ieee=denorm
-clist = /list/show=(incl,expans)
+clist = /list
 cprefix = /pref=all
 cnowarn1 = unknownmacro,intconcastsgn,intconstsign,uninit2,questcompare2
 cnowarn2 = boolexprconst,knrfunc,embedcomment,nestedcomment,notconstqual,controlassign
