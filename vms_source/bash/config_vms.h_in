@@ -49,6 +49,11 @@
 #undef USE_MKDTEMP
 #endif
 
+/* Itanium defines this incorrectly */
+#ifdef HAVE_FNMATCH
+#undef HAVE_FNMATCH
+#endif
+
 /* use fast unlocked inline file functions */
 #define __STDIO_UNLOCK_CHAR_IO 1
 #define __UNIX_PUTC 1
