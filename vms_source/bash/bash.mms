@@ -1837,22 +1837,17 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 
 [.builtins]printf.c : [.builtins]printf.def [.builtins]mkbuiltins.exe
 
-[.builtins]gnv$printf.c_first : [.builtins]gnv_printf.c_first
-    $type $(MMS$SOURCE) /output=$(MMS$TARGET)
-
 [.builtins]printf.obj : [.builtins]printf.c $(config_h) bashtypes.h \
 		[.include]chartypes.h [.include]posixtime.h $(bashansi_h) \
 		$(bashintl_h) $(shell_h) [.include]shmbutil.h \
-		[.builtins]bashgetopt.h [.builtins]common.h \
-		[.builtins]gnv$printf.c_first
+		[.builtins]bashgetopt.h [.builtins]common.h
    $set def prj_root:[.builtins]
    $define/user decc$user_include prj_root:[]
    $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
-   $(CC)$(CFLAGS)/OBJ=printf.obj printf.c \
-	/first_include=gnv$printf.c_first
+   $(CC)$(CFLAGS)/OBJ=printf.obj printf.c
    $set def prj_root:[-]
 
 [.builtins]pushd.c : [.builtins]pushd.def [.builtins]mkbuiltins.exe

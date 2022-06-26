@@ -1154,7 +1154,6 @@ $		endif
 $!
 $		if keysym .eqs. "LONGLONG"
 $		then
-$		    write tf "#pragma message disable longlongtype"
 $		    write tf "#ifndef HAVE_LONGLONG"
 $		    write tf "#define HAVE_LONGLONG 1"
 $		    write tf "#endif"
@@ -1166,7 +1165,6 @@ $!-----------------------------------------------
 $		if (keysym .eqs. "LONG_LONG") .or. -
                    (keysym .eqs. "LONG_LONG_INT")
 $		then
-$		    write tf "#pragma message disable longlongtype"
 $		    write tf "#ifndef HAVE_''keysym'"
 $		    write tf "#define HAVE_''keysym' 1"
 $		    write tf "#endif"
@@ -1177,7 +1175,6 @@ $!		May need to test compiler version
 $!-----------------------------------------------
 $		if keysym .eqs. "UNSIGNED_LONG_LONG"
 $		then
-$		    write tf "#pragma message disable longlongtype"
 $		    write tf "#ifndef HAVE_UNSIGNED_LONG_LONG"
 $		    write tf "#define HAVE_UNSIGNED_LONG_LONG 1"
 $		    write tf "#endif"
@@ -1188,7 +1185,6 @@ $!		May need to test compiler version
 $!-----------------------------------------------
 $		if keysym .eqs. "UNSIGNED_LONG_LONG_INT"
 $		then
-$		    write tf "#pragma message disable longlongtype"
 $		    write tf "#ifndef HAVE_UNSIGNED_LONG_LONG_INT"
 $		    write tf "#define HAVE_UNSIGNED_LONG_LONG_INT 1"
 $		    write tf "#endif"
@@ -1199,7 +1195,6 @@ $!		May need to test compiler version
 $!-----------------------------------------------
 $		if keysym .eqs. "LONG_DOUBLE"
 $		then
-$		    write tf "#pragma message disable longlongtype"
 $		    write tf "#ifndef HAVE_LONG_DOUBLE"
 $		    write tf "#define HAVE_LONG_DOUBLE 1"
 $		    write tf "#endif"

@@ -26,62 +26,14 @@
 #define __NEW_STARLET 1
 #include <descrip.h>
 #include <efndef.h>
+#include <iledef.h>
+#include <iosbdef.h>
 #include <jpidef.h>
 #include <prcdef.h>
 #include <prvdef.h>
 #include <stsdef.h>
 #include <syidef.h>
-
-#ifdef __VAX
-typedef union prvdef PRVDEF;
-#endif
-
-/* These three are noise that the compiler generate for VMS specific code
- * in the more stricter modes
- */
-#pragma message disable pragma
-#pragma message disable dollarid
-#pragma message disable valuepres
-
-#pragma member_alignment save
-#pragma nomember_alignment longword
-struct item_list_3 {
-	unsigned short len;
-	unsigned short code;
-	void * bufadr;
-	unsigned short * retlen;
-};
-
-struct mbx_iosb {
-	unsigned short status;
-	unsigned short count;
-	unsigned long value;
-};
-
-#pragma member_alignment restore
-
-#pragma message save
-#pragma message disable noparmlist
-int SYS$GETJPIW
-       (unsigned long efn,
-	pid_t * pid,
-	const struct dsc$descriptor_s * prcnam,
-	const struct item_list_3 * itmlst,
-	void * iosb,
-	void (* astadr)(__unknown_params),
-	void * astprm,
-	void * nullarg);
-
-int SYS$GETSYIW
-       (unsigned long efn,
-	unsigned long * csi,
-	const struct dsc$descriptor_s * nodenam,
-	const struct item_list_3 * itmlst,
-	void * iosb,
-	void (* astadr)(__unknown_params),
-	void * astprm);
-
-#pragma message restore
+#include <starlet.h>
 
 /* Missing RLIMITS for ulimit builtin */
 
@@ -168,11 +120,7 @@ int SYS$GETSYIW
 #define HAVE_RESOURCE
 #define HAVE_GETRLIMIT 1
 /* We may need to fix these */
-/* #ifdef __VAX */
-/* #define RLIMIT_VMBLKSZ 1 */
-/* #else */
 /* #define RLIMIT_VMBLKSZ 8 */
-/* #endif */
 
 /* Swap size */
 #ifdef VMS_LIMIT_UNLIMITED
@@ -206,25 +154,24 @@ vms_getjpi_curpriv(PRVDEF *priv) {
 int result;
 int status;
 unsigned short result_len;
-struct item_list_3 itemlist[2];
-unsigned short jpi_iosb[4];
+struct _ile3 itemlist[2];
+struct _iosb jpi_iosb;
 
      result = 0;
 
      /* Soft limit is from sys$getjpiw */
-     itemlist[0].len = 4;
-     itemlist[0].code = JPI$_CURPRIV;
-     itemlist[0].bufadr = priv;
-     itemlist[0].retlen = &result_len;
-     itemlist[1].len = 0;
-     itemlist[1].code = 0;
+     itemlist[0].ile3$w_length = 4;
+     itemlist[0].ile3$w_code = JPI$_CURPRIV;
+     itemlist[0].ile3$ps_bufaddr = priv;
+     itemlist[0].ile3$ps_retlen_addr = &result_len;
+     itemlist[1].ile3$w_length = 0;
+     itemlist[1].ile3$w_code = 0;
 
     status = SYS$GETJPIW(EFN$C_ENF,
 			 0,
 			 NULL,
 			 itemlist,
-			 jpi_iosb,
-			 NULL,
+			 &jpi_iosb,
 			 NULL,
 			 0);
 
@@ -234,9 +181,9 @@ unsigned short jpi_iosb[4];
 	return -1;
     }
 
-    if (!$VMS_STATUS_SUCCESS(jpi_iosb[0])) {
+    if (!$VMS_STATUS_SUCCESS(jpi_iosb.iosb$w_status)) {
 	errno = EVMSERR;
-	vaxc$errno = jpi_iosb[0];
+	vaxc$errno = jpi_iosb.iosb$w_status;
 	return -1;
     }
 
@@ -249,18 +196,18 @@ vms_getrlimit_getjpi(int jpi_code, struct vms_rlimit *rlim) {
 int status;
 int result;
 unsigned short result_len;
-struct item_list_3 itemlist[2];
-unsigned short jpi_iosb[4];
+struct _ile3 itemlist[2];
+struct _iosb jpi_iosb;
 
      result = 0;
 
      /* Soft limit is from sys$getjpiw */
-     itemlist[0].len = 4;
-     itemlist[0].code = jpi_code;
-     itemlist[0].bufadr = &result;
-     itemlist[0].retlen = &result_len;
-     itemlist[1].len = 0;
-     itemlist[1].code = 0;
+     itemlist[0].ile3$w_length = 4;
+     itemlist[0].ile3$w_code = jpi_code;
+     itemlist[0].ile3$ps_bufaddr = &result;
+     itemlist[0].ile3$ps_retlen_addr = &result_len;
+     itemlist[1].ile3$w_length = 0;
+     itemlist[1].ile3$w_code = 0;
 
     status = SYS$GETJPIW
 	   (EFN$C_ENF,
@@ -268,7 +215,6 @@ unsigned short jpi_iosb[4];
 	    NULL,
 	    itemlist,
 	    &jpi_iosb,
-	    NULL,
 	    NULL,
 	    0);
 
@@ -278,9 +224,9 @@ unsigned short jpi_iosb[4];
 	return -1;
     }
 
-    if (!$VMS_STATUS_SUCCESS(jpi_iosb[0])) {
+    if (!$VMS_STATUS_SUCCESS(jpi_iosb.iosb$w_status)) {
 	errno = EVMSERR;
-	vaxc$errno = jpi_iosb[0];
+	vaxc$errno = jpi_iosb.iosb$w_status;
 	return -1;
     }
 
