@@ -2290,7 +2290,11 @@ redir.obj : redir.c $(config_h) bashtypes.h [.include]filecntl.h \
 gnv$shell.c_first : gnv_shell.c_first
     $type $(MMS$SOURCE) /output=$(MMS$TARGET)
 
-shell.obj : shell.c $(config_h) bashtypes.h [.include]posixstat.h \
+lcl_root:shell.c : src_root:shell.c []shell_c.tpu
+    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
+	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
+
+shell.obj : lcl_root:shell.c $(config_h) bashtypes.h [.include]posixstat.h \
 		[.include]posixtime.h $(bashansi_h) \
 		[.include]filecntl.h $(bashintl_h) $(shell_h) \
 		flags.h $(trap_h) $(jobs_h) input.h $(execute_cmd_h) \
@@ -2308,7 +2312,7 @@ shell.obj : shell.c $(config_h) bashtypes.h [.include]posixstat.h \
    $(CC)$(cflagsx)/define=\
 	(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1) \
 	/first_include=gnv$shell.c_first \
-	/OBJ=shell.obj shell.c
+	/OBJ=shell.obj lcl_root:shell.c
 
 lcl_root:sig.h : src_root:sig.h sig_h.tpu
     $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\

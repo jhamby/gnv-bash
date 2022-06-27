@@ -16,6 +16,12 @@
 !
 !============================================================================
 !
+! This function doesn't seem to do anything useful.
+!
+VMS_INSERT_BEFORE('void' + LINE_END + LINE_BEGIN + 'check_dev_tty', '#ifndef __VMS');
+VMS_INSERT_AFTER(LINE_BEGIN + '}', '#endif');
+
+!
 ! VMS specific patches needed.
 !
 ! On OpenVMS, the function confstr() does not return a meaningful string
