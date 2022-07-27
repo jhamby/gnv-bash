@@ -62,7 +62,7 @@ extern int errno;
 /* The number of slots to increase the_history by. */
 #define DEFAULT_HISTORY_GROW_SIZE 50
 
-static char *hist_inittime PARAMS((void));
+static char *hist_inittime (void);
 
 /* **************************************************************** */
 /*								    */
@@ -75,7 +75,7 @@ static HIST_ENTRY **the_history = (HIST_ENTRY **)NULL;
 
 /* Non-zero means that we have enforced a limit on the amount of
    history that we save. */
-static int history_stifled;
+static bool history_stifled;
 
 /* The current number of slots allocated to the input_history. */
 static int history_size;
@@ -139,7 +139,7 @@ using_history (void)
 int
 history_total_bytes (void)
 {
-  register int i, result;
+  int i, result;
 
   for (i = result = 0; the_history && the_history[i]; i++)
     result += HISTENT_BYTES (the_history[i]);
@@ -165,7 +165,7 @@ history_set_pos (int pos)
   history_offset = pos;
   return (1);
 }
- 
+
 /* Return the current history array.  The caller has to be careful, since this
    is the actual array of data, and could be bashed or made corrupt easily.
    The array is terminated with a NULL pointer. */
@@ -276,8 +276,6 @@ add_history (const char *string)
 
   if (history_stifled && (history_length == history_max_entries))
     {
-      register int i;
-
       /* If the history is stifled, and history_length is zero,
 	 and it equals history_max_entries, we don't save items. */
       if (history_length == 0)
@@ -373,7 +371,7 @@ copy_history_entry (HIST_ENTRY *hist)
 
   return ret;
 }
-  
+
 /* Make the history entry at WHICH have LINE and DATA.  This returns
    the old entry so you can dispose of the data.  In the case of an
    invalid WHICH, a NULL pointer is returned. */
@@ -420,7 +418,7 @@ _hs_append_history_line (int which, const char *line)
     newlen = minlen;
   /* Assume that realloc returns the same pointer and doesn't try a new
      alloc/copy if the new size is the same as the one last passed. */
-  newline = realloc (hent->line, newlen);
+  newline = (char *)realloc (hent->line, newlen);
   if (newline)
     {
       hent->line = newline;
@@ -436,66 +434,56 @@ _hs_append_history_line (int which, const char *line)
    WHICH >= 0 means to replace that particular history entry's data, as
    long as it matches OLD. */
 void
-_hs_replace_history_data (int which, histdata_t *old, histdata_t *new)
+_hs_replace_history_data (int which, histdata_t *old, histdata_t *new_)
 {
-  HIST_ENTRY *entry;
-  register int i, last;
-
   if (which < -2 || which >= history_length || history_length == 0 || the_history == 0)
     return;
 
   if (which >= 0)
     {
-      entry = the_history[which];
+      HIST_ENTRY *entry = the_history[which];
       if (entry && entry->data == old)
-	entry->data = new;
+	entry->data = new_;
       return;
     }
 
-  last = -1;
-  for (i = 0; i < history_length; i++)
+  int last = -1;
+  for (int i = 0; i < history_length; i++)
     {
-      entry = the_history[i];
+      HIST_ENTRY *entry = the_history[i];
       if (entry == 0)
 	continue;
       if (entry->data == old)
 	{
 	  last = i;
 	  if (which == -1)
-	    entry->data = new;
+	    entry->data = new_;
 	}
     }
   if (which == -2 && last >= 0)
     {
-      entry = the_history[last];
-      entry->data = new;	/* XXX - we don't check entry->old */
+      HIST_ENTRY *entry = the_history[last];
+      entry->data = new_;	/* XXX - we don't check entry->old */
     }
-}      
-  
+}
+
 /* Remove history element WHICH from the history.  The removed
    element is returned to you so you can free the line, data,
    and containing structure. */
 HIST_ENTRY *
 remove_history (int which)
 {
-  HIST_ENTRY *return_value;
-  register int i;
-#if 1
-  int nentries;
-  HIST_ENTRY **start, **end;
-#endif
-
   if (which < 0 || which >= history_length || history_length ==  0 || the_history == 0)
     return ((HIST_ENTRY *)NULL);
 
-  return_value = the_history[which];
+  HIST_ENTRY *return_value = the_history[which];
 
 #if 1
   /* Copy the rest of the entries, moving down one slot.  Copy includes
      trailing NULL.  */
-  nentries = history_length - which;
-  start = the_history + which;
-  end = start + 1;
+  int nentries = history_length - which;
+  HIST_ENTRY **start = the_history + which;
+  HIST_ENTRY **end = start + 1;
   memmove (start, end, nentries * sizeof (HIST_ENTRY *));
 #else
   for (i = which; i < history_length; i++)
@@ -510,11 +498,6 @@ remove_history (int which)
 HIST_ENTRY **
 remove_history_range (int first, int last)
 {
-  HIST_ENTRY **return_value;
-  register int i;
-  int nentries;
-  HIST_ENTRY **start, **end;
-
   if (the_history == 0 || history_length == 0)
     return ((HIST_ENTRY **)NULL);
   if (first < 0 || first >= history_length || last < 0 || last >= history_length)
@@ -522,20 +505,21 @@ remove_history_range (int first, int last)
   if (first > last)
     return (HIST_ENTRY **)NULL;
 
-  nentries = last - first + 1;
-  return_value = (HIST_ENTRY **)malloc ((nentries + 1) * sizeof (HIST_ENTRY *));
+  int nentries = last - first + 1;
+  HIST_ENTRY **return_value = (HIST_ENTRY **)malloc ((nentries + 1) * sizeof (HIST_ENTRY *));
   if (return_value == 0)
     return return_value;
 
   /* Return all the deleted entries in a list */
+  int i;
   for (i = first ; i <= last; i++)
     return_value[i - first] = the_history[i];
   return_value[i - first] = (HIST_ENTRY *)NULL;
 
   /* Copy the rest of the entries, moving down NENTRIES slots.  Copy includes
      trailing NULL.  */
-  start = the_history + first;
-  end = the_history + last + 1;
+  HIST_ENTRY **start = the_history + first;
+  HIST_ENTRY **end = the_history + last + 1;
   memmove (start, end, (history_length - last) * sizeof (HIST_ENTRY *));
 
   history_length -= nentries;
@@ -547,13 +531,12 @@ remove_history_range (int first, int last)
 void
 stifle_history (int max)
 {
-  register int i, j;
-
   if (max < 0)
     max = 0;
 
   if (history_length > max)
     {
+      int i, j;
       /* This loses because we cannot free the data. */
       for (i = 0, j = history_length - max; i < j; i++)
 	free_history_entry (the_history[i]);
@@ -565,7 +548,7 @@ stifle_history (int max)
       history_length = j;
     }
 
-  history_stifled = 1;
+  history_stifled = true;
   max_input_history = history_max_entries = max;
 }
 
@@ -577,7 +560,7 @@ unstifle_history (void)
 {
   if (history_stifled)
     {
-      history_stifled = 0;
+      history_stifled = false;
       return (history_max_entries);
     }
   else
@@ -593,10 +576,8 @@ history_is_stifled (void)
 void
 clear_history (void)
 {
-  register int i;
-
   /* This loses because we cannot free the data. */
-  for (i = 0; i < history_length; i++)
+  for (int i = 0; i < history_length; i++)
     {
       free_history_entry (the_history[i]);
       the_history[i] = (HIST_ENTRY *)NULL;

@@ -43,7 +43,7 @@
 
 extern time_t shell_start_time;
 
-extern int mailstat PARAMS((const char *, struct stat *));
+extern int mailstat (const char *, struct stat *);
 
 typedef struct _fileinfo {
   char *name;
@@ -64,21 +64,21 @@ static int mailfiles_count;
 static time_t last_time_mail_checked = 0;
 
 /* Non-zero means warn if a mail file has been read since last checked. */
-int mail_warning;
+char mail_warning;
 
-static int find_mail_file PARAMS((char *));
-static void init_mail_file PARAMS((int));
-static void update_mail_file PARAMS((int));
-static int add_mail_file PARAMS((char *, char *));
+static int find_mail_file (char *);
+static void init_mail_file (int);
+static void update_mail_file (int);
+static int add_mail_file (char *, char *);
 
-static FILEINFO *alloc_mail_file PARAMS((char *, char *));
-static void dispose_mail_file PARAMS((FILEINFO *));
+static FILEINFO *alloc_mail_file (char *, char *);
+static void dispose_mail_file (FILEINFO *);
 
-static int file_mod_date_changed PARAMS((int));
-static int file_access_date_changed PARAMS((int));
-static int file_has_grown PARAMS((int));
+static bool file_mod_date_changed (int);
+static bool file_access_date_changed (int);
+static bool file_has_grown (int);
 
-static char *parse_mailpath_spec PARAMS((char *));
+static char *parse_mailpath_spec (char *);
 
 /* Returns non-zero if it is time to check mail. */
 int
@@ -112,10 +112,9 @@ reset_mail_timer ()
 /* Locate a file in the list.  Return index of
    entry, or -1 if not found. */
 static int
-find_mail_file (file)
-     char *file;
+find_mail_file (char *file)
 {
-  register int i;
+  int i;
 
   for (i = 0; i < mailfiles_count; i++)
     if (STREQ (mailfiles[i]->name, file))
@@ -144,8 +143,7 @@ find_mail_file (file)
   while (0)
 
 static void
-init_mail_file (i)
-     int i;
+init_mail_file (int i)
 {
   mailfiles[i]->access_time = mailfiles[i]->mod_time = last_time_mail_checked ? last_time_mail_checked : shell_start_time;
   mailfiles[i]->file_size = 0;
@@ -153,8 +151,7 @@ init_mail_file (i)
 }
 
 static void
-update_mail_file (i)
-     int i;
+update_mail_file (int i)
 {
   char *file;
   struct stat finfo;
@@ -169,8 +166,7 @@ update_mail_file (i)
 /* Add this file to the list of remembered files and return its index
    in the list of mail files. */
 static int
-add_mail_file (file, msg)
-     char *file, *msg;
+add_mail_file (char *file, char *msg)
 {
   struct stat finfo;
   char *filename;
@@ -201,15 +197,14 @@ add_mail_file (file, msg)
 void
 reset_mail_files ()
 {
-  register int i;
+  int i;
 
   for (i = 0; i < mailfiles_count; i++)
     RESET_MAIL_FILE (i);
 }
 
 static FILEINFO *
-alloc_mail_file (filename, msg)
-     char *filename, *msg;
+alloc_mail_file (char *filename, char *msg)
 {
   FILEINFO *mf;
 
@@ -222,8 +217,7 @@ alloc_mail_file (filename, msg)
 }
 
 static void
-dispose_mail_file (mf)
-     FILEINFO *mf;
+dispose_mail_file (FILEINFO *mf)
 {
   free (mf->name);
   FREE (mf->msg);
@@ -234,7 +228,7 @@ dispose_mail_file (mf)
 void
 free_mail_files ()
 {
-  register int i;
+  int i;
 
   for (i = 0; i < mailfiles_count; i++)
     dispose_mail_file (mailfiles[i]);
@@ -256,9 +250,8 @@ init_mail_dates ()
 /* Return non-zero if FILE's mod date has changed and it has not been
    accessed since modified.  If the size has dropped to zero, reset
    the cached mail file info. */
-static int
-file_mod_date_changed (i)
-     int i;
+static bool
+file_mod_date_changed (int i)
 {
   time_t mtime;
   struct stat finfo;
@@ -268,7 +261,7 @@ file_mod_date_changed (i)
   mtime = mailfiles[i]->mod_time;
 
   if (mailstat (file, &finfo) != 0)
-    return (0);
+    return false;
 
   if (finfo.st_size > 0)
     return (mtime < finfo.st_mtime);
@@ -276,13 +269,12 @@ file_mod_date_changed (i)
   if (finfo.st_size == 0 && mailfiles[i]->file_size > 0)
     UPDATE_MAIL_FILE (i, finfo);
 
-  return (0);
+  return false;
 }
 
 /* Return non-zero if FILE's access date has changed. */
-static int
-file_access_date_changed (i)
-     int i;
+static bool
+file_access_date_changed (int i)
 {
   time_t atime;
   struct stat finfo;
@@ -292,18 +284,17 @@ file_access_date_changed (i)
   atime = mailfiles[i]->access_time;
 
   if (mailstat (file, &finfo) != 0)
-    return (0);
+    return false;
 
   if (finfo.st_size > 0)
     return (atime < finfo.st_atime);
 
-  return (0);
+  return false;
 }
 
 /* Return non-zero if FILE's size has increased. */
-static int
-file_has_grown (i)
-     int i;
+static bool
+file_has_grown (int i)
 {
   off_t size;
   struct stat finfo;
@@ -319,8 +310,7 @@ file_has_grown (i)
    the first unquoted `?' or `%' to the end of the string.  This is the
    message to be printed when the file contents change. */
 static char *
-parse_mailpath_spec (str)
-     char *str;
+parse_mailpath_spec (char *str)
 {
   char *s;
   int pass_next;
@@ -367,11 +357,7 @@ make_default_mailpath ()
 void
 remember_mail_dates ()
 {
-  char *mailpaths;
-  char *mailfile, *mp;
-  int i = 0;
-
-  mailpaths = get_string_value ("MAILPATH");
+  char *mailpaths = get_string_value ("MAILPATH");
 
   /* If no $MAILPATH, but $MAIL, use that as a single filename to check. */
   if (mailpaths == 0 && (mailpaths = get_string_value ("MAIL")))
@@ -391,9 +377,11 @@ remember_mail_dates ()
       return;
     }
 
-  while (mailfile = extract_colon_unit (mailpaths, &i))
+  char *mailfile;
+  int i = 0;
+  while ((mailfile = extract_colon_unit (mailpaths, &i)))
     {
-      mp = parse_mailpath_spec (mailfile);
+      char *mp = parse_mailpath_spec (mailfile);
       if (mp && *mp)
 	*mp++ = '\0';
       add_mail_file (mailfile, mp);
@@ -416,27 +404,25 @@ remember_mail_dates ()
 void
 check_mail ()
 {
-  char *current_mail_file, *message;
-  int i, use_user_notification;
-  char *dollar_underscore, *temp;
+//   char *current_mail_file, *message;
+//   int i, use_user_notification;
+//   char *dollar_underscore, *temp;
 
-  dollar_underscore = get_string_value ("_");
+  char *dollar_underscore = get_string_value ("_");
   if (dollar_underscore)
     dollar_underscore = savestring (dollar_underscore);
 
-  for (i = 0; i < mailfiles_count; i++)
+  for (int i = 0; i < mailfiles_count; i++)
     {
-      current_mail_file = mailfiles[i]->name;
+      char *current_mail_file = mailfiles[i]->name;
 
       if (*current_mail_file == '\0')
 	continue;
 
       if (file_mod_date_changed (i))
 	{
-	  int file_is_bigger;
-
-	  use_user_notification = mailfiles[i]->msg != (char *)NULL;
-	  message = mailfiles[i]->msg ? mailfiles[i]->msg : _("You have mail in $_");
+	  bool use_user_notification = mailfiles[i]->msg != (char *)NULL;
+	  const char *message = mailfiles[i]->msg ? mailfiles[i]->msg : _("You have mail in $_");
 
 	  bind_variable ("_", current_mail_file, 0);
 
@@ -445,7 +431,7 @@ check_mail ()
 
 	  /* Have to compute this before the call to update_mail_file, which
 	     resets all the information. */
-	  file_is_bigger = file_has_grown (i);
+	  bool file_is_bigger = file_has_grown (i);
 
 	  update_mail_file (i);
 
@@ -465,7 +451,8 @@ check_mail ()
 #undef atime
 #undef mtime
 
-	  if (temp = expand_string_to_string (message, Q_DOUBLE_QUOTES))
+	  char *temp;
+	  if ((temp = expand_string_to_string (message, Q_DOUBLE_QUOTES)))
 	    {
 	      puts (temp);
 	      free (temp);

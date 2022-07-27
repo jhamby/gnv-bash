@@ -73,10 +73,7 @@ extern int errno;
    the inode corresponding to PATH/DIR is identical to THISINO. */
 #if !defined (D_FILENO_AVAILABLE)
 static int
-_path_checkino (dotp, name, thisino)
-     char *dotp;
-     char *name;
-     ino_t thisino;
+_path_checkino (const char *dotp, const char *name, ino_t thisino)
 {
   char *fullpath;
   int r, e;
@@ -94,7 +91,7 @@ _path_checkino (dotp, name, thisino)
   return (st.st_ino == thisino);
 }
 #endif
-    
+
 /* Get the pathname of the current working directory,
    and put it in SIZE bytes of BUF.  Returns NULL if the
    directory couldn't be determined or SIZE was too small.
@@ -102,15 +99,8 @@ _path_checkino (dotp, name, thisino)
    an array is allocated with `malloc'; the array is SIZE
    bytes long, unless SIZE <= 0, in which case it is as
    big as necessary.  */
-#if defined (__STDC__)
 char *
 getcwd (char *buf, size_t size)
-#else /* !__STDC__ */
-char *
-getcwd (buf, size)
-     char *buf;
-     size_t size;
-#endif /* !__STDC__ */
 {
   static const char dots[]
     = "../../../../../../../../../../../../../../../../../../../../../../../\
@@ -121,7 +111,7 @@ getcwd (buf, size)
   dev_t rootdev, thisdev;
   ino_t rootino, thisino;
   char path[PATH_MAX + 1];
-  register char *pathp;
+  char *pathp;
   char *pathbuf;
   size_t pathsize;
   struct stat st;
@@ -155,8 +145,6 @@ getcwd (buf, size)
   dotlist = dots;
   while (!(thisdev == rootdev && thisino == rootino))
     {
-      register DIR *dirstream;
-      register struct dirent *d;
       dev_t dotdev;
       ino_t dotino;
       char mount_point;
@@ -166,25 +154,25 @@ getcwd (buf, size)
       if (dotp == dotlist)
 	{
 	  /* My, what a deep directory tree you have, Grandma.  */
-	  char *new;
+	  char *new_;
 	  if (dotlist == dots)
 	    {
-	      new = (char *)malloc (dotsize * 2 + 1);
-	      if (new == NULL)
+	      new_ = (char *)malloc (dotsize * 2 + 1);
+	      if (new_ == NULL)
 		goto lose;
-	      memcpy (new, dots, dotsize);
+	      memcpy (new_, dots, dotsize);
 	    }
 	  else
 	    {
-	      new = (char *)realloc ((PTR_T) dotlist, dotsize * 2 + 1);
-	      if (new == NULL)
+	      new_ = (char *)realloc ((PTR_T) dotlist, dotsize * 2 + 1);
+	      if (new_ == NULL)
 		goto lose;
 	    }
-	  memcpy (&new[dotsize], new, dotsize);
-	  dotp = &new[dotsize];
+	  memcpy (&new_[dotsize], new_, dotsize);
+	  dotp = &new_[dotsize];
 	  dotsize *= 2;
-	  new[dotsize] = '\0';
-	  dotlist = new;
+	  new_[dotsize] = '\0';
+	  dotlist = new_;
 	}
 
       dotp -= 3;
@@ -197,9 +185,10 @@ getcwd (buf, size)
       mount_point = dotdev != thisdev;
 
       /* Search for the last directory.  */
-      dirstream = opendir (dotp);
+      DIR *dirstream = opendir (dotp);
       if (dirstream == NULL)
 	goto lose;
+      struct dirent *d;
       while ((d = readdir (dirstream)) != NULL)
 	{
 	  if (d->d_name[0] == '.' &&
@@ -253,24 +242,24 @@ getcwd (buf, size)
 
 	  while ((space = pathp - pathbuf) <= namlen)
 	    {
-	      char *new;
+	      char *new_;
 
 	      if (pathbuf == path)
 		{
-		  new = (char *)malloc (pathsize * 2);
-		  if (!new)
+		  new_ = (char *)malloc (pathsize * 2);
+		  if (!new_)
 		    goto lose;
 		}
 	      else
 		{
-		  new = (char *)realloc ((PTR_T) pathbuf, (pathsize * 2));
-		  if (!new)
+		  new_ = (char *)realloc ((PTR_T) pathbuf, (pathsize * 2));
+		  if (!new_)
 		    goto lose;
-		  pathp = new + space;
+		  pathp = new_ + space;
 		}
-	      (void) memcpy (new + pathsize + space, pathp, pathsize - space);
-	      pathp = new + pathsize + space;
-	      pathbuf = new;
+	      (void) memcpy (new_ + pathsize + space, pathp, pathsize - space);
+	      pathp = new_ + pathsize + space;
+	      pathbuf = new_;
 	      pathsize *= 2;
 	    }
 
@@ -335,9 +324,7 @@ getcwd (buf, size)
 
 #if defined (TEST)
 #  include <stdio.h>
-main (argc, argv)
-     int argc;
-     char **argv;
+main (int argc, char **argv)
 {
   char b[PATH_MAX];
 

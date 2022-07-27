@@ -3,7 +3,7 @@
 /* Copyright (C) 1987-2017 Free Software Foundation, Inc.
 
    This file is part of the GNU Readline Library (Readline), a library
-   for reading lines of text with interactive input and history editing.      
+   for reading lines of text with interactive input and history editing.
 
    Readline is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -49,14 +49,14 @@
 #if defined (HANDLE_SIGNALS)
 
 #if !defined (RETSIGTYPE)
-#  if defined (VOID_SIGHANDLER)
+#  if defined (VOID_SIGHANDLER) || defined(__cplusplus)	/* XXX: bad autoconf result in C++ mode */
 #    define RETSIGTYPE void
 #  else
 #    define RETSIGTYPE int
 #  endif /* !VOID_SIGHANDLER */
 #endif /* !RETSIGTYPE */
 
-#if defined (VOID_SIGHANDLER)
+#if defined (VOID_SIGHANDLER) || defined(__cplusplus)	/* XXX: bad autoconf result in C++ mode */
 #  define SIGHANDLER_RETURN return
 #else
 #  define SIGHANDLER_RETURN return (0)
@@ -64,7 +64,7 @@
 
 /* This typedef is equivalent to the one for Function; it allows us
    to say SigHandler *foo = signal (SIGKILL, SIG_IGN); */
-typedef RETSIGTYPE SigHandler ();
+typedef RETSIGTYPE SigHandler (int sig);
 
 #if defined (HAVE_POSIX_SIGNALS)
 typedef struct sigaction sighandler_cxt;
@@ -78,13 +78,13 @@ typedef struct { SigHandler *sa_handler; int sa_mask, sa_flags; } sighandler_cxt
 #  define SA_RESTART 0
 #endif
 
-static SigHandler *rl_set_sighandler PARAMS((int, SigHandler *, sighandler_cxt *));
-static void rl_maybe_set_sighandler PARAMS((int, SigHandler *, sighandler_cxt *));
-static void rl_maybe_restore_sighandler PARAMS((int, sighandler_cxt *));
+static SigHandler *rl_set_sighandler (int, SigHandler *, sighandler_cxt *);
+static void rl_maybe_set_sighandler (int, SigHandler *, sighandler_cxt *);
+static void rl_maybe_restore_sighandler (int, sighandler_cxt *);
 
-static RETSIGTYPE rl_signal_handler PARAMS((int));
-static RETSIGTYPE _rl_handle_signal PARAMS((int));
-     
+static RETSIGTYPE rl_signal_handler (int);
+static RETSIGTYPE _rl_handle_signal (int);
+
 /* Exported variables for use by applications. */
 
 /* If non-zero, readline will install its own signal handlers for
@@ -103,14 +103,14 @@ int volatile _rl_caught_signal = 0;	/* should be sig_atomic_t, but that requires
 
 /* If non-zero, print characters corresponding to received signals as long as
    the user has indicated his desire to do so (_rl_echo_control_chars). */
-int _rl_echoctl = 0;
+bool _rl_echoctl = false;
 
 int _rl_intr_char = 0;
 int _rl_quit_char = 0;
 int _rl_susp_char = 0;
 
-static int signals_set_flag;
-static int sigwinch_set_flag;
+static bool signals_set_flag;
+static bool sigwinch_set_flag;
 
 #if defined (HAVE_POSIX_SIGNALS)
 sigset_t _rl_orig_sigset;
@@ -320,7 +320,7 @@ _rl_handle_signal (int sig)
 #endif /* !HAVE_POSIX_SIGNALS */
 #endif
 
-      rl_reset_after_signal ();      
+      rl_reset_after_signal ();
     }
 
   RL_UNSETSTATE(RL_STATE_SIGHANDLER);
@@ -465,10 +465,10 @@ rl_set_signals (void)
       sigaddset (&bset, SIGTTOU);
 #endif
       sigmask_set = 1;
-    }      
+    }
 #endif /* HAVE_POSIX_SIGNALS */
 
-  if (rl_catch_signals && signals_set_flag == 0)
+  if (rl_catch_signals && !signals_set_flag)
     {
 #if defined (HAVE_POSIX_SIGNALS)
       sigemptyset (&_rl_orig_sigset);
@@ -510,7 +510,7 @@ rl_set_signals (void)
       rl_maybe_set_sighandler (SIGTTIN, rl_signal_handler, &old_ttin);
 #endif /* SIGTTIN */
 
-      signals_set_flag = 1;
+      signals_set_flag = true;
 
 #if defined (HAVE_POSIX_SIGNALS)
       sigprocmask (SIG_SETMASK, &_rl_orig_sigset, (sigset_t *)NULL);
@@ -525,10 +525,10 @@ rl_set_signals (void)
     }
 
 #if defined (SIGWINCH)
-  if (rl_catch_sigwinch && sigwinch_set_flag == 0)
+  if (rl_catch_sigwinch && !sigwinch_set_flag)
     {
       rl_maybe_set_sighandler (SIGWINCH, rl_sigwinch_handler, &old_winch);
-      sigwinch_set_flag = 1;
+      sigwinch_set_flag = true;
     }
 #endif /* SIGWINCH */
 
@@ -540,7 +540,7 @@ rl_clear_signals (void)
 {
   sighandler_cxt dummy;
 
-  if (rl_catch_signals && signals_set_flag == 1)
+  if (rl_catch_signals && signals_set_flag)
     {
       /* Since rl_maybe_set_sighandler doesn't override a SIG_IGN handler,
 	 we should in theory not have to restore a handler where
@@ -571,15 +571,15 @@ rl_clear_signals (void)
       rl_maybe_restore_sighandler (SIGTTIN, &old_ttin);
 #endif /* SIGTTIN */
 
-      signals_set_flag = 0;
+      signals_set_flag = false;
     }
 
 #if defined (SIGWINCH)
-  if (rl_catch_sigwinch && sigwinch_set_flag == 1)
+  if (rl_catch_sigwinch && sigwinch_set_flag)
     {
       sigemptyset (&dummy.sa_mask);
       rl_sigaction (SIGWINCH, &old_winch, &dummy);
-      sigwinch_set_flag = 0;
+      sigwinch_set_flag = false;
     }
 #endif
 
@@ -610,11 +610,11 @@ rl_reset_after_signal (void)
 /* Free up the readline variable line state for the current line (undo list,
    any partial history entry, any keyboard macros in progress, and any
    numeric arguments in process) after catching a signal, before calling
-   rl_cleanup_after_signal(). */ 
+   rl_cleanup_after_signal(). */
 void
 rl_free_line_state (void)
 {
-  register HIST_ENTRY *entry;
+  HIST_ENTRY *entry;
 
   rl_free_undo_list ();
 
@@ -748,7 +748,7 @@ rl_echo_signal_char (int sig)
   char cstr[3];
   int cslen, c;
 
-  if (_rl_echoctl == 0 || _rl_echo_control_chars == 0)
+  if (!_rl_echoctl || !_rl_echo_control_chars)
     return;
 
   switch (sig)
