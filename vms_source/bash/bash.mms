@@ -59,13 +59,10 @@ crepository = /repo=lcl_root:[bash.cxx_repository]
 cnames = /name=(as_i,shor)$(crepository)/fl=ieee/ieee=denorm
 clist = /list
 cprefix = /pref=all
-cnowarn1 = unknownmacro,intconcastsgn,intconstsign,uninit2,questcompare2
-cnowarn2 = boolexprconst,knrfunc,embedcomment,nestedcomment,notconstqual,controlassign
-cnowarn = $(cnowarn1),$(cnowarn2)
-cwarn1 = defunct,obsolescent,questcode
-cwarn = /warnings=(enable=($(cwarn1)),disable=($(cnowarn)))
+cnowarn = missingreturn,conptrlosbit
+cwarn = /warnings=(disable=($(cnowarn)))
 #cinc1 = prj_root:[],prj_root:[.include],prj_root:[.lib.intl],prj_root:[.lib.sh]
-cinc2 = /nested=none
+cinc2 = /nested=none/Opt=(Lev=5)
 cinc = $(cinc2)
 #
 # Force the status of the HAVE_REGEX_H, HAVE_REGCOMP, and HAVE_REGEXEC macros on
@@ -74,8 +71,8 @@ cinc = $(cinc2)
 # via [.lib.sh]shmatch.c. Note that this cannot be done via config_h.com because
 # configure does not have tests for these macros; So they must be manually set.
 #
-cdefs = /define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,HAVE_REGEX_H=1,\
-HAVE_REGCOMP=1,HAVE_REGEXEC=1)
+cdefs = /define=(VMS=1,_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,HAVE_REGEX_H=1,\
+HAVE_REGCOMP=1,HAVE_REGEXEC=1,__POSIX_TTYNAME=1)/noexceptions/nortti
 cflags = $(cnames)/debu$(clist)$(cprefix)$(cwarn)$(cinc)$(cdefs)
 cflagsx = $(cnames)/debu$(clist)$(cprefix)$(cwarn)$(cinc2)
 
@@ -87,6 +84,11 @@ UNIX_2_VMS = /COMM=prj_root:unix_c_to_vms_c.tpu
 
 EVE = EDIT/TPU/SECT=EVE$SECTION/NODISP
 
+# Use C++ compiler.
+#==================
+
+CC = CXX
+LINK = CXXLINK
 
 # Set up the rules for use.
 #===========================================
@@ -101,8 +103,8 @@ EVE = EDIT/TPU/SECT=EVE$SECTION/NODISP
    $define/user readline prj_root:[.lib.readline]
    $define/user glob prj_root:[.lib.glob]
    $define/user tilde prj_root:[.lib.tilde]
-   $define/user decc$system_include prj_root:[],prj_root:[.include]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[],prj_root:[.include]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
@@ -165,7 +167,6 @@ libsh_objs =	"cltck"=[.lib.sh]clktck.obj,\
                 "strtoull"=[.lib.sh]strtoull.obj,\
 		"fmtumax"=[.lib.sh]fmtumax.obj,\
                 "netconn"=[.lib.sh]netconn.obj,\
-		"mktime"=[.lib.sh]mktime.obj,\
                 "memset"=[.lib.sh]memset.obj,\
                 "mbschr"=[.lib.sh]mbschr.obj,\
 		"zcatfd"=[.lib.sh]zcatfd.obj,\
@@ -465,7 +466,7 @@ variables_h = variables.h array.h assoc.h hashlib.h conftypes.h
 shell_h = shell.h bashjmp.h, [.include]posixjmp.h, command.h syntax.h \
 	$(general_h) lcl_root:error.h $(variables_h) arrayfunc.h quit.h \
 	[.include]maxpath.h unwind_prot.h dispose_cmd.h make_cmd.h \
-        [.include]ocache.h subst.h lcl_root:sig.h pathnames.h lcl_root:externs.h
+        [.include]ocache.h subst.h sig.h pathnames.h externs.h
 
 termios_h = vms_term.h, vms_terminal_io.h bits_termios.h
 
@@ -647,8 +648,8 @@ signames.obj : [.support]signames.c $(config_h)
 mksignames.obj : [.support]mksignames.c $(config_h)
 
 buildsignames.obj : [.support]signames.c $(config_h)
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
@@ -712,8 +713,8 @@ gnv$version.c_first : gnv_version.c_first
     $copy $(MMS$SOURCE) $(MMS$TARGET)
 
 version.obj : version.c version.h gnv$version.c_first vms_eco_level.h
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
@@ -725,8 +726,8 @@ lcl_root:[.lib]regex.DIR :
 
 [.lib.regex]regex.obj : vms_root:[.lib.regex]regex.c, \
                         $(config_h)
-   $define/user decc$system_include prj_root:[.lib.regex], prj_root:[bash]
-   $define/user decc$user_include prj_root:[.lib.regex], prj_root:[.include]
+   $define/user cxx$system_include prj_root:[.lib.regex], prj_root:[bash]
+   $define/user cxx$user_include prj_root:[.lib.regex], prj_root:[.include]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
 
 # libsh
@@ -752,8 +753,8 @@ libsh.olb : libsh($(libsh_objs))
 
 [.lib.sh]eaccess.obj : [.lib.sh]eaccess.c $(config_h) \
 	bashtypes.h $(bashansi_h) [.include]posixstat.h
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
@@ -812,7 +813,7 @@ lcl_root:[.lib.sh]input_avail.c : src_root:[.lib.sh]input_avail.c \
 
 #[.lib.sh]memset.obj : [.lib.sh]memset.c
 
-[.lib.sh]mktime.obj : [.lib.sh]mktime.c $(config_h)
+#[.lib.sh]mktime.obj : [.lib.sh]mktime.c $(config_h)
 
 [.lib.sh]netconn.obj : [.lib.sh]netconn.c $(config_h) \
 	bashtypes.h
@@ -826,8 +827,8 @@ lcl_root:[.lib.sh]input_avail.c : src_root:[.lib.sh]input_avail.c \
 [.lib.sh]oslib.obj : [.lib.sh]oslib.c $(config_h) \
 		bashtypes.h $(bashansi_h) $(shell_h) [.include]posixstat.h \
 		[.lib.sh]gnv$oslib.c_first
-   $define/user decc$system_include prj_root:[],prj_root:[.include]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[],prj_root:[.include]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
@@ -846,7 +847,7 @@ lcl_root:[.lib.sh]input_avail.c : src_root:[.lib.sh]input_avail.c \
 		$(config_h) $(xmalloc_h)
 
 [.lib.sh]shmatch.obj : [.lib.sh]shmatch.c $(config_h) \
-		$(bashansi_h) regex.h $(shell_h) $(variables_h) lcl_root:externs.h
+		$(bashansi_h) regex.h $(shell_h) $(variables_h) externs.h
 
 [.lib.sh]shmbchar.obj : [.lib.sh]shmbchar.c $(config_h) \
 		[.include]shmbutil.h [.include]shmbchar.h
@@ -918,7 +919,11 @@ strtol_c = [.lib.sh]strtol.c, $(config_h), $(bashansi_h) [.include]chartypes.h
 [.lib.sh]ufuncs.obj : [.lib.sh]ufuncs.c $(config_h) \
 		bashtypes.h
 
-[.lib.sh]unicode.obj : [.lib.sh]unicode.c
+lcl_root:[.lib.sh]unicode.c : src_root:[.lib.sh]unicode.c [.lib.sh]unicode_c.tpu
+    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
+	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
+
+[.lib.sh]unicode.obj : lcl_root:[.lib.sh]unicode.c
 
 [.lib.sh]vprint.obj : [.lib.sh]vprint.c $(config_h)
 
@@ -984,7 +989,7 @@ libreadline.olb : libreadline($(libreadline_objs))
 #   $define/user readline prj_root:[.lib.readline]
 #   $define/user glob prj_root:[.lib.glob]
 #   $define/user tilde prj_root:[.lib.tilde]
-#   $define/user decc$user_include prj_root:[.lib.readline]
+#   $define/user cxx$user_include prj_root:[.lib.readline]
 
 emacs_keymap_c = [.lib.readline]emacs_keymap.c $(readline_readline_h)
 vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
@@ -1030,8 +1035,8 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
 		$(readline_rlshell_h) $(xmalloc_h) \
 		[.lib.readline]gnv$input.c_first
    $define/user readline prj_root:[.lib.readline]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[.lib.readline],prj_root:[.include]
+   $define/user cxx$system_include prj_root:[]
+   $define/user cxx$user_include prj_root:[.lib.readline],prj_root:[.include]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
    /first_include=gnv$input.c_first $(MMS$SOURCE)
 
@@ -1087,8 +1092,8 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
    $define/user readline prj_root:[.lib.readline]
    $define/user glob prj_root:[.lib.glob]
    $define/user tilde prj_root:[.lib.tilde]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/define=(MODULE_READLINE=1,_USE_STD_STAT=1,_POSIX_EXIT=1,\
 	HAVE_CONFIG_H=1,SHELL=1)\
@@ -1100,8 +1105,8 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
    $define/user readline prj_root:[.lib.readline]
    $define/user glob prj_root:[.lib.glob]
    $define/user tilde prj_root:[.lib.tilde]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/define=(MODULE_RLTTY=1,_USE_STD_STAT=1,_POSIX_EXIT=1,\
 	HAVE_CONFIG_H=1,SHELL=1)\
@@ -1198,7 +1203,7 @@ libglob.olb : libglob($(libglob_objs))
 		[.lib.glob]glob.h [.lib.glob]glob_loop.c [.lib.glob]strmatch.h
 
 [.lib.glob]gmisc.obj : [.lib.glob]gmisc.c $(config_h) bashtypes.h \
-		$(bashansi_h) [.include]shmbutil.h
+		$(bashansi_h) [.include]shmbutil.h [.lib.glob]gm_loop.c
 
 [.lib.glob]smatch.obj : [.lib.glob]smatch.c $(config_h) [.lib.glob]strmatch.h \
 		$(bashansi_h) [.include]shmbutil.h $(xmalloc_h) \
@@ -1252,8 +1257,8 @@ lcl_root:[.lib.intl]dcigettext.c : src_root:[.lib.intl]dcigettext.c \
 		[.lib.intl]gettextP.h [.lib.intl]plural-exp.h \
 		[.lib.intl]hash-string.h [.lib.intl]libgnuintl.h \
 		[.lib.intl]eval-plural.h, [.lib.intl]gnv$dcigettext.c_first
-   $define/user decc$system_include prj_root:[],prj_root:[.include]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[],prj_root:[.include]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(cflagsx)/define=\
@@ -1292,8 +1297,8 @@ lcl_root:[.lib.intl]dcigettext.c : src_root:[.lib.intl]dcigettext.c \
 		[.lib.intl]gmo.h [.lib.intl]gettextP.h \
 		[.lib.intl]hash-string.h [.lib.intl]plural-exp.h \
 		[.lib.intl]gnv$loadmsgcat.c_first
-   $define/user decc$system_include prj_root:[],prj_root:[.include]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[],prj_root:[.include]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
@@ -1340,8 +1345,8 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
 [.builtins]bashgetopt.obj : [.builtins]bashgetopt.c, $(config_h) $(shell_h),\
 	$(bashansi_h) [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1351,8 +1356,8 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
 [.builtins]builtins.obj : [.builtins]builtins.c $(builtins_h), \
 	[.builtins]builtext.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $(CC)$(CFLAGS)/OBJ=builtins.obj builtins.c
    $set def prj_root:[-]
 
@@ -1382,8 +1387,8 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
 		[.builtins]builtext.h [.lib.tilde]tilde.h bashhist.h \
 		[.builtins]gnv$common.c_first
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1402,8 +1407,8 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
 		$(builtins_h) flags.h input.h $(execute_cmd_h) $(trap_h) \
 		bashhist.h [.builtins]common.h, [.builtins]gnv$evalfile.c_first
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1417,8 +1422,8 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
 		redir.h $(trap_h) $(bashintl_h) $(y_tab_h) bashhist.h \
 		[.builtins]common.h [.builtins]builtext.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1428,8 +1433,8 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
 [.builtins]getopt.obj : [.builtins]getopt.c, $(config_h) [.include]memalloc.h \
 		$(bashintl_h)  $(shell_h) [.builtins]getopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1437,7 +1442,7 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
    $set def prj_root:[-]
 
 [.builtins]psize.obj : [.builtins]psize.c, $(config_h) bashtypes.h \
-	command.h $(general_h) lcl_root:sig.h
+	command.h $(general_h) sig.h
 
 [.builtins]psize.exe : [.builtins]psize.obj
 
@@ -1454,8 +1459,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 		bashtypes.h [.include]posixstat.h [.include]filecntl.h \
 		$(bashansi_h) $(builtins_h)
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[],prj_root:[-]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[],prj_root:[-]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $(CC)$(cflagsx) \
 	/OBJ=mkbuiltins.obj mkbuiltins.c \
 	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,\
@@ -1466,8 +1471,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 
 [.builtins]alias.obj : [.builtins]alias.c
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1481,8 +1486,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 		$(bashintl_h) $(shell_h) \
 		bashline.h [.builtins]bashgetopt.h [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1494,8 +1499,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 [.builtins]break.obj : [.builtins]break.c $(config_h) $(bashintl_h) \
 		$(shell_h) [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1507,8 +1512,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 [.builtins]builtin.obj : [.builtins]builtin.c $(config_h) $(shell_h) \
 		[.builtins]common.h [.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1522,8 +1527,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 		[.builtins]common.h [.builtins]builtext.h \
 		[.builtins]bashgetopt.h $(builtins_h)
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1539,8 +1544,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 		[.include]maxpath.h [.builtins]common.h \
 		[.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1551,8 +1556,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 
 [.builtins]colon.obj : [.builtins]colon.c
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1565,8 +1570,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 		$(bashansi_h) $(shell_h) $(execute_cmd_h) flags.h \
 		[.builtins]bashgetopt.h [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1582,8 +1587,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 		[.builtins]common.h [.builtins]bashgetopt.h \
 		$(readline_readline_h)
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1597,8 +1602,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 		[.builtins]common.h [.builtins]builtext.h \
 		[.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1610,8 +1615,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 [.builtins]echo.obj : [.builtins]echo.c $(config_h) \
 		$(bashansi_h) $(shell_h) [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1624,8 +1629,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 	$(bashansi_h) $(bashintl_h) $(shell_h), $(builtins_h), flags.h \
 	[.builtins]common.h [.builtins]bashgetopt.h $(pcomplete_h)
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1637,8 +1642,8 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 [.builtins]eval.obj : [.builtins]eval.c $(config_h) $(shell_h) \
 		[.builtins]bashgetopt.h [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1652,26 +1657,22 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
 		$(execute_cmd_h) findcmd.h $(jobs_h) flags.h $(trap_h) \
 		bashhist.h [.builtins]common.h [.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
    $(CC)$(CFLAGS)/OBJ=exec.obj exec.c
    $set def prj_root:[-]
 
-lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
-
-[.builtins]exit.c : lcl_root:[.builtins]exit.def, [.builtins]mkbuiltins.exe
+[.builtins]exit.c : [.builtins]exit.def, [.builtins]mkbuiltins.exe
 
 [.builtins]exit.obj : [.builtins]exit.c, $(config_h) bashtypes.h \
 		$(bashintl_h) $(shell_h) $(jobs_h) [.builtins]common.h \
 		[.builtins]builtext.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1686,8 +1687,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		flags.h bashhist.h [.include]maxpath.h $(readline_history_h) \
 		[.builtins]bashgetopt.h [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1700,8 +1701,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(bashintl_h) $(shell_h) $(jobs_h) [.builtins]common.h \
 		[.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1714,8 +1715,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(shell_h) [.builtins]common.h [.builtins]bashgetopt.h \
 		[.builtins]getopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1730,8 +1731,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		[.builtins]common.h, \
 		[.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1744,8 +1745,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(shell_h), $(builtins_h) pathexp.h [.builtins]common.h \
 		[.builtins]bashgetopt.h [.lib.glob]strmatch.h [.lib.glob]glob.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1759,8 +1760,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(bashintl_h) $(shell_h) bashhist.h $(readline_history_h) \
 		[.builtins]bashgetopt.h [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1771,8 +1772,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 
 [.builtins]inlib.obj : [.builtins]inlib.c $(config_h) $(shell_h)
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1785,8 +1786,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(bashansi_h) $(bashintl_h) $(shell_h) $(jobs_h) \
 		$(execute_cmd_h) [.builtins]bashgetopt.h [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1799,8 +1800,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(bashintl_h) $(shell_h) $(trap_h) $(jobs_h) \
 		[.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1812,8 +1813,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 [.builtins]let.obj : [.builtins]let.c $(config_h) $(bashintl_h) \
 		$(shell_h) [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1827,8 +1828,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(readline_rlshell_h) [.builtins]common.h \
 		[.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1842,8 +1843,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(bashintl_h) $(shell_h) [.include]shmbutil.h \
 		[.builtins]bashgetopt.h [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1857,8 +1858,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		[.include]maxpath.h [.builtins]common.h [.builtins]builtext.h \
 		$(builtins_h)
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1873,8 +1874,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		[.include]shtty.h bashline.h \
 		$(readline_readline_h) input.h $(termios_h)
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1887,8 +1888,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(bashintl_h) $(shell_h) [.builtins]common.h \
 		[.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1902,8 +1903,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		[.builtins]common.h [.builtins]bashgetopt.h input.h bashline.h \
 		$(readline_readline_h) bashhist.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1916,8 +1917,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(bashansi_h) $(bashintl_h) $(shell_h) [.builtins]common.h \
 		[.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1929,8 +1930,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 [.builtins]shift.obj : [.builtins]shift.c, $(config_h) $(bashansi_h) \
 		$(bashintl_h) $(shell_h) [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1943,8 +1944,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(bashintl_h) $(shell_h) flags.h [.builtins]common.h \
 		[.builtins]bashgetopt.h bashhist.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1958,8 +1959,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(bashintl_h) $(shell_h) flags.h findcmd.h \
 		[.builtins]common.h [.builtins]bashgetopt.h $(trap_h)
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1972,8 +1973,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		bashtypes.h $(bashintl_h) $(shell_h) $(jobs_h) \
 		[.builtins]common.h [.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1985,8 +1986,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 [.builtins]test.obj : [.builtins]test.c, $(config_h) $(bashansi_h) \
 		$(bashintl_h) $(shell_h) test.h [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -1998,8 +1999,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 [.builtins]times.obj : [.builtins]times.c, $(config_h) bashtypes.h \
 		$(shell_h) [.include]posixtime.h [.builtins]common.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -2012,8 +2013,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(bashansi_h) $(shell_h) $(trap_h) [.builtins]common.h \
 		[.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -2027,8 +2028,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		findcmd.h $(hashcmd_h) $(alias_h) [.builtins]common.h \
 		[.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -2047,8 +2048,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		[.builtins]bashgetopt.h [.builtins]pipesize.h \
 		[.builtins]gnv$ulimit.c_first
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -2063,8 +2064,8 @@ lcl_root:[.builtins]exit.def : src_root:[.builtins]exit.def [.builtins]exit_def.
 		$(shell_h) [.include]posixstat.h [.builtins]common.h \
 		[.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -2081,8 +2082,8 @@ lcl_root:[.builtins]wait.def : src_root:[.builtins]wait.def [.builtins]wait_def.
 		[.include]chartypes.h $(bashansi_h) $(shell_h) $(jobs_h) \
 		[.builtins]common.h [.builtins]bashgetopt.h
    $set def prj_root:[.builtins]
-   $define/user decc$user_include prj_root:[]
-   $define/user decc$system_include prj_root:[-],PRJ_ROOT:[-.include]
+   $define/user cxx$user_include prj_root:[]
+   $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
@@ -2090,7 +2091,7 @@ lcl_root:[.builtins]wait.def : src_root:[.builtins]wait.def [.builtins]wait_def.
    $set def prj_root:[-]
 
 alias.obj : alias.c $(config_h) [.include]chartypes.h $(bashansi_h), command.h \
-		$(general_h) lcl_root:externs.h $(alias_h) $(pcomplete_h)
+		$(general_h) externs.h $(alias_h) $(pcomplete_h)
 
 array.obj : array.c $(config_h) $(bashansi_h) $(shell_h) array.h \
 		[.builtins]common.h
@@ -2159,8 +2160,8 @@ execute_cmd.obj : lcl_root:execute_cmd.c $(config_h) \
 		input.h $(alias_h) bashhist.h
    $define/user glob prj_root:[.lib.glob]
    $define/user tilde prj_root:[.lib.tilde]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/OBJ=$(MMS$TARGET) $(MMS$SOURCE) \
 	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_REGEX_H=1,HAVE_CONFIG_H=1,\
@@ -2169,9 +2170,9 @@ execute_cmd.obj : lcl_root:execute_cmd.c $(config_h) \
 expr.obj : expr.c $(config_h) $(bashansi_h) [.include]chartypes.h \
 		$(bashintl_h)  $(shell_h)
 
-lcl_root:externs.h : src_root:externs.h externs_h.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
+#lcl_root:externs.h : src_root:externs.h externs_h.tpu
+#    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
+#	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
 
 # moved to vms_lstat_hack.h
 #gnv$findcmd.c_first : gnv_findcmd.c_first
@@ -2189,8 +2190,8 @@ findcmd.obj : lcl_root:findcmd.c $(config_h) \
    $define/user readline prj_root:[.lib.readline]
    $define/user glob prj_root:[.lib.glob]
    $define/user tilde prj_root:[.lib.tilde]
-   $define/user decc$system_include prj_root:[],prj_root:[.include]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[],prj_root:[.include]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(CFLAGS)/OBJ=$(MMS$TARGET) \
@@ -2213,7 +2214,7 @@ hashlib.obj : hashlib.c $(config_h) $(bashansi_h) $(shell_h) hashlib.h
 
 input.obj : input.c $(config_h) bashtypes.h [.include]filecntl.h \
 		[.include]posixstat.h $(bashansi_h) $(bashintl_h) \
-		$(general_h) input.h lcl_root:error.h lcl_root:externs.h quit.h
+		$(general_h) input.h lcl_root:error.h externs.h quit.h
 
 lcl_root:nojobs.c : src_root:nojobs.c nojobs_c.tpu
     $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
@@ -2241,8 +2242,8 @@ mailcheck.obj : mailcheck.c $(config_h) bashtypes.h [.include]posixstat.h \
    $define/user readline prj_root:[.lib.readline]
    $define/user tilde prj_root:[.lib.tilde]
    $define/user glob prj_root:[.lib.glob]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(cflagsx)/define=\
@@ -2254,7 +2255,7 @@ make_cmd.obj : make_cmd.c $(config_h) bashtypes.h [.include]filecntl.h \
 		$(bashansi_h) $(bashintl_h) $(parser_h) syntax.h \
 		command.h $(general_h) lcl_root:error.h flags.h make_cmd.h \
 		dispose_cmd.h $(variables_h) subst.h input.h \
-		[.include]ocache.h lcl_root:externs.h $(jobs_h) \
+		[.include]ocache.h externs.h $(jobs_h) \
 		[.include]shmbutil.h
 
 pathexp.obj : pathexp.c $(config_h) bashtypes.h $(bashansi_h) \
@@ -2275,8 +2276,8 @@ print_cmd.obj : print_cmd.c $(config_h) $(bashansi_h) $(bashintl_h) \
 		[.builtins]common.h
    $define/user glob prj_root:[.lib.glob]
    $define/user tilde prj_root:[.lib.tilde]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/OBJ=$(MMS$TARGET) $(MMS$SOURCE) \
 	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,\
@@ -2305,8 +2306,8 @@ shell.obj : lcl_root:shell.c $(config_h) bashtypes.h [.include]posixstat.h \
    $define/user readline prj_root:[.lib.readline]
    $define/user tilde prj_root:[.lib.tilde]
    $define/user glob prj_root:[.lib.glob]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
+   $define/user cxx$system_include prj_root:[]
+   $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
    $(CC)$(cflagsx)/define=\
@@ -2314,12 +2315,12 @@ shell.obj : lcl_root:shell.c $(config_h) bashtypes.h [.include]posixstat.h \
 	/first_include=gnv$shell.c_first \
 	/OBJ=shell.obj lcl_root:shell.c
 
-lcl_root:sig.h : src_root:sig.h sig_h.tpu
-    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
-	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
+#lcl_root:sig.h : src_root:sig.h sig_h.tpu
+#    $(EVE) $(UNIX_2_VMS) $(MMS$SOURCE)/OUT=$(MMS$TARGET)\
+#	    /init='f$element(1, ",", "$(MMS$SOURCE_LIST)")'
 
 sig.obj : sig.c $(config_h) bashtypes.h $(bashintl_h) $(shell_h) $(jobs_h) \
-		siglist.h lcl_root:sig.h $(trap_h) [.builtins]common.h \
+		siglist.h sig.h $(trap_h) [.builtins]common.h \
 		bashline.h bashhist.h
 
 siglist.obj : siglist.c $(config_h) bashtypes.h siglist.h $(trap_h) \
@@ -2341,29 +2342,17 @@ subst.obj : subst.c $(config_h) bashtypes.h \
 
 syntax.obj : syntax.c $(config_h) syntax.h
 
-gnv$test.c_first : gnv_test.c_first
-    $type $(MMS$SOURCE) /output=$(MMS$TARGET)
-
-test.obj : test.c $(config_h) gnv$test.c_first \
+test.obj : test.c $(config_h) \
 		bashtypes.h [.include]posixstat.h \
 		[.include]filecntl.h $(bashintl_h) $(shell_h) \
 		pathexp.h test.h [.builtins]common.h [.lib.glob]strmatch.h
-   $define/user readline prj_root:[.lib.readline]
-   $define/user tilde prj_root:[.lib.tilde]
-   $define/user glob prj_root:[.lib.glob]
-   $define/user decc$system_include prj_root:[]
-   $define/user decc$user_include prj_root:[],prj_root:[.include],\
-	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
-	prj_root:[.lib.glob]
-   $(CC)$(cflags)/first_include=gnv$test.c_first \
-	/OBJ=test.obj test.c
 
 trap.obj : trap.c $(config_h) bashtypes.h $(bashansi_h) $(bashintl_h) \
 		$(trap_h) $(shell_h) flags.h input.h $(jobs_h) signames.h \
 		$(builtins_h) [.builtins]common.h [.builtins]builtext.h
 
 unwind_prot.obj : unwind_prot.c $(config_h) bashtypes.h $(bashansi_h) \
-		command.h $(general_h) unwind_prot.h quit.h lcl_root:sig.h \
+		command.h $(general_h) unwind_prot.h quit.h sig.h \
 		lcl_root:error.h
 
 lcl_root:variables.c : src_root:variables.c variables.tpu version.h

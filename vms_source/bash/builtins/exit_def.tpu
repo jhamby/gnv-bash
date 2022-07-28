@@ -17,6 +17,7 @@
 !============================================================================
 !
 ! Change return type of exit_or_logout() since it doesn't return.
+! Note: this doesn't work with the C++ compiler.
 !
 VMS_INSERT_BEFORE('static int exit_or_logout', '#ifdef __VMS');
 COPY_TEXT('static void exit_or_logout PARAMS((WORD_LIST *));');

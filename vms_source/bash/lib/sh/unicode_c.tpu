@@ -1,4 +1,4 @@
-! File externs_h.tpu
+! File unicode_c.tpu
 !
 ! Copyright 2022, Jake Hamby
 !
@@ -16,13 +16,11 @@
 !
 !============================================================================
 !
+! VMS needs <langinfo.h> for nl_langinfo(CODESET).
 !
-! Add pragmas to correspond to __attribute__((__noreturn__)).
-! Not compatible with cxx, unfortunately.
-!
-VMS_INSERT_AFTER('exit_shell', '#pragma assert func_attrs(exit_shell) noreturn');
+VMS_INSERT_BEFORE('#if HAVE_ICONV', '#ifdef HAVE_LANGINFO_H');
+COPY_TEXT('#include <langinfo.h>');
 SPLIT_LINE;
-VMS_INSERT_AFTER('sh_exit', '#pragma assert func_attrs(sh_exit) noreturn');
+COPY_TEXT('#endif');
 SPLIT_LINE;
-VMS_INSERT_AFTER('subshell_exit', '#pragma assert func_attrs(subshell_exit) noreturn');
 SPLIT_LINE;

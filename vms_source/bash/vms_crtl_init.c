@@ -19,5 +19,5 @@ void (* const iniarray[])(void) = {vms_set_crtl_values, } ;	/* Set our contribut
 #endif
 #pragma extern_model restore
 
-int LIB$INITIALIZE(void);
+extern "C" int LIB$INITIALIZE(void);
 /* globaldef */ int (*lib_init_ref)(void) = LIB$INITIALIZE;

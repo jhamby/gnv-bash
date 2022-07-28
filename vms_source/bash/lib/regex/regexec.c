@@ -219,12 +219,8 @@ static reg_errcode_t extend_buffers (re_match_context_t *mctx, int min_len)
    We return 0 if we find a match and REG_NOMATCH if not.  */
 
 int
-regexec (preg, string, nmatch, pmatch, eflags)
-    const regex_t *_Restrict_ preg;
-    const char *_Restrict_ string;
-    size_t nmatch;
-    regmatch_t pmatch[_Restrict_arr_];
-    int eflags;
+regexec (const regex_t *_Restrict_ preg, const char *_Restrict_ string,
+    size_t nmatch, regmatch_t pmatch[_Restrict_arr_], int eflags)
 {
   reg_errcode_t err;
   Idx start, length;
@@ -305,11 +301,8 @@ compat_symbol (libc, __compat_regexec, regexec, GLIBC_2_0);
    match was found and -2 indicates an internal error.  */
 
 regoff_t
-re_match (bufp, string, length, start, regs)
-    struct re_pattern_buffer *bufp;
-    const char *string;
-    Idx length, start;
-    struct re_registers *regs;
+re_match (struct re_pattern_buffer *bufp, const char *string, Idx length,
+    Idx start, struct re_registers *regs)
 {
   return re_search_stub (bufp, string, length, start, 0, length, regs, true);
 }
@@ -318,12 +311,8 @@ weak_alias (__re_match, re_match)
 #endif
 
 regoff_t
-re_search (bufp, string, length, start, range, regs)
-    struct re_pattern_buffer *bufp;
-    const char *string;
-    Idx length, start;
-    regoff_t range;
-    struct re_registers *regs;
+re_search (struct re_pattern_buffer *bufp, const char *string, Idx length,
+    Idx start, regoff_t range, struct re_registers *regs)
 {
   return re_search_stub (bufp, string, length, start, range, length, regs,
 			 false);
@@ -333,11 +322,9 @@ weak_alias (__re_search, re_search)
 #endif
 
 regoff_t
-re_match_2 (bufp, string1, length1, string2, length2, start, regs, stop)
-    struct re_pattern_buffer *bufp;
-    const char *string1, *string2;
-    Idx length1, length2, start, stop;
-    struct re_registers *regs;
+re_match_2 (struct re_pattern_buffer *bufp, const char *string1,
+    const char *string2, Idx length1, Idx length2, Idx start, Idx stop,
+    struct re_registers *regs)
 {
   return re_search_2_stub (bufp, string1, length1, string2, length2,
 			   start, 0, regs, stop, true);
@@ -347,12 +334,9 @@ weak_alias (__re_match_2, re_match_2)
 #endif
 
 regoff_t
-re_search_2 (bufp, string1, length1, string2, length2, start, range, regs, stop)
-    struct re_pattern_buffer *bufp;
-    const char *string1, *string2;
-    Idx length1, length2, start, stop;
-    regoff_t range;
-    struct re_registers *regs;
+re_search_2 (struct re_pattern_buffer *bufp, const char *string1,
+    const char *string2, Idx length1, Idx length2, Idx start, Idx stop,
+    regoff_t range, struct re_registers *regs)
 {
   return re_search_2_stub (bufp, string1, length1, string2, length2,
 			   start, range, regs, stop, false);
@@ -577,11 +561,8 @@ re_copy_regs (struct re_registers *regs, regmatch_t *pmatch, Idx nregs,
    freeing the old data.  */
 
 void
-re_set_registers (bufp, regs, num_regs, starts, ends)
-    struct re_pattern_buffer *bufp;
-    struct re_registers *regs;
-    __re_size_t num_regs;
-    regoff_t *starts, *ends;
+re_set_registers (struct re_pattern_buffer *bufp, struct re_registers *regs,
+    __re_size_t num_regs, regoff_t *starts, regoff_t *ends)
 {
   if (num_regs)
     {
@@ -609,8 +590,7 @@ int
 # ifdef _LIBC
 weak_function
 # endif
-re_exec (s)
-     const char *s;
+re_exec (const char *s)
 {
   return 0 == regexec (&re_comp_buf, s, 0, NULL, 0);
 }
@@ -1060,7 +1040,7 @@ prune_impossible_nodes (re_match_context_t *mctx)
    since initial states may have constraints like "\<", "^", etc..  */
 
 static inline re_dfastate_t *
-__attribute__ ((always_inline)) internal_function
+/* __attribute__ ((always_inline)) internal_function */
 acquire_init_state_context (reg_errcode_t *err, const re_match_context_t *mctx,
 			    Idx idx)
 {
@@ -1387,7 +1367,7 @@ push_fail_stack (struct re_fail_stack_t *fs, Idx str_idx, Idx dest_node,
   if (fs->num == fs->alloc)
     {
       struct re_fail_stack_ent_t *new_array;
-      new_array = realloc (fs->stack, (sizeof (struct re_fail_stack_ent_t)
+      new_array = (re_fail_stack_ent_t *)realloc (fs->stack, (sizeof (struct re_fail_stack_ent_t)
 				       * fs->alloc * 2));
       if (new_array == NULL)
 	return REG_ESPACE;
@@ -2829,7 +2809,7 @@ get_subexp (re_match_context_t *mctx, Idx bkref_node, Idx bkref_str_idx)
 	    continue; /* No.  */
 	  if (sub_top->path == NULL)
 	    {
-	      sub_top->path = calloc (sizeof (state_array_t),
+	      sub_top->path = (state_array_t *)calloc (sizeof (state_array_t),
 				      sl_str - sub_top->str_idx + 1);
 	      if (sub_top->path == NULL)
 		return REG_ESPACE;
@@ -4359,7 +4339,7 @@ match_ctx_add_subtop (re_match_context_t *mctx, Idx node, Idx str_idx)
       mctx->sub_tops = new_array;
       mctx->asub_tops = new_asub_tops;
     }
-  mctx->sub_tops[mctx->nsub_tops] = calloc (1, sizeof (re_sub_match_top_t));
+  mctx->sub_tops[mctx->nsub_tops] = (re_sub_match_top_t *)calloc (1, sizeof (re_sub_match_top_t));
   if (BE (mctx->sub_tops[mctx->nsub_tops] == NULL, 0))
     return REG_ESPACE;
   mctx->sub_tops[mctx->nsub_tops]->node = node;
@@ -4386,7 +4366,7 @@ match_ctx_add_sublast (re_sub_match_top_t *subtop, Idx node, Idx str_idx)
       subtop->lasts = new_array;
       subtop->alasts = new_alasts;
     }
-  new_entry = calloc (1, sizeof (re_sub_match_last_t));
+  new_entry = (re_sub_match_last_t *)calloc (1, sizeof (re_sub_match_last_t));
   if (BE (new_entry != NULL, 1))
     {
       subtop->lasts[subtop->nlasts] = new_entry;

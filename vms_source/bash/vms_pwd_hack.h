@@ -33,7 +33,6 @@
  */
 #pragma message save
 #pragma message disable dollarid
-#pragma message disable valuepres
 #define passwd hide_passwd
 #include <pwd.h>
 #include <stdlib.h>
@@ -46,11 +45,6 @@
 #include <lnmdef.h>
 #include <starlet.h>
 #include <unixlib.h>
-
-#ifdef __VAX
-#define __passwd struct hide_passwd
-
-#endif
 
 
 /* Need a new struct passwd that has the pw_gecos and pw_passwd members */
@@ -91,9 +85,6 @@ static const char vms__bad_password[] = "BAD PASSWORD$$$";
 /* Need to cache what shell to report if we are overriding it */
 static int vms__internal_passwd_shell_valid = -1;
 static char vms__internal_passwd_shell[256] = {0};
-#ifdef __VAX
-static char vms__internal_passwd_dir[256] = {0};
-#endif
 
 /* Take all the fun out of simply looking up a logical name */
 static int sys_trnlnm(const char * logname,
@@ -158,17 +149,6 @@ __passwd * result;
 	vms__internal_passwd.pw_uid = result->pw_uid;
 	vms__internal_passwd.pw_gid = result->pw_gid;
 	vms__internal_passwd.pw_dir = result->pw_dir;
-#ifdef __VAX
-	/* Home directory must be an absolute path */
-	if (result->pw_dir[0] != '/') {
-	    /* VMS file specification found */
-	    char * new_path;
-	    new_path = decc$translate_vms(result->pw_dir);
-	    strncpy(vms__internal_passwd_dir, new_path, 255);
-	    vms__internal_passwd_dir[255] = 0;
-	    vms__internal_passwd.pw_dir = vms__internal_passwd_dir;
-	}
-#endif
 	if (vms__internal_passwd_shell_valid == 1) {
 	    vms__internal_passwd.pw_shell = vms__internal_passwd_shell;
 	} else {
@@ -188,7 +168,6 @@ __passwd * result;
    }
 }
 
-#ifndef __VAX
 static int vms_getpwnam_r
    (const char * nam,
     struct vms_passwd * pwd,
@@ -211,7 +190,6 @@ VMS_PASSWD * rslt;
 	return -1;
    }
 }
-#endif
 
 static VMS_PASSWD * vms_getpwuid
    (uid_t id)
@@ -224,17 +202,6 @@ __passwd * result;
 	vms__internal_passwd.pw_uid = result->pw_uid;
 	vms__internal_passwd.pw_gid = result->pw_gid;
 	vms__internal_passwd.pw_dir = result->pw_dir;
-#ifdef __VAX
-	/* Home directory must be an absolute path */
-	if (result->pw_dir[0] != '/') {
-	    /* VMS file specification found */
-	    char * new_path;
-	    new_path = decc$translate_vms(result->pw_dir);
-	    strncpy(vms__internal_passwd_dir, new_path, 255);
-	    vms__internal_passwd_dir[255] = 0;
-	    vms__internal_passwd.pw_dir = vms__internal_passwd_dir;
-	}
-#endif
 	if (vms__internal_passwd_shell_valid == 1) {
 	    vms__internal_passwd.pw_shell = vms__internal_passwd_shell;
 	} else {
@@ -253,7 +220,6 @@ __passwd * result;
    }
 }
 
-#ifndef __VAX
 static int vms_getpwuid_r
    (uid_t id, VMS_PASSWD *pwd, char * buffer,
     size_t bufsize, VMS_PASSWD **result)
@@ -273,14 +239,7 @@ VMS_PASSWD *rslt;
 	return -1;
    }
 }
-#endif
 
-#ifdef __VAX
-static void vms_endpwent(void) {}
-#define endpwent vms_endpwent
-#endif
-
-#ifndef __VAX
 static VMS_PASSWD * vms_getpwent
    (uid_t id)
 {
@@ -309,7 +268,6 @@ __passwd * result;
 	return NULL;
    }
 }
-#endif
 
 #pragma member_alignment restore
 #if __INITIAL_POINTER_SIZE

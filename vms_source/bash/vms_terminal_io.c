@@ -97,11 +97,6 @@
  * to be populated.
  */
 
-#pragma member_alignment save
-#pragma nomember_alignment longword
-#pragma message save
-#pragma message disable misalgndmem
-
 struct tt_framing_st {
     unsigned tt_v_framesize : 4;
     unsigned tt_v_altframe : 1;
@@ -126,7 +121,7 @@ struct term_mode_iosb_st {
 };
 
 struct term_char_st {
-    unsigned char class;
+    unsigned char term_class;
     unsigned char type;
     unsigned short page_width;
     TTDEF ttdef;
@@ -142,9 +137,6 @@ struct term_read_iosb_st {
     unsigned short terminator;
     unsigned short terminator_count;
 };
-
-#pragma message restore
-#pragma member_alignment restore
 
 struct vms_info_st {
 	unsigned short channel;		/* VMS channel assigned */
@@ -220,7 +212,7 @@ static struct vms_info_st * vms_lookup_fd(int fd) {
 	vms_info_size = getdtablesize();
 
 	/* Allocate the array */
-	vms_info = malloc(vms_info_size * sizeof(struct vms_info_st));
+	vms_info = (vms_info_st *)malloc(vms_info_size * sizeof(struct vms_info_st));
 	if (vms_info == NULL) {
 
 	    /* We are probably out of memory, so degrade gracefully */
@@ -283,7 +275,7 @@ int vms_open(const char *file_spec, int flags, ...) {
                 dump_pointer_m(info->path, "vms_open/strdup",
                                strlen(file_spec)+1);
 
-                info->st_buf = malloc(sizeof (struct stat));
+                info->st_buf = (struct stat *)malloc(sizeof (struct stat));
                 if (info->st_buf == NULL) {
                     free(info->vmscwd);
                     info->vmscwd = NULL;
@@ -330,7 +322,7 @@ DIR * vms_opendir(const char * name) {
         i = pathlen - 4;
         cmp = strcasecmp(".dir", &name[i]);
         if (cmp == 0) {
-            newpath = malloc(pathlen + 3);
+            newpath = (char *)malloc(pathlen + 3);
             if (newpath == NULL) {
                 return NULL;
             }
@@ -362,7 +354,7 @@ DIR * vms_fdopendir(int fd) {
     }
     /* char dir_path[MAX_UNIX_DIR_PATH + 1]; */
     char * dir_path;
-    dir_path = malloc(MAX_UNIX_DIR_PATH + 1);
+    dir_path = (char *)malloc(MAX_UNIX_DIR_PATH + 1);
     if (dir_path == NULL) {
         return NULL;
     }
@@ -385,7 +377,7 @@ DIR * vms_fdopendir(int fd) {
             len2 = strlen(info->path);
             if (len1 + len2 > MAX_UNIX_DIR_PATH) {
                 char * dir_path2;
-                dir_path2 = malloc(len1 + len2 + 1);
+                dir_path2 = (char *)malloc(len1 + len2 + 1);
                 if (dir_path2 == NULL) {
                     free(dir_path);
                     errno = ENOMEM;
@@ -533,7 +525,7 @@ int vms_dup(int fd1) {
                        strlen(info1->path)+1);
     }
     if (info1->st_buf != NULL) {
-        info2->st_buf = malloc(sizeof (struct stat));
+        info2->st_buf = (struct stat *)malloc(sizeof (struct stat));
         if (info2->st_buf == NULL) {
             if (info2->vmscwd != NULL) {
                 free(info2->vmscwd);
@@ -596,7 +588,7 @@ int vms_dup2(int fd1, int fd2) {
                        strlen(info1->path)+1);
     }
     if (info1->st_buf != NULL) {
-        info2->st_buf = malloc(sizeof (struct stat));
+        info2->st_buf = (struct stat *)malloc(sizeof (struct stat));
         if (info2->st_buf == NULL) {
             if (info2->vmscwd != NULL) {
                 free(info2->vmscwd);
@@ -685,7 +677,7 @@ struct vms_info_st * info;
 	vms_info_size = getdtablesize();
 
 	/* Allocate the array */
-	vms_info = malloc(vms_info_size * sizeof(struct vms_info_st));
+	vms_info = (vms_info_st *)malloc(vms_info_size * sizeof(struct vms_info_st));
 	if (vms_info == NULL) {
 
 	    /* We are probably out of memory, so degrade gracefully */
@@ -912,7 +904,7 @@ int ret_stat = 0;
 
     /* Set up the structures to hold the information if not already there */
     if (info->vms_char == NULL) {
-	info->vms_char = malloc(sizeof(struct term_char_st));
+	info->vms_char = (term_char_st *)malloc(sizeof(struct term_char_st));
 	if (info->vms_char == NULL) {
 	    return -1;
 	}
@@ -920,7 +912,7 @@ int ret_stat = 0;
     termchar = info->vms_char;
 
     if (info->vms_iosb == NULL) {
-	info->vms_iosb = malloc(sizeof(struct term_mode_iosb_st));
+	info->vms_iosb = (term_mode_iosb_st *)malloc(sizeof(struct term_mode_iosb_st));
 	if (info->vms_iosb == NULL) {
 	    return -1;
 	}
@@ -928,7 +920,7 @@ int ret_stat = 0;
     mode_iosb = info->vms_iosb;
 
     if (info->term_attr == NULL) {
-	info->term_attr = malloc(sizeof(struct termios));
+	info->term_attr = (termios *)malloc(sizeof(struct termios));
 	if (info->term_attr == NULL) {
 	    return -1;
 	}

@@ -75,7 +75,7 @@ static int vms_lstat(const char * name, struct stat * st) {
 
     if (cmp == 0) {
         char * newpath;
-        newpath = malloc(pathlen + 3);
+        newpath = (char *)malloc(pathlen + 3);
         if (newpath == NULL) {
             return -1;
         }
@@ -175,7 +175,7 @@ static int vms_stat(const char * name, struct stat * st) {
     /* Either special case */
     if (cmp == 0) {
         char * newpath;
-        newpath = malloc(pathlen + 3);
+        newpath = (char *)malloc(pathlen + 3);
         if (newpath == NULL) {
             return -1;
         }
@@ -229,7 +229,7 @@ static int vms_unlink(const char * name) {
         i = pathlen - 4;
         cmp = strcasecmp(".dir", &name[i]);
         if (cmp == 0) {
-            newpath = malloc(pathlen + 3);
+            newpath = (char *)malloc(pathlen + 3);
             if (newpath == NULL) {
                 return -1;
             }
@@ -404,7 +404,7 @@ static int vms_access(const char * file, int mode) {
     pathlen = strlen(file);
     if (cmp ==  0) {
         char * newpath;
-        newpath = malloc(pathlen + 3);
+        newpath = (char *)malloc(pathlen + 3);
         if (newpath == NULL) {
             return -1;
         }
@@ -463,7 +463,7 @@ static int vms_chdir(const char * file) {
         i = pathlen - 4;
         cmp = strcasecmp(".dir", &file[i]);
         if (cmp == 0) {
-            newpath = malloc(pathlen + 3);
+            newpath = (char *)malloc(pathlen + 3);
             if (newpath == NULL) {
                 return -1;
             }
@@ -491,7 +491,7 @@ static int vms_mkdir(const char * file, mode_t mode) {
         i = pathlen - 4;
         cmp = strcasecmp(".dir", &file[i]);
         if (cmp == 0) {
-            newpath = malloc(pathlen + 3);
+            newpath = (char *)malloc(pathlen + 3);
             if (newpath == NULL) {
                 return -1;
             }
@@ -557,7 +557,7 @@ static int tovms_rmdir(const char * unix_dir) {
     }
 #if __CRTL_VER >= 70301000
     /* Current decc$to_vms is reentrant */
-    decc$to_vms (unix_dir, to_vms_action, 0, 1, &vms_dir[dir_len]);
+    decc$to_vms (unix_dir, (int (*)(char *, int))to_vms_action, 0, 1, &vms_dir[dir_len]);
 #else
     /* Older decc$to_vms is not reentrant */
     decc$to_vms (unix_dir, to_vms_action, 0, 1);
@@ -604,7 +604,7 @@ static int vms_rmdir(const char * file) {
         i = pathlen - 4;
         cmp = strcasecmp(".dir", &file[i]);
         if (cmp == 0) {
-            newpath = malloc(pathlen + 3);
+            newpath = (char *)malloc(pathlen + 3);
             if (newpath == NULL) {
                 return -1;
             }

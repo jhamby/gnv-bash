@@ -28,15 +28,9 @@ char *decc$getcwd(char * buffer, size_t size, ...);
 #include <vms_sys_library/string.h>
 #include <vms_sys_library/stdlib.h>
 
-#pragma message disable questcompare
-#ifndef __VAX
 #define VMS_MAX_PATH 4097
-#pragma extern_prefix NOCRTL (getcwd)
-#else
-#define VMS_MAX_PATH 255
-#endif
 
-char * vms_to_unix(const char * vms_spec);
+char *vms_to_unix(const char *vms_spec);
 
 /* GNU open source code expects that the getcwd() with a NULL buffer and
  * and a buffer size of 0 will allocate a buffer of the size needed
@@ -45,12 +39,12 @@ char * vms_to_unix(const char * vms_spec);
  * VMS does not do this, so this wrapper fixes it.
  */
 
-static char * vms_getcwd(char * buffer, unsigned int size, ...)
+static char *vms_getcwd(char * buffer, unsigned int size, ...)
 {
   int real_size;
-  char * result;
-  char * vms_result;
-  char * unix_result;
+  char *result;
+  char *vms_result;
+  char *unix_result;
 
     real_size = 0;
     if ((buffer == NULL) && (size == 0)) {

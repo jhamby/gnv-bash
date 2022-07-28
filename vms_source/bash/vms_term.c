@@ -78,15 +78,12 @@
 #pragma message disable dollarid
 #endif
 
-#pragma member_alignment save
-#pragma nomember_alignment longword
-
 /* 8 bit Control Sequence Introducer */
 #define ANSI_CSI ((char)0x9B)
 #define ASCII_ESC 0x33
 
 struct sense_st {
-    unsigned char class;
+    unsigned char term_class;
     unsigned char type;
     unsigned short term_width;
     unsigned int tt_def;     /* Page length and characteristics */
@@ -112,8 +109,6 @@ struct ttyread_iosb_st {
     unsigned short terminator;
     unsigned short terminator_size;
 };
-
-#pragma member_alignment restore
 
 
 /* Simple wrapper for SYS$ASSIGN(SYS$OUTPUT, chan) */
@@ -419,7 +414,7 @@ int vms_tgetent(char * bp, const char * name) {
 /* int vms_tputs(char *, int, __tputs_callback); */
 
 int vms_tputs(
-	char * str,
+	const char *str,
 	int affcnt ,
 	vms_tputs_callback my_puts) {
 
@@ -1265,7 +1260,7 @@ static int vms_get_smg_request_code(
 static char _vms_tgoto_buffer[VMS_TERM_BUFFER_LEN + 1];
 
 /* Return the escape sequence to move to specific position */
-char * vms_tgoto(char * id, int col, int row) {
+char * vms_tgoto(const char *id, int col, int row) {
 
     unsigned int status;
     int request_code;
@@ -1547,7 +1542,7 @@ char *vms_tgetstr(char * id, char **area) {
     case ASCII_CHAR:
 	/* All terminals on VMS basically need to do these */
 	if (return_buffer == NULL) {
-	    return_buffer = malloc(2);
+	    return_buffer = (char *)malloc(2);
 	}
 	return_buffer[0] = request_code & 0xFF;
 	return_buffer[1] = 0;
@@ -1566,7 +1561,7 @@ char *vms_tgetstr(char * id, char **area) {
 
     /* Allocate memory for the return value if needed */
     if (return_buffer == NULL) {
-	return_buffer = malloc(VMS_TERM_BUFFER_LEN + 1);
+	return_buffer = (char *)malloc(VMS_TERM_BUFFER_LEN + 1);
     }
 
     /* Get the string for the terminal */

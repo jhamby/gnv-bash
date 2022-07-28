@@ -23,11 +23,11 @@ IF find_range <> 0
 THEN
     POSITION(END_OF(find_range));
 ENDIF;
-COPY_TEXT(') || defined (HAVE_SELECT)');
+COPY_TEXT(') || defined (HAVE_SELECT');
 
 find_range := SEARCH_QUIETLY('#if defined (HAVE_PSELECT)', FORWARD, EXACT);
 IF find_range <> 0
 THEN
     POSITION(END_OF(find_range));
 ENDIF;
-COPY_TEXT(') || defined (HAVE_SELECT)');
+COPY_TEXT(') || defined (HAVE_SELECT');

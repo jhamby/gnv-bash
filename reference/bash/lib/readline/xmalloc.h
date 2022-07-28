@@ -29,11 +29,7 @@
 #endif
 
 #ifndef PTR_T
-
-#ifdef __STDC__
-#  define PTR_T	void *
-#else
-#  define PTR_T	char *
+#define PTR_T	void *
 #endif
 
 #endif /* !PTR_T */

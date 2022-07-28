@@ -135,7 +135,8 @@ void
 redirection_error (REDIRECT *temp, int error,
                    char *fn)		/* already-expanded filename */
 {
-  char *filename, *allocname;
+  const char *filename;
+  char *allocname;
   int oflags;
 
   allocname = 0;
@@ -1460,11 +1461,8 @@ redir_varvalue (REDIRECT *redir)
   if (val == 0 || *val == 0)
     return -1;
 
-#if 0
-  /* this can't happen */
-  if (legal_number (val, &vmax) < 0)
+  if (!legal_number (val, &vmax))
     return -1;
-#endif
 
   i = vmax;	/* integer truncation */
   return i;

@@ -36,11 +36,7 @@
 /* Supress this header from being included */
 #define _RLTCAP_H_ 1
 
-#pragma message disable pragma
-#pragma message save
-#pragma message disable unusedtop
 #include <unistd.h>  /* isatty, STDIN_FILENO */
-#pragma message restore
 
 #ifndef ERR
 #define ERR (-1)  /* Ncurses uses -1, VMS curses uses 0 */
@@ -63,18 +59,11 @@ typedef int (*vms_tputs_callback) (int);
 #define VMS_NONL     002
 #define VMS_NOCRMODE 004
 
-#ifdef __VAX
-#pragma member_alignment save
-#pragma nomember_alignment word
-#endif
 struct vms_kb_st {
 	unsigned char flags;
 	unsigned char termchan_valid;
 	unsigned short termchan;
     };
-#ifdef __VAX
-#pragma member_alignment restore
-#endif
 
 extern struct vms_kb_st vms_keyboard;
 
@@ -99,7 +88,7 @@ extern struct vms_kb_st vms_keyboard;
 #define initscr()
 
 int vms_tputs(
-	char * str,
+	const char *str,
 	int affcnt ,
 	vms_tputs_callback my_puts);
 
@@ -107,7 +96,7 @@ int vms_tputs(
 
 int vms_getch(struct vms_kb_st *vms_keyboard);
 
-char * vms_tgoto(char * id, int col, int row);
+char * vms_tgoto(const char *id, int col, int row);
 
 int vms_tgetnum(char * id);
 

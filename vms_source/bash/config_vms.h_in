@@ -54,9 +54,13 @@
 #undef HAVE_FNMATCH
 #endif
 
+/* We actually do have mempcpy() with the new C RTL. */
+#if __CRTL_VER >= 80500000
+#define HAVE_MEMPCPY 1
+#endif
+
 /* use fast unlocked inline file functions */
 #define __STDIO_UNLOCK_CHAR_IO 1
-#define __UNIX_PUTC 1
 
 /* defines a macro so that existing files always get UNIX file attributes */
 #define __UNIX_FOPEN 1
@@ -73,18 +77,6 @@
 #define LOCALEDIR "/usr/share/locale"
 #define LOCALE_ALIAS_PATH "/usr/share/locale"
 #define CONF_OSTYPE "vms"
-
-/* command.h needs pid.t in inlib.def, and nothing includes this */
-#include <unistd.h>
-
-/* Missing from [.lib.sh]unicode.c */
-/* #include <langinfo.h> */
-/* BUG: unicode.c is missing code to support nl_langinfo */
-#ifdef HAVE_NL_LANGINFO
-#undef HAVE_NL_LANGINFO
-#endif
-
-#define alloca __ALLOCA
 
 /* Missing from nojobs.c */
 #ifndef SA_RESTART
@@ -135,3 +127,18 @@ void bash_unsetenv(const char * __name);
 
 /* Get rid of a implicit function diagnostic. */
 void v_set_pid_list_vms_pid (pid_t, pid_t);
+
+/* These C library functions aren't defined for the C++ compiler. */
+#if defined(__cplusplus)
+
+#include <stdint.h>
+
+extern "C" {
+
+intmax_t strtoimax(const char *__nptr, char **__endptr, int __base);
+uintmax_t strtoumax(const char *__nptr, char **__endptr, int __base);
+int isblank(int);
+
+}
+
+#endif  /* __cplusplus */

@@ -33,8 +33,6 @@
 /* Maximum fake CD values for special handling */
 #define GNV_ICONV_MAX_SELF_CD 8192
 
-#pragma message save
-#pragma message disable multichar
 
 static char * vms_iconv_charset_sub(const char * charset, int *malloc_flag)
 {
@@ -97,7 +95,7 @@ int result_len;
     case 'ISO-':
     case 'DEC-':
 	result_len = strlen(charset) - 1;
-	result = malloc(result_len);
+	result = (char *)malloc(result_len);
 	if (result == NULL) {
 	    return (char *)charset;
 	}
@@ -168,7 +166,6 @@ int result_len;
 	return -1;
     }
 }
-#pragma message restore
 
 iconv_t libintl_vms_iconv_open
 	(const char *tocode, const char * fromcode)
@@ -421,7 +418,7 @@ size_t libintl_vms_iconv
 	/* Did all the input get transfered? */
 	if (in_left > out_left) {
 	    errno = E2BIG;
-	    return -1;
+	    return (size_t)-1;
 	}
 	return ret_stat;
       }

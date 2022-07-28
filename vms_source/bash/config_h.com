@@ -636,14 +636,6 @@ $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
 $!
-$	if key2 .eqs. "NAMED_PIPES_MISSING"
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' 1"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
 $	if key2 .eqs. "OPENDIR_NOT_ROBUST"
 $	then
 $	    write tf "#ifndef ''key2'"
@@ -772,14 +764,10 @@ $	    write tf "#define ''key2' 1"
 $	    write tf "#endif"
 $	    goto cfgh_in_loop1
 $	endif
-$!
-$	if key2 .eqs. "STRCOLL_BROKEN"
-$	then
-$	    write tf "#ifndef ''key2'"
-$	    write tf "#define ''key2' 1"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
+$
+$! Note: strcoll() *is* broken (case-sensitive), but because the fallback
+$! code path in bash just uses strcmp(), we're likely better off saying that
+$! strcoll() does work, and then fall back to strcmp() if needed.
 $!
 $	if key2 .eqs. "DUP_BROKEN"
 $	then
@@ -1924,9 +1912,7 @@ $if P1 .nes. "NOBUILTINS"
 $then
 $   write tf " /* Allow compiler builtins */"
 $   write tf "/*-------------------------*/"
-$   write tf "#ifdef __DECC_VER"
 $   write tf "#include <non_existant_dir:builtins.h>"
-$   write tf "#endif"
 $endif
 $!
 $write tf ""
@@ -1938,7 +1924,7 @@ $write_config_h_tail:
 $write tf ""
 $write tf " /* Include the hand customized settings */"
 $write tf "/*--------------------------------------*/"
-$write tf "#include ""sys$disk:config_vms.h"""
+$write tf "#include ""config_vms.h"""
 $write tf ""
 $write tf "#endif /* CONFIG_H */"
 $close tf

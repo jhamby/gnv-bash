@@ -90,7 +90,7 @@ char * vms_get_foreign_cmd(const char * exec_name) {
     name_desc.dsc$b_dtype = DSC$K_DTYPE_T;
     name_desc.dsc$b_class = DSC$K_CLASS_S;
 
-    value = malloc(MAX_DCL_SYMBOL_VALUE + 1);
+    value = (char *)malloc(MAX_DCL_SYMBOL_VALUE + 1);
     if (value == NULL) {
         save_errno = errno;
         free(clean_name);

@@ -31,18 +31,11 @@
 #include <vms_sys_library/stdio.h>
 #include <vms_sys_library/unixlib.h>
 
-#pragma message disable questcompare
-#ifndef __VAX
 #define VMS_MAX_PATH 4097
-#pragma extern_prefix NOCRTL (getcwd)
-#else
-#define VMS_MAX_PATH 255
-#endif
 
-char * vms_to_unix(const char * vms_spec) {
+char *vms_to_unix(const char *vms_spec) {
     char *unix_spec = NULL;
     char *unix_spec2;
-#ifndef __VAX
     char *vms_spec2;
     char dir_delim;
     struct dsc$descriptor_s dev_desc;
@@ -68,11 +61,11 @@ char * vms_to_unix(const char * vms_spec) {
     dev_desc.dsc$b_class = DSC$K_CLASS_S;
     dev_desc.dsc$w_length = 0;
     if (dir_strt != NULL) {
-        int dev_len;
-        dev_desc.dsc$w_length  = dir_strt - vms_spec - 1;
-        if (dev_desc.dsc$w_length < 0) {
-            dev_desc.dsc$w_length = 0;
+        int dev_len = dir_strt - vms_spec - 1;
+        if (dev_len < 0) {
+            dev_len = 0;
         }
+        dev_desc.dsc$w_length = dev_len;
     }
     /* Worst case parse: [1,2,3.12345][4,5,6.12345] */
     if ((*dir_strt == '[') || (*dir_strt == '<')) {
@@ -108,7 +101,7 @@ char * vms_to_unix(const char * vms_spec) {
 
             sscanf(dir_strt, "%d,%d,%d", &did[0], &did[1], &did[2]);
 
-            vms_spec2 = malloc(VMS_MAX_PATH);
+            vms_spec2 = (char *)malloc(VMS_MAX_PATH);
             if (vms_spec2 == NULL)
                 return vms_spec2;
 
@@ -151,7 +144,7 @@ char * vms_to_unix(const char * vms_spec) {
 
                 /* Now we have three components to deal with */
                 /* device name, directory base, and subdirs */
-                unix_spec = malloc(VMS_MAX_PATH);
+                unix_spec = (char *)malloc(VMS_MAX_PATH);
                 unix_spec2 = decc$translate_vms(vms_spec2);
                 if (unix_spec2 <= (char *) 0) {
                     free(unix_spec);
@@ -184,8 +177,6 @@ char * vms_to_unix(const char * vms_spec) {
             free(vms_spec2);
         }
     }
-#endif
-    /* TODO VAX ODS2/NFS/PATHWORKS code */
 
     /* We either could not parse it or did not find a DID */
     /* Punt it back to decc$translate_vms with a malloced buffer */
