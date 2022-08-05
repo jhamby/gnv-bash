@@ -1531,35 +1531,6 @@ $	    gosub comment_out_xline
 $	    goto cfgh_in_loop1
 $	endif
 $!
-$!
-$!	Process STATFS directives
-$!-------------------------------
-$!	if key2a .eqs. "STATFS"
-$!	then
-$!	    gosub comment_out_xline
-$!	    goto cfgh_in_loop1
-$!	endif
-$!
-$!	Process inline directive
-$!------------------------------
-$	if key2 .eqs. "inline"
-$	then
-$	    write tf "#ifndef inline"
-$	    write tf "#define inline __inline"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
-$!	Process restrict directive
-$!--------------------------------
-$	if key2 .eqs. "restrict"
-$	then
-$	    write tf "#ifndef restrict"
-$	    write tf "#define restrict __restrict"
-$	    write tf "#endif"
-$	    goto cfgh_in_loop1
-$	endif
-$!
 $!	Process RETSIGTYPE and GETTIMEOFDAY_TIMEZONE directive
 $!------------------------------------------------------------
 $	if key2 .eqs. "RETSIGTYPE" .or. key2 .eqs. "GETTIMEOFDAY_TIMEZONE"

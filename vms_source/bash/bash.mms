@@ -56,14 +56,13 @@
 #
 #===================================================================
 crepository = /repo=lcl_root:[bash.cxx_repository]
-cnames = /name=(as_i,shor)$(crepository)/fl=ieee/ieee=denorm
+cnames = /name=(as_i,shor)$(crepository)/fl=ieee/ieee=denorm/stand=latest/nopure
 clist = /list
-cprefix = /pref=all
-cnowarn = missingreturn,conptrlosbit
-cwarn = /warnings=(disable=($(cnowarn)))
+cprefix = /pref=all/main=posix
+cnowarn = missingreturn,conptrlosbit,dollarid
+cwarn = /warnings=(disable=($(cnowarn)))/undef=(__HIDE_FORBIDDEN_NAMES)
 #cinc1 = prj_root:[],prj_root:[.include],prj_root:[.lib.intl],prj_root:[.lib.sh]
-cinc2 = /nested=none/Opt=(Lev=5)
-cinc = $(cinc2)
+cinc = /nested=none/Opt=(Lev=5)
 #
 # Force the status of the HAVE_REGEX_H, HAVE_REGCOMP, and HAVE_REGEXEC macros on
 # VMS so that HAVE_POSIX_REGEXP is indirectly forced which will in turn set the
@@ -71,10 +70,11 @@ cinc = $(cinc2)
 # via [.lib.sh]shmatch.c. Note that this cannot be done via config_h.com because
 # configure does not have tests for these macros; So they must be manually set.
 #
-cdefs = /define=(VMS=1,_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,HAVE_REGEX_H=1,\
-HAVE_REGCOMP=1,HAVE_REGEXEC=1,__POSIX_TTYNAME=1)/noexceptions/nortti
+cdefs1 = _USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,__POSIX_TTYNAME=1,\
+	 __DECC,__STDC_VERSION__=199901L
+cdefs = /define=(VMS=1,$(cdefs1),HAVE_REGEX_H=1,HAVE_REGCOMP=1,HAVE_REGEXEC=1)
 cflags = $(cnames)/debu$(clist)$(cprefix)$(cwarn)$(cinc)$(cdefs)
-cflagsx = $(cnames)/debu$(clist)$(cprefix)$(cwarn)$(cinc2)
+cflagsx = $(cnames)/debu$(clist)$(cprefix)$(cwarn)$(cinc)
 
 #
 # TPU symbols
@@ -1095,8 +1095,7 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
    $define/user cxx$system_include prj_root:[]
    $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
-   $(CC)$(cflagsx)/define=(MODULE_READLINE=1,_USE_STD_STAT=1,_POSIX_EXIT=1,\
-	HAVE_CONFIG_H=1,SHELL=1)\
+   $(CC)$(cflagsx)/define=(MODULE_READLINE=1,$(cdefs1),SHELL=1)\
 	/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
 
 [.lib.readline]rltty.obj : [.lib.readline]rltty.c  $(config_h) \
@@ -1108,8 +1107,7 @@ vi_keymap_c = [.lib.readline]vi_keymap.c $(readline_readline_h)
    $define/user cxx$system_include prj_root:[]
    $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
-   $(CC)$(cflagsx)/define=(MODULE_RLTTY=1,_USE_STD_STAT=1,_POSIX_EXIT=1,\
-	HAVE_CONFIG_H=1,SHELL=1)\
+   $(CC)$(cflagsx)/define=(MODULE_RLTTY=1,$(cdefs1),SHELL=1)\
 	/OBJ=$(MMS$TARGET) $(MMS$SOURCE)
 
 [.lib.readline]savestring.obj : [.lib.readline]savestring.c $(config_h) \
@@ -1261,8 +1259,7 @@ lcl_root:[.lib.intl]dcigettext.c : src_root:[.lib.intl]dcigettext.c \
    $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
-   $(CC)$(cflagsx)/define=\
-	(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,IN_LIBINTL=1) \
+   $(CC)$(cflagsx)/define=(_USE_STD_STAT=1,$(cdefs1),IN_LIBINTL=1) \
 	/OBJ=$(MMS$TARGET) \
 	/first_include=[.lib.intl]gnv$dcigettext.c_first $(MMS$SOURCE)
 
@@ -1392,9 +1389,7 @@ libbuiltins.olb : libbuiltins($(libbuiltins_objs))
    $define/user readline prj_root:[-.lib.readline]
    $define/user glob prj_root:[-.lib.glob]
    $define/user tilde prj_root:[-.lib.tilde]
-   $(CC)$(cflagsx)/define=\
-	(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1)\
-	/first_include=gnv$common.c_first \
+   $(CC)$(cflags)/first_include=gnv$common.c_first \
 	/OBJ=common.obj common.c
    $set def prj_root:[-]
 
@@ -1463,8 +1458,7 @@ lcl_root:[.builtins]mkbuiltins.c : src_root:[.builtins]mkbuiltins.c \
    $define/user cxx$system_include prj_root:[-],PRJ_ROOT:[-.include]
    $(CC)$(cflagsx) \
 	/OBJ=mkbuiltins.obj mkbuiltins.c \
-	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,\
-	MODULE_MKBUILTINS=1)
+	/define=(_USE_STD_STAT=1,$(cdefs1),MODULE_MKBUILTINS=1)
    $set def prj_root:[-]
 
 [.builtins]alias.c : [.builtins]alias.def, [.builtins]mkbuiltins.exe
@@ -2164,8 +2158,7 @@ execute_cmd.obj : lcl_root:execute_cmd.c $(config_h) \
    $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/OBJ=$(MMS$TARGET) $(MMS$SOURCE) \
-	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_REGEX_H=1,HAVE_CONFIG_H=1,\
-	HAVE_REGCOMP=1,HAVE_REGEXEC=1, MODULE_EXECUTE_CMD=1)
+	/define=($(cdefs1),MODULE_EXECUTE_CMD=1)
 
 expr.obj : expr.c $(config_h) $(bashansi_h) [.include]chartypes.h \
 		$(bashintl_h)  $(shell_h)
@@ -2246,9 +2239,7 @@ mailcheck.obj : mailcheck.c $(config_h) bashtypes.h [.include]posixstat.h \
    $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
-   $(CC)$(cflagsx)/define=\
-	(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1) \
-	/first_include=gnv$mailcheck.c_first \
+   $(CC)$(cflags)/first_include=gnv$mailcheck.c_first \
 	/OBJ=mailcheck.obj mailcheck.c
 
 make_cmd.obj : make_cmd.c $(config_h) bashtypes.h [.include]filecntl.h \
@@ -2280,8 +2271,7 @@ print_cmd.obj : print_cmd.c $(config_h) $(bashansi_h) $(bashintl_h) \
    $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh]
    $(CC)$(cflagsx)/OBJ=$(MMS$TARGET) $(MMS$SOURCE) \
-	/define=(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1,\
-	MODULE_PRINT_CMD=1)
+	/define=($(cdefs1),MODULE_PRINT_CMD=1)
 
 redir.obj : redir.c $(config_h) bashtypes.h [.include]filecntl.h \
 		[.include]posixstat.h $(bashansi_h) $(bashintl_h) \
@@ -2310,9 +2300,7 @@ shell.obj : lcl_root:shell.c $(config_h) bashtypes.h [.include]posixstat.h \
    $define/user cxx$user_include prj_root:[],prj_root:[.include],\
 	prj_root:[.lib.readline],prj_root:[.lib.intl],prj_root:[.lib.sh],\
 	prj_root:[.lib.glob]
-   $(CC)$(cflagsx)/define=\
-	(_USE_STD_STAT=1,_POSIX_EXIT=1,HAVE_CONFIG_H=1) \
-	/first_include=gnv$shell.c_first \
+   $(CC)$(cflags)/first_include=gnv$shell.c_first \
 	/OBJ=shell.obj lcl_root:shell.c
 
 #lcl_root:sig.h : src_root:sig.h sig_h.tpu
@@ -2394,11 +2382,11 @@ decw_showdisplay.obj : decw_showdisplay.c
 #	[.builtins]common.h [.builtins]builtext.h $(trap_h)
 
 vms_crtl_init.obj : vms_crtl_init.c
-	$(CC)$(cflagsx) \
+	$(CC)$(cflags) \
 	/object=$(MMS$TARGET) $(MMS$SOURCE)
 
 vms_crtl_values.obj : vms_crtl_values.c
-	$(CC)$(cflagsx) \
+	$(CC)$(cflags) \
 	/object=$(MMS$TARGET) $(MMS$SOURCE)
 
 gnv$bash.exe : $(bash_objs) \

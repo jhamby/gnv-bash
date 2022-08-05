@@ -76,10 +76,6 @@ extern int locale_utf8locale;	/* XXX */
 #define MBLEN(s, n)		1
 #define MBRLEN(s, n, p)		1
 
-#ifndef wchar_t
-#  define wchar_t	int
-#endif
-
 #define UTF8_SINGLEBYTE(c)	(1)
 #define UTF8_MBFIRSTCHAR(c)	(0)
 

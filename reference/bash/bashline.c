@@ -115,8 +115,10 @@ extern int tputs (const char *string, int nlines, int (*outx(int)));
 
 /* Forward declarations */
 
+extern "C" {
+
 /* Functions bound to keys in Readline for Bash users. */
-static int shell_expand_line (int, int);
+int shell_expand_line (int, int);
 static int display_shell_version (int, int);
 
 static int bash_ignore_filenames (char **);
@@ -125,8 +127,8 @@ static int bash_progcomp_ignore_filenames (char **);
 
 #if defined (BANG_HISTORY)
 static char *history_expand_line_internal (char *);
-static int history_expand_line (int, int);
-static int tcsh_magic_space (int, int);
+int history_expand_line (int, int);
+int tcsh_magic_space (int, int);
 #endif /* BANG_HISTORY */
 #ifdef ALIAS
 static int alias_expand_line (int, int);
@@ -267,6 +269,8 @@ static int vi_edit_and_execute_command (int, int);
 static int bash_vi_complete (int, int);
 #endif
 static int emacs_edit_and_execute_command (int, int);
+
+} // extern "C"
 
 /* Non-zero once initialize_readline () has been called. */
 bool bash_readline_initialized = false;

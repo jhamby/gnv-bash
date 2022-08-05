@@ -89,32 +89,6 @@
 /* Need to use our lstat/stat/rmdir, etc routines. */
 #include "vms_lstat_hack.h"
 
-/* Ensure command.h is included for WORD_DESC and WORD_LIST. */
-#include "command.h"
-
-/* Need to use the getenv() and friends supplied by bash */
-#define getenv decc_getenv
-#define putenv decc_putenv
-#define setenv decc_setenv
-#define unsetenv decc_unsetenv
-#include <stdlib.h>
-#undef getenv
-#undef putenv
-#undef setenv
-#undef unsetenv
-
-#define getenv bash_getenv
-char *bash_getenv(const char * __name);
-
-#define putenv bash_putenv
-int bash_putenv(const char * __name);
-
-#define setenv bash_setenv
-int bash_setenv(const char * __name, const char * __value, int __overwrite);
-
-#define unsetenv bash_unsetenv
-void bash_unsetenv(const char * __name);
-
 /* Set the default mail directory for VMS */
 #ifdef DEFAULT_MAIL_DIRECTORY
 #undef DEFAULT_MAIL_DIRECTORY
@@ -127,18 +101,3 @@ void bash_unsetenv(const char * __name);
 
 /* Get rid of a implicit function diagnostic. */
 void v_set_pid_list_vms_pid (pid_t, pid_t);
-
-/* These C library functions aren't defined for the C++ compiler. */
-#if defined(__cplusplus)
-
-#include <stdint.h>
-
-extern "C" {
-
-intmax_t strtoimax(const char *__nptr, char **__endptr, int __base);
-uintmax_t strtoumax(const char *__nptr, char **__endptr, int __base);
-int isblank(int);
-
-}
-
-#endif  /* __cplusplus */

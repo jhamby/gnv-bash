@@ -25,21 +25,17 @@
 
 #include "stdc.h"
 
-#include <signal.h>		/* for sig_atomic_t */
+#include <csignal>		/* for sig_atomic_t */
 
 #if !defined (SIGABRT) && defined (SIGIOT)
 #  define SIGABRT SIGIOT
 #endif
 
-#define sighandler RETSIGTYPE
-typedef RETSIGTYPE SigHandler (int);
+#define sighandler void
+typedef void SigHandler (int);
 
-/* Note: the VOID_SIGHANDLER autoconf test fails in C++. */
-#if defined (VOID_SIGHANDLER) || defined(__cplusplus)
-#  define SIGRETURN(n)	return
-#else
-#  define SIGRETURN(n)	return(n)
-#endif /* !VOID_SIGHANDLER */
+/* Always returns void. */
+#define SIGRETURN(n)	return
 
 /* Here is a definition for set_signal_handler () which simply expands to
    a call to signal () for non-Posix systems.  The code for set_signal_handler

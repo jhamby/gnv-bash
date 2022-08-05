@@ -193,7 +193,7 @@ char hist_verify;
 char dont_save_function_defs;
 
 #if defined (BANG_HISTORY)
-static int bash_history_inhibit_expansion (char *, int);	/* rl_linebuf_func_t */
+extern "C" int bash_history_inhibit_expansion (char *, int);	/* rl_linebuf_func_t */
 #endif
 #if defined (READLINE)
 static void re_edit (const char *);
@@ -208,7 +208,7 @@ static bool history_should_ignore (const char *);
 #if defined (BANG_HISTORY)
 /* Is the history expansion starting at string[i] one that should not
    be expanded? */
-static int
+int
 bash_history_inhibit_expansion (char *string, int i)
 {
   int t, si;

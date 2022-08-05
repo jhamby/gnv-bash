@@ -20,29 +20,24 @@
  *
  */
 
-#define chdir hide_chdir
-#define delete hide_delete  /* delete() not used but conflicts with tr.c */
+//#define chdir hide_chdir
+//#define delete hide_delete  /* delete() not used but conflicts with tr.c */
 
-#include <vms_fake_path/stat.h>
-#include <vms_fake_path/stdlib.h>
-#include <vms_fake_path/unixlib.h>
-#include <vms_fake_path/unistd.h>
-#include <vms_fake_path/string.h>
-#include <vms_fake_path/errno.h>
-#include <vms_fake_path/unixio.h>
-#undef lstat
-#undef unlink
-#undef readlink
-#undef chdir
-#undef delete
-#include <vms_fake_path/stdio.h>
+#include <sys/stat.h>
+#include <cstdlib>
+#include <unixlib.h>
+#include <sys/unistd.h>
+#include <cstring>
+#include <cerrno>
+#include <unixio.h>
+#include <cstdio>
+
 #include <descrip.h>
 #include <libfildef.h>
 #include <dscdef.h>
 #include <stsdef.h>
-#include <vms_fake_path/errno.h>
 
-int decc$chdir(const char *__dir_spec, ...);
+// int decc$chdir(const char *__dir_spec, ...);
 
 #define VMS_LSH_FNAME_LEN 4096
 
@@ -55,8 +50,8 @@ static int vms_lstat(const char * name, struct stat * st) {
     int cmp;
 
     /* check for bare filename bug */
-    slash = strchr(name, '/');
-    pathlen = strlen(name);
+    slash = std::strchr(name, '/');
+    pathlen = std::strlen(name);
 
     cmp = 1;
     if (slash == NULL) {
@@ -66,7 +61,7 @@ static int vms_lstat(const char * name, struct stat * st) {
             /* also check for ".dir" bug */
             int i;
             i = pathlen - 4;
-            cmp = strcasecmp(".dir", &name[i]);
+            cmp = ::strcasecmp(".dir", &name[i]);
             if (cmp == 1) {
                 slash = NULL;
             }
@@ -75,32 +70,33 @@ static int vms_lstat(const char * name, struct stat * st) {
 
     if (cmp == 0) {
         char * newpath;
-        newpath = (char *)malloc(pathlen + 3);
+        newpath = (char *)std::malloc(pathlen + 3);
         if (newpath == NULL) {
             return -1;
         }
         if (slash == NULL) {
-            strcpy(newpath, "./");
-            strcat(newpath, name);
+            std::strcpy(newpath, "./");
+            std::strcat(newpath, name);
         } else {
-            strcpy(newpath, name);
-            strcat(newpath, "/.");
+            std::strcpy(newpath, name);
+            std::strcat(newpath, "/.");
         }
-        result = lstat(newpath, st);
-        free(newpath);
+        result = ::lstat(newpath, st);
+        std::free(newpath);
         if (result == 0) {
             return result;
         }
     }
 
-    result = lstat(name, st);
+    result = ::lstat(name, st);
 
+#if 0
     /* lstat not handling relative link to self or some directories */
     if ((result >= 0) && (!S_ISDIR(st->st_mode))) {
         return result;
     }
-    /* Error?  May be a bug so try again */
 
+    /* Error?  May be a bug so try again */
     /* Save the PCP mode */
 #if (__CRTL_VER >= 80300000)
     pcp_mode = decc$feature_get("DECC$POSIX_COMPLIANT_PATHNAMES",
@@ -128,19 +124,20 @@ static int vms_lstat(const char * name, struct stat * st) {
         }
     }
 #endif
+#endif
 
     return result;
 }
 
 static int do_exe_stat(const char *path, struct stat *buf) {
-   char *exepath = (char *)malloc(strlen(path) + 5);
+   char *exepath = (char *)std::malloc(std::strlen(path) + 5);
    int retvalue;
 
    if (exepath != NULL) {
-      strcpy(exepath, path);
-      strcat(exepath, ".exe");
-      retvalue = stat(exepath, buf);
-      free(exepath);
+      std::strcpy(exepath, path);
+      std::strcat(exepath, ".exe");
+      retvalue = ::stat(exepath, buf);
+      std::free(exepath);
    } else {
       retvalue = -1;
    }
@@ -154,8 +151,8 @@ static int vms_stat(const char * name, struct stat * st) {
     int cmp;
 
     /* check for bare filename bug */
-    slash = strchr(name, '/');
-    pathlen = strlen(name);
+    slash = std::strchr(name, '/');
+    pathlen = std::strlen(name);
 
     cmp = 1;
     if (slash == NULL) {
@@ -165,7 +162,7 @@ static int vms_stat(const char * name, struct stat * st) {
             /* also check for ".dir" bug */
             int i;
             i = pathlen - 4;
-            cmp = strcasecmp(".dir", &name[i]);
+            cmp = ::strcasecmp(".dir", &name[i]);
             if (cmp == 1) {
                 slash = NULL;
             }
@@ -175,25 +172,25 @@ static int vms_stat(const char * name, struct stat * st) {
     /* Either special case */
     if (cmp == 0) {
         char * newpath;
-        newpath = (char *)malloc(pathlen + 3);
+        newpath = (char *)std::malloc(pathlen + 3);
         if (newpath == NULL) {
             return -1;
         }
         if (slash == NULL) {
-            strcpy(newpath, "./");
-            strcat(newpath, name);
+            std::strcpy(newpath, "./");
+            std::strcat(newpath, name);
         } else {
-            strcpy(newpath, name);
-            strcat(newpath, "/.");
+            std::strcpy(newpath, name);
+            std::strcat(newpath, "/.");
         }
-        result = stat(newpath, st);
-        free(newpath);
+        result = ::stat(newpath, st);
+        std::free(newpath);
         if (result == 0) {
             return result;
         }
     }
 
-    result = stat(name, st);
+    result = ::stat(name, st);
 
     /* Retry to see if an executable is present */
     if (result == -1) {
@@ -201,10 +198,10 @@ static int vms_stat(const char * name, struct stat * st) {
         char *dotptr = NULL;
 
         if (errno == ENOENT) {
-            if ((dotptr = strrchr(name, '.')) == NULL) {
+            if ((dotptr = std::strrchr(name, '.')) == NULL) {
                 result = do_exe_stat(name, st);
             } else {
-                if (((slashptr = strrchr(name, '/')) != NULL) &&
+                if (((slashptr = std::strrchr(name, '/')) != NULL) &&
                     (dotptr < slashptr)) {
 
                     result = do_exe_stat(name, st);
@@ -221,29 +218,28 @@ static int vms_unlink(const char * name) {
     int pathlen;
 
     /* First check for ".dir" bug */
-    pathlen = strlen(name);
+    pathlen = std::strlen(name);
     if (pathlen > 4) {
         int i, cmp;
         char * newpath;
 
         i = pathlen - 4;
-        cmp = strcasecmp(".dir", &name[i]);
+        cmp = ::strcasecmp(".dir", &name[i]);
         if (cmp == 0) {
-            newpath = (char *)malloc(pathlen + 3);
+            newpath = (char *)std::malloc(pathlen + 3);
             if (newpath == NULL) {
                 return -1;
             }
-            strcpy(newpath, name);
-            strcat(newpath, "/.");
-            result = unlink(newpath);
-            free(newpath);
+            std::strcpy(newpath, name);
+            std::strcat(newpath, "/.");
+            result = ::unlink(newpath);
+            std::free(newpath);
             if (result == 0) {
                 return result;
             }
         }
     }
-
-
+#if 0
     /* Save the PCP mode */
 #if (__CRTL_VER >= 80300000)
     pcp_mode = decc$feature_get("DECC$POSIX_COMPLIANT_PATHNAMES",
@@ -267,10 +263,12 @@ static int vms_unlink(const char * name) {
     /* Error?  May be a bug so try again */
 #endif
     result = unlink(name);
+#endif
 
     return result;
 }
 
+#if 0
 static int vms_readlink(const char * path, char *buf, size_t bufsize) {
     int result;
     int pcp_mode;
@@ -303,8 +301,9 @@ static int vms_readlink(const char * path, char *buf, size_t bufsize) {
 #endif
     return result;
 }
+#endif
 
-int  decc$access (const char *__file_spec, int __mode);
+//int  decc$access (const char *__file_spec, int __mode);
 
 static int vms_access_root (const char *file_spec, int mode) {
 int result;
@@ -319,13 +318,13 @@ gid_t maxsysgroup;
 
     /* First try the access() routine to see if it works */
 
-    result = decc$access(file_spec, mode);
+    result = ::access(file_spec, mode);
     if (result == 0) {
         return result;
     }
 
     /* The access() routine fails for the root directories */
-    stat_result = stat(file_spec, &st);
+    stat_result = ::stat(file_spec, &st);
     if (stat_result < 0) {
         /* If stat fails, return original access status */
         return result;
@@ -335,8 +334,8 @@ gid_t maxsysgroup;
         return result;
     }
 
-    my_gid = getgid();
-    my_uid = getuid();
+    my_gid = ::getgid();
+    my_uid = ::getuid();
     result = 0;
     x_mask = S_IXOTH;
     w_mask = S_IWOTH;
@@ -372,7 +371,7 @@ gid_t maxsysgroup;
         }
     }
 
-return result;
+    return result;
 }
 
 static int vms_access(const char * file, int mode) {
@@ -383,8 +382,8 @@ static int vms_access(const char * file, int mode) {
     int cmp;
 
     /* check for bare filename bug */
-    slash = strchr(file, '/');
-    pathlen = strlen(file);
+    slash = std::strchr(file, '/');
+    pathlen = std::strlen(file);
 
     cmp = 1;
     if (slash == NULL) {
@@ -394,29 +393,29 @@ static int vms_access(const char * file, int mode) {
             /* also check for ".dir" bug */
             int i;
             i = pathlen - 4;
-            cmp = strcasecmp(".dir", &file[i]);
+            cmp = ::strcasecmp(".dir", &file[i]);
             if (cmp == 1) {
                 slash = NULL;
             }
         }
     }
 
-    pathlen = strlen(file);
+    pathlen = std::strlen(file);
     if (cmp ==  0) {
         char * newpath;
-        newpath = (char *)malloc(pathlen + 3);
+        newpath = (char *)std::malloc(pathlen + 3);
         if (newpath == NULL) {
             return -1;
         }
         if (slash == NULL) {
-            strcpy(newpath, "./");
-            strcat(newpath, file);
+            std::strcpy(newpath, "./");
+            std::strcat(newpath, file);
         } else {
-            strcpy(newpath, file);
-            strcat(newpath, "/.");
+            std::strcpy(newpath, file);
+            std::strcat(newpath, "/.");
         }
         result = vms_access_root(newpath, mode);
-        free(newpath);
+        std::free(newpath);
         if (result == 0) {
             return result;
         }
@@ -439,43 +438,36 @@ static char transpath[VMS_LSH_FNAME_LEN - 1];
 static int
 to_vms_action (char * vms_spec, int flag, char * transpath_parm)
 {
-  strncpy (transpath, vms_spec, VMS_LSH_FNAME_LEN -2);
+  std::strncpy (transpath, vms_spec, VMS_LSH_FNAME_LEN -2);
   transpath[VMS_LSH_FNAME_LEN - 2] = 0;
   return 0;
 }
-
-#ifdef __DECC
-# pragma message save
-  /* Undocumented extra parameter use triggers a ptrmismatch warning */
-# pragma message disable ptrmismatch
-#endif
-
 
 static int vms_chdir(const char * file) {
     int result;
     int pathlen;
 
-    pathlen = strlen(file);
+    pathlen = std::strlen(file);
     if (pathlen > 4) {
         int i, cmp;
         char * newpath;
 
         i = pathlen - 4;
-        cmp = strcasecmp(".dir", &file[i]);
+        cmp = ::strcasecmp(".dir", &file[i]);
         if (cmp == 0) {
-            newpath = (char *)malloc(pathlen + 3);
+            newpath = (char *)std::malloc(pathlen + 3);
             if (newpath == NULL) {
                 return -1;
             }
-            strcpy(newpath, file);
-            strcat(newpath, "/.");
-            result = decc$chdir(newpath);
-            free(newpath);
+            std::strcpy(newpath, file);
+            std::strcat(newpath, "/.");
+            result = ::chdir(newpath);
+            std::free(newpath);
             return result;
         }
     }
 
-    result = decc$chdir(file);
+    result = ::chdir(file);
     return result;
 }
 
@@ -483,27 +475,27 @@ static int vms_mkdir(const char * file, mode_t mode) {
     int result;
     int pathlen;
 
-    pathlen = strlen(file);
+    pathlen = std::strlen(file);
     if (pathlen > 4) {
         int i, cmp;
         char * newpath;
 
         i = pathlen - 4;
-        cmp = strcasecmp(".dir", &file[i]);
+        cmp = ::strcasecmp(".dir", &file[i]);
         if (cmp == 0) {
-            newpath = (char *)malloc(pathlen + 3);
+            newpath = (char *)std::malloc(pathlen + 3);
             if (newpath == NULL) {
                 return -1;
             }
-            strcpy(newpath, file);
-            strcat(newpath, "/.");
-            result = mkdir(newpath, mode);
-            free(newpath);
+            std::strcpy(newpath, file);
+            std::strcat(newpath, "/.");
+            result = ::mkdir(newpath, mode);
+            std::free(newpath);
             return result;
         }
     }
 
-    result = mkdir(file, mode);
+    result = ::mkdir(file, mode);
     return result;
 }
 
@@ -519,7 +511,7 @@ static int tovms_rmdir(const char * unix_dir) {
     int dir_len;
     char vms_dir[VMS_LSH_FNAME_LEN + 1];
 
-    result = stat(".", &st);
+    result = ::stat(".", &st);
     if (result < 0) {
         if (errno == ENOENT) {
             return 0;  /* parent does not exist? */
@@ -535,8 +527,8 @@ static int tovms_rmdir(const char * unix_dir) {
         S_INO_NUM(st.st_ino);
     did[1] = S_INO_SEQ(st.st_ino);
     did[2] = S_INO_RVN_RVN(st.st_ino);
-    sprintf(vms_dir, "[%d,%d,%d]", did[0], did[1], did[2]);
-    dir_len = strlen(vms_dir);
+    std::sprintf(vms_dir, "[%d,%d,%d]", did[0], did[1], did[2]);
+    dir_len = std::strlen(vms_dir);
 
 #if (__CRTL_VER >= 80300000)
     int pcp_mode;
@@ -557,23 +549,23 @@ static int tovms_rmdir(const char * unix_dir) {
     }
 #if __CRTL_VER >= 70301000
     /* Current decc$to_vms is reentrant */
-    decc$to_vms (unix_dir, (int (*)(char *, int))to_vms_action, 0, 1, &vms_dir[dir_len]);
+    decc$to_vms (unix_dir, (__to_vms_callback)to_vms_action, 0, 1, &vms_dir[dir_len]);
 #else
     /* Older decc$to_vms is not reentrant */
     decc$to_vms (unix_dir, to_vms_action, 0, 1);
-    strncpy (&vms_dir[dir_len], transpath, VMS_LSH_FNAME_LEN - dir_len);
+    std::strncpy (&vms_dir[dir_len], transpath, VMS_LSH_FNAME_LEN - dir_len);
     vms_dir[VMS_LSH_FNAME_LEN] = 0;
 #endif
-    len = strlen(vms_dir);
+    len = std::strlen(vms_dir);
     if (len < (VMS_LSH_FNAME_LEN - 6)) {
-        strcat(vms_dir, ".dir;1");
+        std::strcat(vms_dir, ".dir;1");
     }
 
-    exists = access(vms_dir, F_OK);
+    exists = ::access(vms_dir, F_OK);
     if (exists != 0) {
         result = 0;
     } else {
-        result = unlink(vms_dir);
+        result = ::unlink(vms_dir);
     }
     if (file_ux_only_mode > 0) {
         decc$feature_set("DECC$FILENAME_UNIX_ONLY",
@@ -588,39 +580,35 @@ static int tovms_rmdir(const char * unix_dir) {
     return result;
 }
 
-#ifdef __DECC
-# pragma message restore
-#endif
-
 static int vms_rmdir(const char * file) {
     int result;
     int pathlen;
 
-    pathlen = strlen(file);
+    pathlen = std::strlen(file);
     if (pathlen > 4) {
         int i, cmp;
         char * newpath;
 
         i = pathlen - 4;
-        cmp = strcasecmp(".dir", &file[i]);
+        cmp = ::strcasecmp(".dir", &file[i]);
         if (cmp == 0) {
-            newpath = (char *)malloc(pathlen + 3);
+            newpath = (char *)std::malloc(pathlen + 3);
             if (newpath == NULL) {
                 return -1;
             }
-            strcpy(newpath, file);
-            strcat(newpath, "/.");
-            result = rmdir(newpath);
-            free(newpath);
+            std::strcpy(newpath, file);
+            std::strcat(newpath, "/.");
+            result = ::rmdir(newpath);
+            std::free(newpath);
             return result;
         }
     }
 
-    result = rmdir(file);
+    result = ::rmdir(file);
     if (result != 0) {
         /* helper for unlinkat */
         char * slash;
-        slash = strchr(file, '/');
+        slash = std::strchr(file, '/');
         if (slash == NULL) {
             result = tovms_rmdir(file);
         }
@@ -632,7 +620,6 @@ static int vms_rmdir(const char * file) {
 #define lstat vms_lstat
 #define unlink vms_unlink
 #define remove vms_unlink
-#define readlink vms_readlink
 #define access vms_access
 #define chdir vms_chdir
 #define mkdir vms_mkdir
